@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.oscar.atestados.ui.theme.AtestadosTheme
+import com.oscar.atestados.ui.theme.BlueGray700
 import kotlinx.coroutines.delay
 import navigation.AppScrens
 
@@ -39,7 +41,7 @@ fun SplashScreen(navController: NavController) {
         navController.popBackStack()
         navController.navigate(AppScrens.MainScreen.route)
     }
-
+    BackgroundImage()
     Splash()
 
 }
@@ -48,16 +50,6 @@ fun SplashScreen(navController: NavController) {
 fun Splash() {
     AtestadosTheme(darkTheme = false, dynamicColor = false) {
         Box(modifier = Modifier.fillMaxSize()) { // Usamos Box para posicionar elementos libremente
-            /*Image(
-                painter = painterResource(id = R.drawable.escudo_parcial),
-                contentDescription = "",
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .fillMaxHeight() // La imagen ocupará todo el alto disponible
-                    .graphicsLayer(alpha = 0.1f)
-                    .fillMaxWidth()// Reducimos la opacidad al 20%
-            )*/
-
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -84,7 +76,7 @@ fun Splash() {
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(10.dp,),
-                    color = MaterialTheme.colorScheme.primary
+                    color = BlueGray700
                 )
 
                 Spacer(modifier = Modifier.height(30.dp)) // Espacio entre el texto y el indicador
@@ -101,10 +93,27 @@ fun Splash() {
     }
 }
 
+@Composable
+fun BackgroundImage(){
+    Box(modifier = Modifier.fillMaxSize()) { // Usamos Box para posicionar elementos libremente
+        Image(
+                painter = painterResource(id = R.drawable.escudo_parcial),
+                contentDescription = "",
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .align(Alignment.TopEnd)
+                    .graphicsLayer(alpha = 0.1f)
+                    //.fillMaxWidth()
+            )
+    }
+
+}
+
 
 @Preview(showBackground = true)
 @Composable
 fun SplashScreenPreview() {
+    BackgroundImage()
     Splash()
 
 }
