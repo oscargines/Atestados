@@ -1,11 +1,11 @@
-package navigation
+package com.oscar.atestados.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.oscar.atestados.MainScreen
-import com.oscar.atestados.SplashScreen
+import com.oscar.atestados.screens.MainScreen
+import com.oscar.atestados.screens.SplashScreen
 
 @Composable
 fun AppNavigation() {
@@ -18,6 +18,9 @@ fun AppNavigation() {
         composable(AppScrens.MainScreen.route){
             MainScreen()
 
+        }
+        composable(AppScrens.Alcolemia01Screen.route) {
+            AppScrens.Alcolemia01Screen()
         }
 
     }

@@ -29,3 +29,9 @@ val LightBlue800 = Color(0xFF0277BD)
 val White = Color(0xFFFFFFFF)
 val Black = Color(0xFF000000)
 val Transparent = Color(0x00000000)
+
+/*
+Colores utilizados para Screen de Componentes
+ */
+val PrimerComponenteColor = Color(0xFFC8E6C9) //Primer componente --> Green100
+val SegundoComponenteColor = Color(0xFFB3E5FC) //Segundo componente --> LightBlue100

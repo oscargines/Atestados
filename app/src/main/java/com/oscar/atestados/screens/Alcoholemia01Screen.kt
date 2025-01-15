@@ -1,4 +1,4 @@
-package com.oscar.atestados
+package com.oscar.atestados.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
