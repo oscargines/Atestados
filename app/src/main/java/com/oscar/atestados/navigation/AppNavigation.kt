@@ -19,9 +19,7 @@ fun AppNavigation() {
             MainScreen()
 
         }
-        composable(AppScrens.Alcolemia01Screen.route) {
-            AppScrens.Alcolemia01Screen()
-        }
+
 
     }
 }
