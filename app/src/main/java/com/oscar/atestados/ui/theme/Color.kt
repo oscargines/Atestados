@@ -25,6 +25,7 @@ val Brown800 = Color(0xFF4E342E)
 val Gray800 = Color(0xFF424242)
 val Orange800 = Color(0xFFEF6C00)
 val LightBlue800 = Color(0xFF0277BD)
+val Green800 = Color(0xFF2E7D32)
 
 val White = Color(0xFFFFFFFF)
 val Black = Color(0xFF000000)
@@ -35,3 +36,13 @@ Colores utilizados para Screen de Componentes
  */
 val PrimerComponenteColor = Color(0xFFC8E6C9) //Primer componente --> Green100
 val SegundoComponenteColor = Color(0xFFB3E5FC) //Segundo componente --> LightBlue100
+
+/*
+Colores a utilizar para las screen en general
+*/
+val BotonesNormales = BlueGray900
+val TextoBotonesNormales = BlueGray50
+val BotonesSecundarios = Green800
+val TextpBotonesSecundarios = BlueGray900
+val TextoNormales = BlueGray900
+val TextoSecundarios = BlueGray600

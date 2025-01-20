@@ -9,17 +9,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val LightColorScheme = lightColorScheme(
-    primary = BlueGray800,            // Color principal para elementos destacados
-    secondary = BlueGray400,          // Color secundario para elementos complementarios
-    tertiary = Orange800,             // Color terciario para elementos adicionales
-    onPrimary = White,                // Color del texto sobre colores principales
-    onSecondary = White,              // Color del texto sobre colores secundarios
-    onTertiary = White,               // Color del texto sobre colores terciarios
-    surfaceVariant = BlueGray900,     // Variante del color de superficie, útil para fondos secundarios
-    background = White,               // Fondo principal de la app
-    onBackground = Black,             // Color del texto sobre el fondo principal
-    surface = Color(0xFFEEEEEE), // Color de superficie, como tarjetas y diálogos
-    onSurface = Color.Black           // Color del texto sobre las superficies
+    primary = BlueGray800,                  // Color principal para elementos destacados
+    secondary = BlueGray400,                // Color secundario para elementos complementarios
+    tertiary = Orange800,                   // Color terciario para elementos adicionales
+    onPrimary = BlueGray50,                 // Color del texto sobre colores principales
+    onSecondary = BlueGray50,               // Color del texto sobre colores secundarios
+    onTertiary = BlueGray900,               // Color del texto sobre colores terciarios
+    surfaceVariant = BlueGray900,           // Variante del color de superficie, útil para fondos secundarios
+    background = White,                     // Fondo principal de la app
+    onBackground = BlueGray900,             // Color del texto sobre el fondo principal
+    surface = Color(0xFFEEEEEE),       // Color de superficie, como tarjetas y diálogos
+    onSurface = Color.Black                 // Color del texto sobre las superficies
 
 
     /* Other default colors to override
