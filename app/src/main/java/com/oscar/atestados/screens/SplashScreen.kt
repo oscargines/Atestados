@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -32,15 +31,13 @@ import com.oscar.atestados.R
 import com.oscar.atestados.ui.theme.AtestadosTheme
 import com.oscar.atestados.ui.theme.BlueGray700
 import kotlinx.coroutines.delay
-import com.oscar.atestados.navigation.AppScrens
 
 
 @Composable
-fun SplashScreen(navController: NavController) {
+fun SplashScreen(navigateToMain: () -> Unit) {
     LaunchedEffect(key1 = true) {
         delay(3000)
-        navController.popBackStack()
-        navController.navigate(AppScrens.MainScreen.route)
+        navigateToMain()
     }
     BackgroundImage()
     Splash()

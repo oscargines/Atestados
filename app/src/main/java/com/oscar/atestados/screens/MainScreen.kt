@@ -1,25 +1,26 @@
 package com.oscar.atestados.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,30 +49,42 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
 import com.oscar.atestados.R
-import com.oscar.atestados.navigation.AppScrens
 import com.oscar.atestados.ui.theme.BotonesNormales
-import com.oscar.atestados.ui.theme.BotonesSecundarios
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
 
 
 @Composable
-fun MainScreen() {
-    ViewContainer()
-
+fun MainScreen(navigateToScreen: (String) -> Unit) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = { Toolbar() },
+        bottomBar = { BottomAppBar()}
+    ) { paddingValues ->
+        Content(
+            modifier = Modifier.padding(paddingValues),
+            onNavigate = navigateToScreen
+        )
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
 @Composable
 fun ViewContainer() {
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         topBar = { Toolbar() },
-        content = { Content() },
-        bottomBar = { BottonAppBar() }
-    )
+        //bottomBar = { BottomAppBar() }
+
+    ) { paddingValues ->
+        Content(
+            modifier = Modifier.padding(paddingValues),
+            onNavigate = { }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,6 +92,7 @@ fun ViewContainer() {
 fun Toolbar() {
     var isDialogVisible by remember { mutableStateOf(false) }
     val plainTooltipState = rememberTooltipState()
+
     TopAppBar(
         title = {
             Row(
@@ -86,64 +100,60 @@ fun Toolbar() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                //Columna Izquierda
+                // Column for left icons with tooltips
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         state = plainTooltipState,
-                        tooltip ={
+                        tooltip = {
                             PlainTooltip {
-                                Text("Pulse aquí para añadir o modificar los componentes")
+                                Text("Añadir/modificar componentes")
                             }
-
+                        },
+                        content = {
+                            IconButton(
+                                onClick = { /* Handle left icon click */ },
+                                modifier = Modifier.fillMaxHeight(1f)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.person_50),
+                                    contentDescription = "Botón para añadir a los actuantes",
+                                    tint = BotonesNormales
+                                )
+                            }
                         }
-                    ) {
-                        IconButton(
-                            onClick = { },
-                            modifier = Modifier.fillMaxHeight(1f)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.person_50),
-                                contentDescription = "Botón para añadir a los actuantes",
-                                tint = BotonesNormales
-                            )
-                        }
-                    }
+                    )
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
                         state = plainTooltipState,
-                        tooltip ={
+                        tooltip = {
                             PlainTooltip {
-                                Text("Pulse aquí para añadir o modificar las impresorar enlazadas")
+                                Text("Añadir/modificar impresoras")
                             }
-
+                        },
+                        content = {
+                            IconButton(
+                                onClick = { /* Handle right icon click */ },
+                                modifier = Modifier.fillMaxHeight(1f)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.print_50),
+                                    contentDescription = "Botón de impresión",
+                                    tint = BotonesNormales
+                                )
+                            }
                         }
-                    ) {
-
-                        IconButton(
-                            onClick = { },
-                            modifier = Modifier.fillMaxHeight(1f)
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.print_50),
-                                contentDescription = "Botón de impresión",
-                                tint = BotonesNormales
-                            )
-                        }
-                    }
+                    )
                 }
-                //Columna derecha
-                TextButton(onClick = {
-                    isDialogVisible = true
 
-                }) {
+                // TextButton for version info
+                TextButton(onClick = { isDialogVisible = true }) {
                     Text(
                         text = "Versión 1.0",
                         fontSize = 8.sp,
                         color = TextoSecundarios,
                         textAlign = TextAlign.Center
                     )
-
                 }
             }
         },
@@ -151,104 +161,106 @@ fun Toolbar() {
             containerColor = Color.Transparent
         )
     )
+
     LanzaAlert(
         showDialog = isDialogVisible,
         onDismiss = { isDialogVisible = false },
         title = "Información",
-        message = "Para informar de errores o mandar sigerencias, m" +
-                "ande un correo electrónico a oscargines@guardiacivil.es." +
-                "\nPor favor, tenga paciencia en la contestación."
+        message = "Para informar de errores o mandar sugerencias, mande un correo electrónico a oscargines@guardiacivil.es.\nPor favor, tenga paciencia en la contestación."
     )
-
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BottonAppBar() {
-    var context = LocalContext.current
+fun BottomAppBar() {
+    val context = LocalContext.current
     val plainTooltipState = rememberTooltipState()
+
     BottomAppBar(
-        modifier = Modifier.height(60.dp),
-        containerColor = Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                state = plainTooltipState,
-                tooltip ={
-                    PlainTooltip {
-                        Text("Pulse aquí para confeccionar e imprimir otros documentos")
-                    }
-
-                }
+        //modifier = Modifier.height(60.dp),
+        modifier = Modifier.wrapContentHeight(),
+        containerColor = Color.Transparent,
+        content = { // Aquí añadimos explícitamente el content
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-
-                Button(
-                    onClick = { /* Acción del botón "OTROS DOCUMENTOS" */ },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(10.dp, 0.dp, 10.dp, 0.dp),
-                    enabled = true,
-                    shape = RoundedCornerShape(0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BotonesNormales,
-                        contentColor = TextoBotonesNormales
-                    )
-                ) {
-                    Text(
-                        "OTROS DOCUMENTOS",
-                        textAlign = TextAlign.Center,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                state = plainTooltipState,
-                tooltip ={
-                    PlainTooltip {
-                        Text("Pulse aquí para limpiar todos los datos almacenados " +
-                                "en la aplicación")
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    state = plainTooltipState,
+                    tooltip = {
+                        PlainTooltip {
+                            Text("Pulse aquí para confeccionar e imprimir otros documentos")
+                        }
                     }
-
-                }
-            ) {
-                Button(
-                    onClick = { /* Acción del botón "LIMPIAR DATOS" */ },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(10.dp, 0.dp, 10.dp, 0.dp), // Ajusta automáticamente el ancho
-                    enabled = true,
-                    shape = RoundedCornerShape(0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BotonesNormales,
-                        contentColor = TextoBotonesNormales
-                    )
                 ) {
-                    Text(
-                        "LIMPIAR DATOS",
-                        textAlign = TextAlign.Center,
-                        fontSize = 10.sp
-                    )
+                    Button(
+                        onClick = { /* Acción del botón "OTROS DOCUMENTOS" */ },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(10.dp, 0.dp, 10.dp, 0.dp),
+                        enabled = true,
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BotonesNormales,
+                            contentColor = TextoBotonesNormales
+                        )
+                    ) {
+                        Text(
+                            "OTROS DOCUMENTOS",
+                            textAlign = TextAlign.Center,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                    state = plainTooltipState,
+                    tooltip = {
+                        PlainTooltip {
+                            Text(
+                                "Pulse aquí para limpiar todos los datos almacenados " +
+                                        "en la aplicación"
+                            )
+                        }
+                    }
+                ) {
+                    Button(
+                        onClick = { /* Acción del botón "LIMPIAR DATOS" */ },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(10.dp, 0.dp, 10.dp, 0.dp),
+                        enabled = true,
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = BotonesNormales,
+                            contentColor = TextoBotonesNormales
+                        )
+                    ) {
+                        Text(
+                            "LIMPIAR DATOS",
+                            textAlign = TextAlign.Center,
+                            fontSize = 10.sp
+                        )
+                    }
                 }
             }
         }
-    }
+    )
 }
 
 @Composable
-fun Content() {
+fun Content(
+    modifier: Modifier = Modifier,
+    onNavigate: (String) -> Unit
+) {
     var context = LocalContext.current
     var isDialogVisible by remember { mutableStateOf(false) }
-    val navController = NavController(context)
+
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .padding(bottom = 60.dp)
     ) {
@@ -262,13 +274,12 @@ fun Content() {
                 modifier = Modifier
                     .padding(0.dp, 30.dp, 0.dp, 0.dp)
                     .clickable { isDialogVisible = true }
-
             )
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 "Agrupación de Tráfico",
                 color = TextoNormales,
-                style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -276,38 +287,37 @@ fun Content() {
             Text(
                 "Atestados",
                 color = TextoSecundarios,
-                style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(20.dp))
-            CreaBoton({
-                navController.popBackStack()
-                navController.navigate(AppScrens.Alcoholemia01Screen.route)
-                      },
-                "PERSONA",
-                "Pulse aquí para introducir los datos de la persona investigada")
-            //Spacer(modifier = Modifier.height(1.dp))
-            CreaBoton({
-                navController.popBackStack()
-                navController.navigate(AppScrens.Alcoholemia01Screen.route)
-            },
-                "VEHÍCULO",
-                "Pulse aquí para introducir los datos del vehículo implicado")
-            Spacer(modifier = Modifier.height(30.dp))
-            CreaBoton({
-                navController.popBackStack()
-                navController.navigate(AppScrens.Alcoholemia01Screen.route)
-                      },
-                "ALCOHOLEMIA",
-                "Pulse aquí para inicar un Atestado por Alcoholemia" )
-            //Spacer(modifier = Modifier.height(10.dp))
-            CreaBoton({  },
-                "CARECER DE PERMISO",
-                "Este botón se encuentra deshabilitado, estamos trabajando para hacerlo funcionar")
 
+            // Navigation buttons
+            CreaBoton(
+                onClick = { onNavigate("PersonaScreen") },
+                text = "PERSONA",
+                mensaje = "Pulse aquí para introducir los datos de la persona investigada"
+            )
+            CreaBoton(
+                onClick = { onNavigate("VehiculoScreen") },
+                text = "VEHÍCULO",
+                mensaje = "Pulse aquí para introducir los datos del vehículo implicado"
+            )
+            Spacer(modifier = Modifier.height(30.dp))
+            CreaBoton(
+                onClick = { onNavigate("Alcoholemia01Screen") },
+                text = "ALCOHOLEMIA",
+                mensaje = "Pulse aquí para inicar un Atestado por Alcoholemia"
+            )
+            CreaBoton(
+                onClick = { onNavigate("CarecerScreen") },
+                text = "CARECER DE PERMISO",
+                mensaje = "Este botón se encuentra deshabilitado, estamos trabajando para hacerlo funcionar"
+            )
         }
     }
+
     LanzaAlert(
         showDialog = isDialogVisible,
         onDismiss = { isDialogVisible = false },
@@ -317,40 +327,42 @@ fun Content() {
                 "\nCreada por el Guardia Civil Óscar I. Ginés R., destinado en" +
                 " el Destacamento de Tráfico de Ribadesella, Asturias."
     )
-
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreaBoton(onClick: () -> Unit, text: String, mensaje: String) {
+fun CreaBoton(
+    onClick: () -> Unit,
+    text: String,
+    mensaje: String,
+    enabled: Boolean = true
+) {
     val plainTooltipState = rememberTooltipState()
+
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         state = plainTooltipState,
-        tooltip ={
+        tooltip = {
             PlainTooltip {
                 Text(mensaje)
             }
-
         }
     ) {
         Button(
-            enabled = true,
+            enabled = enabled,
             shape = RoundedCornerShape(0.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,
                 contentColor = TextoBotonesNormales
             ),
             modifier = Modifier
-                .fillMaxWidth(1f)
-                .padding(10.dp, 0.dp, 10.dp, 0.dp),
-            onClick = {}
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp),
+            onClick = onClick
         ) {
             Text(text = text)
         }
     }
-
 }
 
 @Composable
@@ -372,9 +384,4 @@ fun LanzaAlert(
             }
         )
     }
-}
-
-
-fun onClick() {
-
 }

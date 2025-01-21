@@ -30,14 +30,23 @@ import androidx.navigation.NavController
 import com.oscar.atestados.ui.theme.BotonesNormales
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 
+
 @Composable
-fun VehiculoScreen(navigateToScreen: () -> Unit) {
-    VehiculoScreenContent(navigateToScreen)
+fun CarecerScreen(navigateToScreen: () -> Unit) {
+    CarecerScreenContent(navigateToScreen)
+
 }
 
+@Preview(showBackground = true)
+@Composable
+fun CarecerScreenPreview() {
+    CarecerScreenContent(
+        navigateToScreen = TODO()
+    )
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VehiculoScreenContent(navigateToScreen: () -> Unit) {
+fun CarecerScreenContent(navigateToScreen: () -> Unit) {
     val plainTooltipState = rememberTooltipState()
     var context = LocalContext.current
     var isDialogVisible by remember { mutableStateOf(false) }
@@ -49,11 +58,10 @@ fun VehiculoScreenContent(navigateToScreen: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ){
             Text(text = "Estamos trabajando para habilitar esta opción." +
-                    " En breve la tendremos activa.\nVEHICULO",
+                    " En breve la tendremos activa.",
                 textAlign = TextAlign.Center,
                 fontSize = 20.sp,
-                color = BotonesNormales
-            )
+                color = BotonesNormales)
             Spacer(modifier = Modifier.height(16.dp))
             Button(shape = RoundedCornerShape(0.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -71,15 +79,4 @@ fun VehiculoScreenContent(navigateToScreen: () -> Unit) {
         }
 
     }
-
-}
-
-@Preview(showBackground = true)
-@Composable
-fun VehiculoScreenPreview() {
-    VehiculoScreenContent(
-        navigateToScreen = TODO()
-    )
-
-
 }
