@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
@@ -77,7 +79,7 @@ fun ViewContainer() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { Toolbar() },
-        //bottomBar = { BottomAppBar() }
+        bottomBar = { BottomAppBar()}
 
     ) { paddingValues ->
         Content(
@@ -100,7 +102,6 @@ fun Toolbar() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Column for left icons with tooltips
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
@@ -199,7 +200,7 @@ fun BottomAppBar() {
                         onClick = { /* Acción del botón "OTROS DOCUMENTOS" */ },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(10.dp, 0.dp, 10.dp, 0.dp),
+                            .padding(horizontal = 5.dp),
                         enabled = true,
                         shape = RoundedCornerShape(0.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -210,7 +211,7 @@ fun BottomAppBar() {
                         Text(
                             "OTROS DOCUMENTOS",
                             textAlign = TextAlign.Center,
-                            fontSize = 10.sp
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -231,7 +232,7 @@ fun BottomAppBar() {
                         onClick = { /* Acción del botón "LIMPIAR DATOS" */ },
                         modifier = Modifier
                             .weight(1f)
-                            .padding(10.dp, 0.dp, 10.dp, 0.dp),
+                            .padding(horizontal = 5.dp),
                         enabled = true,
                         shape = RoundedCornerShape(0.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -242,7 +243,7 @@ fun BottomAppBar() {
                         Text(
                             "LIMPIAR DATOS",
                             textAlign = TextAlign.Center,
-                            fontSize = 10.sp
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -265,7 +266,7 @@ fun Content(
             .padding(bottom = 60.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(

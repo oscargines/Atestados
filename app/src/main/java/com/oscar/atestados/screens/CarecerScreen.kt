@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
@@ -32,51 +33,31 @@ import com.oscar.atestados.ui.theme.TextoBotonesNormales
 
 
 @Composable
-fun CarecerScreen(navigateToScreen: () -> Unit) {
-    CarecerScreenContent(navigateToScreen)
+fun CarecerScreen(navigateToScreen: (String) -> Unit) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = { Toolbar() },
+        bottomBar = { BottomAppBar() }
+    ) {
+            paddingValues ->
+        Content (modifier = Modifier.padding(paddingValues),
+            onNavigate = navigateToScreen)
+
+    }
 
 }
 
 @Preview(showBackground = true)
 @Composable
 fun CarecerScreenPreview() {
-    CarecerScreenContent(
-        navigateToScreen = TODO()
-    )
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CarecerScreenContent(navigateToScreen: () -> Unit) {
-    val plainTooltipState = rememberTooltipState()
-    var context = LocalContext.current
-    var isDialogVisible by remember { mutableStateOf(false) }
-    val navController = NavController(context)
-    Box {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ){
-            Text(text = "Estamos trabajando para habilitar esta opción." +
-                    " En breve la tendremos activa.",
-                textAlign = TextAlign.Center,
-                fontSize = 20.sp,
-                color = BotonesNormales)
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(shape = RoundedCornerShape(0.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BotonesNormales,
-                    contentColor = TextoBotonesNormales
-                ),
-                modifier = Modifier
-                    .fillMaxWidth(1f)
-                    .padding(10.dp),
-                onClick = {
-                    navigateToScreen()
-                }
-            ) { Text(text = "Volver") }
-
-        }
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = { Toolbar() },
+        bottomBar = { BottomAppBar() }
+    ) {
+            paddingValues ->
+        Content (modifier = Modifier.padding(paddingValues),
+            onNavigate = {  })
 
     }
 }

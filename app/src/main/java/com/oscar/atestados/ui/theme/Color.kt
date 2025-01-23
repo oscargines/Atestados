@@ -46,3 +46,4 @@ val BotonesSecundarios = Green800
 val TextpBotonesSecundarios = BlueGray900
 val TextoNormales = BlueGray900
 val TextoSecundarios = BlueGray600
+val TextoTerciarios = BlueGray300
