@@ -11,17 +11,13 @@ import com.oscar.atestados.screens.PersonaScreen
 import com.oscar.atestados.screens.SplashScreen
 import com.oscar.atestados.screens.VehiculoScreen
 
-
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     NavHost(
         navController = navController,
-        startDestination = "SplashScreen"
+        startDestination = "MainScreen"  // Inicia directamente en MainScreen
     ) {
-        composable("SplashScreen") {
-            SplashScreen { navController.navigate("MainScreen") }
-        }
         composable("MainScreen") {
             MainScreen { route ->
                 navController.navigate(route)

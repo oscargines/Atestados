@@ -1,7 +1,9 @@
 package com.oscar.atestados.screens
 
 
+import android.database.Cursor
 import android.widget.Toast
+import android.widget.Toast.LENGTH_SHORT
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +30,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.oscar.atestados.R
+import com.oscar.atestados.persistence.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.BotonesNormales
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
@@ -384,7 +388,7 @@ fun PersonaContent(
                                         Toast.makeText(
                                             context,
                                             "Se ha pulsado el calendario",
-                                            Toast.LENGTH_SHORT
+                                            LENGTH_SHORT
                                         ).show()
                                     },
                                     modifier = Modifier.size(24.dp),
@@ -497,13 +501,14 @@ fun PersonaContent(
                             .fillMaxWidth(1f)
                             .padding(end = 5.dp),
                         singleLine = true,
+                    )
 
-                        )
                 }
             }
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownSexo() {
@@ -549,9 +554,22 @@ fun DropDownSexo() {
 fun DropDownNacionalidad() {
 
     var isExpandedNacionalidad by remember { mutableStateOf(false) }
-    val listNacionalidad = listOf("España")
+
+    // Inicializas la lista de nacionalidades
+    var listNacionalidad by remember { mutableStateOf(listOf<String>()) }
+    // Obtienes la lista de países (esto debería ser asincrónico en la práctica)
+    listNacionalidad = getPaises()
 
     var selectedText by remember { mutableStateOf(listNacionalidad[0]) }
+
+
+
+    // Aseguramos que selectedText tenga el primer valor de la lista después de que se haya cargado
+    LaunchedEffect(listNacionalidad) {
+        if (listNacionalidad.isNotEmpty() && selectedText.isEmpty()) {
+            selectedText = listNacionalidad[0]
+        }
+    }
 
     ExposedDropdownMenuBox(
         expanded = isExpandedNacionalidad,
@@ -584,6 +602,7 @@ fun DropDownNacionalidad() {
     }
 
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownDocumento() {
@@ -596,7 +615,9 @@ fun DropDownDocumento() {
     ExposedDropdownMenuBox(
         expanded = isExpandedDocumento,
         onExpandedChange = { isExpandedDocumento = !isExpandedDocumento },
-        modifier = Modifier.width(150.dp).padding(top = 8.dp)
+        modifier = Modifier
+            .width(150.dp)
+            .padding(top = 8.dp)
     ) {
         OutlinedTextField(
             value = selectedText,
@@ -641,8 +662,15 @@ fun DropDownDocumento() {
             .fillMaxWidth(1f)
             .padding(end = 5.dp),
         singleLine = true,
-
         )
-
 }
 
+@Composable
+fun getPaises() :List<String>{
+    var context = LocalContext.current
+    val myDB = AccesoBaseDatos(context, "paises.db", 1)
+
+    val cursor: List<String> = myDB.query("SELECT nombre FROM paises")
+
+    return cursor
+}

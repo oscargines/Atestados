@@ -5,15 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
@@ -52,6 +49,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.oscar.atestados.R
+import com.oscar.atestados.persistence.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.BotonesNormales
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
@@ -60,6 +58,7 @@ import com.oscar.atestados.ui.theme.TextoSecundarios
 
 @Composable
 fun MainScreen(navigateToScreen: (String) -> Unit) {
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { Toolbar() },
@@ -386,3 +385,4 @@ fun LanzaAlert(
         )
     }
 }
+

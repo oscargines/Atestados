@@ -50,13 +50,20 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation (libs.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.coil.compose)
+    implementation (libs.kotlinx.coroutines.core)
+    implementation (libs.jetbrains.kotlinx.coroutines.android)
+    implementation (libs.androidx.runtime) // Versión más reciente
+    implementation (libs.ui)
+    implementation (libs.androidx.activity.compose.v180)
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.protolite.well.known.types)
+    implementation(libs.androidx.fragment.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
