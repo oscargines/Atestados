@@ -1,9 +1,18 @@
 package com.oscar.atestados.screens
 
 
-import android.database.Cursor
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Log
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -13,6 +22,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -20,18 +31,22 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,142 +59,227 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavController
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.oscar.atestados.R
-import com.oscar.atestados.persistence.AccesoBaseDatos
+import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.BotonesNormales
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoTerciarios
+import com.oscar.atestados.viewModel.PersonaViewModel
+import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
+/**
+ * Configuración de DataStore para almacenar preferencias de la aplicación.
+ * Se utiliza para guardar y recuperar datos persistentes relacionados con la entidad "Persona".
+ *
+ * @property name Nombre del DataStore, utilizado para identificar el archivo de preferencias.
+ */
+val Context.dataStore by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme")
+
+/**
+ * Pantalla principal de la entidad "Persona".
+ * Muestra un formulario para ingresar datos personales y permite la captura de imágenes mediante la cámara.
+ *
+ * @param navigateToScreen Función de navegación para cambiar a otras pantallas.
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ */
 @Composable
-fun PersonaScreen(navigateToScreen: (String) -> Unit) {
+fun PersonaScreen(
+    navigateToScreen: (String) -> Unit,
+    personaViewModel: PersonaViewModel
+) {
+    var showCamera by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
+    // Función para manejar el clic en el botón de la cámara
+    val onCameraButtonClicked = {
+        showCamera = true
+    }
+
+    // Cargar datos al iniciar la pantalla
+    LaunchedEffect(Unit) {
+        personaViewModel.loadData(context)
+    }
+
+    // Mostrar la cámara si showCamera es true
+    if (showCamera) {
+        CameraPreview(
+            onImageCaptured = { bitmap ->
+                showCamera = false
+                processImage(bitmap) { text ->
+                    personaViewModel.updateNombre(text) // Ejemplo: actualizar el nombre
+                }
+            },
+            onDismiss = { showCamera = false }
+        )
+    }
+    // Contenido principal de la pantalla.
+    PersonaScreenContent(
+        navigateToScreen = navigateToScreen,
+        personaViewModel = personaViewModel,
+        onCameraButtonClicked = onCameraButtonClicked,
+        onTextFieldChanged = { text -> personaViewModel.updateNombre(text) }
+    )
+}
+
+/**
+ * Contenido principal de la pantalla "Persona".
+ * Organiza la interfaz de usuario en un [Scaffold] con una barra superior, un contenido central y una barra inferior.
+ *
+ * @param navigateToScreen Función de navegación para cambiar a otras pantallas.
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ * @param onCameraButtonClicked Función para manejar el clic en el botón de la cámara.
+ */
+@Composable
+fun PersonaScreenContent(
+    navigateToScreen: (String) -> Unit,
+    personaViewModel: PersonaViewModel,
+    onCameraButtonClicked: () -> Unit,
+    onTextFieldChanged: (String) -> Unit
+) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { ToolbarPersona() },
-        bottomBar = { BottomAppBarPersona() }
+        topBar = { ToolbarPersona(onCameraButtonClicked = onCameraButtonClicked) },
+        bottomBar = { BottomAppBarPersona(personaViewModel, navigateToScreen) }
     ) { paddingValues ->
         PersonaContent(
             modifier = Modifier.padding(paddingValues),
-            onNavigate = navigateToScreen
+            onTextFieldChanged = { text -> personaViewModel.updateNombre(text) },
+            personaViewModel = personaViewModel
         )
 
     }
 
 }
 
-@Preview
-@Composable
-fun PersonaScreenPreview() {
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = { ToolbarPersona() },
-        bottomBar = { BottomAppBarPersona() }
-    ) { paddingValues ->
-        PersonaContent(modifier = Modifier.padding(paddingValues),
-            onNavigate = { })
-
-    }
-
-}
-
+/**
+ * Barra inferior de la pantalla "Persona".
+ * Contiene botones para guardar y limpiar los datos ingresados.
+ *
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BottomAppBarPersona() {
+fun BottomAppBarPersona(
+    personaViewModel: PersonaViewModel,
+    navigateToScreen: (String) -> Unit
+) {
+
     val context = LocalContext.current
     val plainTooltipState = rememberTooltipState()
 
-    androidx.compose.material3.BottomAppBar(
-        //modifier = Modifier.height(60.dp),
+    Surface(
         modifier = Modifier.wrapContentHeight(),
-        containerColor = Color.Transparent,
-        content = { // Aquí añadimos explícitamente el content
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+        color = Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Botón "GUARDAR" con tooltip.
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                state = plainTooltipState,
+                modifier = Modifier.width(175.dp),
+                tooltip = {
+                    PlainTooltip {
+                        Text("Pulse aquí para guardar los datos introducidos")
+                    }
+                }
             ) {
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    state = plainTooltipState,
-                    modifier = Modifier
-                        .width(175.dp),
-                    tooltip = {
-                        PlainTooltip {
-                            Text("Pulse aquí para guardar los datos introducidos")
-                        }
-                    }
-                ) {
-                    Button(
-                        onClick = { /* Acción del botón "OTROS DOCUMENTOS" */ },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 5.dp),
-                        enabled = true,
-                        shape = RoundedCornerShape(0.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BotonesNormales,
-                            contentColor = TextoBotonesNormales
-                        )
-                    ) {
-                        Text(
-                            "GUARDAR",
-                            textAlign = TextAlign.Center,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                    state = plainTooltipState,
-                    modifier = Modifier
-                        .width(175.dp),
-                    tooltip = {
-                        PlainTooltip {
-                            Text(
-                                "Pulse aquí para limpiar todos los datos almacenados " +
-                                        "en la aplicación"
-                            )
-                        }
-                    }
-                ) {
-                    Button(
-                        onClick = { /* Acción del botón "LIMPIAR DATOS" */ },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 4.dp),
-                        enabled = true,
-                        shape = RoundedCornerShape(0.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BotonesNormales,
-                            contentColor = TextoBotonesNormales
-                        )
-                    ) {
-                        Text(
-                            "LIMPIAR",
-                            textAlign = TextAlign.Center,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
 
+                Button(
+                    onClick = {
+                        personaViewModel.saveData(context)
+                        Toast.makeText(
+                            context,
+                            "Datos guardados correctamente",
+                            LENGTH_SHORT
+                        ).show()
+                        navigateToScreen("MainScreen")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 5.dp),
+                    enabled = true,
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BotonesNormales,
+                        contentColor = TextoBotonesNormales
+                    )
+                ) {
+                    Text(
+                        "GUARDAR",
+                        textAlign = TextAlign.Center,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
+            Spacer(modifier = Modifier.width(8.dp))
+            // Botón "LIMPIAR" con tooltip.
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                state = plainTooltipState,
+                modifier = Modifier.width(175.dp),
+                tooltip = {
+                    PlainTooltip {
+                        Text(
+                            "Pulse aquí para limpiar todos los datos almacenados en la aplicación"
+                        )
+                    }
+                }
+            ) {
+                Button(
+                    onClick = {
+                        personaViewModel.clearData(context)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp),
+                    enabled = true,
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BotonesNormales,
+                        contentColor = TextoBotonesNormales
+                    )
+                ) {
+                    Text(
+                        "LIMPIAR",
+                        textAlign = TextAlign.Center,
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
-    )
+    }
 }
 
+
+/**
+ * Barra superior de la pantalla "Persona".
+ * Muestra el título de la pantalla y un botón para acceder a la cámara.
+ *
+ * @param onCameraButtonClicked Función para manejar el clic en el botón de la cámara.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ToolbarPersona() {
-    var isDialogVisible by remember { mutableStateOf(false) }
+fun ToolbarPersona(onCameraButtonClicked: () -> Unit) {
     TopAppBar(
         title = {
             Text(
@@ -194,7 +294,7 @@ fun ToolbarPersona() {
                     .padding(10.dp),
             )
             IconButton(
-                onClick = { },
+                onClick = onCameraButtonClicked,
                 modifier = Modifier.fillMaxHeight(1f)
             ) {
                 Icon(
@@ -211,37 +311,35 @@ fun ToolbarPersona() {
     )
 }
 
+/**
+ * Contenido central de la pantalla "Persona".
+ * Muestra un formulario con campos de texto para ingresar datos personales.
+ *
+ * @param modifier Modificador para personalizar el diseño.
+ * @param onTextFieldChanged Función para manejar cambios en los campos de texto.
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonaContent(
     modifier: Modifier = Modifier,
-    onNavigate: (String) -> Unit
-) {
-    val plainTooltipState = rememberTooltipState()
-    var context = LocalContext.current
-    var isDialogVisible by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
-    val navController = NavController(context)
+    onTextFieldChanged: (String) -> Unit,
+    personaViewModel: PersonaViewModel,
 
+    ) {
+    var showDatePicker by remember { mutableStateOf(false) }
 
-    // Estados para los dropdowns
-    var expandedGender by remember { mutableStateOf(false) }
-    var expandedCountry by remember { mutableStateOf(false) }
-    var expandedDNI by remember { mutableStateOf(false) }
-    var selectedGender by remember { mutableStateOf("Masculino") }
-    var selectedCountry by remember { mutableStateOf("España") }
-    var selectedDNI by remember { mutableStateOf("DNI") }
-    var documento by remember { mutableStateOf("") }
-    var nombre by remember { mutableStateOf("") }
-    var apellidos by remember { mutableStateOf("") }
-    var nombrePadre by remember { mutableStateOf("") }
-    var nombreMadre by remember { mutableStateOf("") }
-    var fechaNacimiento by remember { mutableStateOf("") }
-    var lugarNacimiento by remember { mutableStateOf("") }
-    var domicilio by remember { mutableStateOf("") }
-    var codigoPostal by remember { mutableStateOf("") }
-    var telefono by remember { mutableStateOf("") }
-    var correoElectronico by remember { mutableStateOf("") }
+    //Estados para los campos de texto
+    val nombre by personaViewModel.nombre.observeAsState(initial = "")
+    val apellidos by personaViewModel.apellidos.observeAsState(initial = "")
+    val nombrePadre by personaViewModel.nombrePadre.observeAsState(initial = "")
+    val nombreMadre by personaViewModel.nombreMadre.observeAsState(initial = "")
+    val fechaNacimiento by personaViewModel.fechaNacimiento.observeAsState(initial = "")
+    val lugarNacimiento by personaViewModel.lugarNacimiento.observeAsState(initial = "")
+    val domicilio by personaViewModel.domicilio.observeAsState(initial = "")
+    val codigoPostal by personaViewModel.codigoPostal.observeAsState(initial = "")
+    val telefono by personaViewModel.telefono.observeAsState(initial = "")
+    val correoElectronico by personaViewModel.email.observeAsState(initial = "")
 
 
     Spacer(modifier = Modifier.height(80.dp))
@@ -258,265 +356,226 @@ fun PersonaContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-
-
+                DropDownSexo(personaViewModel)
+                Spacer(modifier = Modifier.width(8.dp))
+                DropDownNacionalidad(personaViewModel)
             }
-            Column(
-                modifier = Modifier.fillMaxSize(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row {
-                    Column {
-                        Row {
-                            DropDownSexo()
-                            Spacer(modifier = Modifier.width(8.dp))
-                            DropDownNacionalidad()
-
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row {
-                            DropDownDocumento()
-                            /*Spacer(modifier = Modifier.width(8.dp))
-
-                            OutlinedTextField(
-                                value = documento,
-                                onValueChange = { documento = it },
-                                label = { Text("Documento de identidad", color = TextoTerciarios) },
-                                placeholder = {
-                                    Text(
-                                        "Introduzca el documento de identidad completo",
-                                        color = TextoTerciarios,
-                                        textDecoration = TextDecoration.Underline
-                                    )
-                                },
-                                shape = MaterialTheme.shapes.extraSmall,
-                                modifier = Modifier
-                                    .fillMaxWidth(1f)
-                                    .padding(end = 5.dp),
-                                singleLine = true,
-
-                                )*/
-                        }
-
-                    }
-                }
-                Row {
-                    Column() {
-                        OutlinedTextField(
-                            value = nombre,
-                            onValueChange = { nombre = it },
-                            label = { Text("Nombre", color = TextoTerciarios) },
-                            placeholder = {
-                                Text(
-                                    "Introduzca el nombre completo",
-                                    color = TextoTerciarios,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                        OutlinedTextField(
-                            value = apellidos,
-                            onValueChange = { apellidos = it },
-                            label = { Text("Apellidos", color = TextoTerciarios) },
-                            placeholder = {
-                                Text(
-                                    "Introduzca los apellidos completos",
-                                    color = TextoTerciarios,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                        OutlinedTextField(
-                            value = nombrePadre,
-                            onValueChange = { nombrePadre = it },
-                            label = { Text("Nombre del padre", color = TextoTerciarios) },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            placeholder = {
-                                Text(
-                                    "Introduzca el nombre del padre",
-                                    color = TextoTerciarios,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                        OutlinedTextField(
-                            value = nombreMadre,
-                            onValueChange = { nombreMadre = it },
-                            label = { Text("Nombre de la Madre", color = TextoTerciarios) },
-                            placeholder = {
-                                Text(
-                                    "Introduzca el nombre de la madre",
-                                    color = TextoTerciarios,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                        OutlinedTextField(
-                            value = fechaNacimiento,
-                            onValueChange = { fechaNacimiento = it },
-                            label = { Text("Fecha de nacimiento", color = TextoTerciarios) },
-                            leadingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        Toast.makeText(
-                                            context,
-                                            "Se ha pulsado el calendario",
-                                            LENGTH_SHORT
-                                        ).show()
-                                    },
-                                    modifier = Modifier.size(24.dp),
-
-                                    ) {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = R.drawable.calendar_ico
-                                        ),
-                                        tint = BotonesNormales,
-                                        contentDescription = "Botón de acceso a calendario"
-                                    )
-                                }
-                            },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                        OutlinedTextField(
-                            value = lugarNacimiento,
-                            onValueChange = { lugarNacimiento = it },
-                            label = { Text("Lugar de nacimiento", color = TextoTerciarios) },
-                            placeholder = {
-                                Text(
-                                    "Introduzca el lugar de nacimiento",
-                                    color = TextoTerciarios,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-
-                            )
-                        OutlinedTextField(
-                            value = domicilio,
-                            onValueChange = { domicilio = it },
-                            label = { Text("Domicilio", color = TextoTerciarios) },
-                            placeholder = {
-                                Text(
-                                    "Introduzca el domicilio completo.",
-                                    color = TextoTerciarios,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-
-                            )
-                    }
-                }
-                Row {
-                    Column {
-
-                        OutlinedTextField(
-                            value = codigoPostal,
-                            onValueChange = { codigoPostal = it },
-                            label = { Text("Código Postal", color = TextoTerciarios) },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier
-                                .width(150.dp)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                    }
-                    Column {
-
-                        OutlinedTextField(
-                            value = telefono,
-                            onValueChange = { telefono = it },
-                            label = { Text("Teléfono", color = TextoTerciarios) },
-                            shape = MaterialTheme.shapes.extraSmall,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            modifier = Modifier
-                                .fillMaxWidth(1f)
-                                .padding(end = 5.dp),
-                            singleLine = true,
-
-                            )
-                    }
-
-                }
+                DropDownDocumento(
+                    personaViewModel = personaViewModel,
+                    onTextFieldChanged = onTextFieldChanged
+                )
             }
-            Row {
-                Column {
+            /**
+             * Campo de texto personalizado con un diseño de borde y opciones adicionales.
+             *
+             * @param value Valor actual del campo de texto.
+             * @param onValueChange Función para manejar cambios en el valor del campo.
+             * @param label Etiqueta del campo.
+             * @param placeholder Texto de marcador de posición.
+             * @param keyboardType Tipo de teclado para la entrada de texto.
+             * @param modifier Modificador para personalizar el diseño.
+             * @param leadingIcon Icono opcional para mostrar a la izquierda del campo.
+             */
+            @Composable
+            fun CustomOutlinedTextField(
+                value: String,
+                onValueChange: (String) -> Unit,
+                label: String,
+                placeholder: String,
+                keyboardType: KeyboardType = KeyboardType.Text,
+                modifier: Modifier = Modifier.fillMaxWidth(),
+                leadingIcon: @Composable (() -> Unit)? = null
+            ) {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    label = { Text(label, color = TextoTerciarios) },
+                    placeholder = {
+                        Text(
+                            placeholder,
+                            color = TextoTerciarios,
+                            textDecoration = TextDecoration.Underline
+                        )
+                    },
+                    shape = MaterialTheme.shapes.extraSmall,
+                    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                    modifier = modifier.padding(vertical = 4.dp),
+                    singleLine = true,
+                    leadingIcon = leadingIcon
+                )
 
-                    OutlinedTextField(
-                        value = correoElectronico,
-                        onValueChange = { correoElectronico = it },
-                        label = { Text("Correo electrónico", color = TextoTerciarios) },
-                        placeholder = {
-                            Text(
-                                "Introduzca el correo electrónico, si lo tiene",
-                                color = TextoTerciarios,
-                                textDecoration = TextDecoration.Underline
-                            )
-                        },
-                        shape = MaterialTheme.shapes.extraSmall,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier
-                            .fillMaxWidth(1f)
-                            .padding(end = 5.dp),
-                        singleLine = true,
-                    )
-
-                }
             }
+            CustomOutlinedTextField(
+                value = nombre,
+                onValueChange = { personaViewModel.updateNombre(it) },
+                label = "Nombre",
+                placeholder = "Introduzca el nombre completo"
+            )
+
+            CustomOutlinedTextField(
+                value = apellidos,
+                onValueChange = { personaViewModel.updateApellidos(it) },
+                label = "Apellidos",
+                placeholder = "Introduzca los apellidos completos"
+            )
+
+            CustomOutlinedTextField(
+                value = nombrePadre,
+                onValueChange = { personaViewModel.updateNombrePadre(it) },
+                label = "Nombre del Padre",
+                placeholder = "Introduzca el nombre del padre"
+            )
+
+            CustomOutlinedTextField(
+                value = nombreMadre,
+                onValueChange = { personaViewModel.updateNombreMadre(it) },
+                label = "Nombre de la Madre",
+                placeholder = "Introduzca el nombre de la madre"
+            )
+
+            CustomOutlinedTextField(
+                value = fechaNacimiento,
+                onValueChange = { personaViewModel.updateFechaNacimiento(it) },
+                label = "Fecha de nacimiento",
+                placeholder = "Seleccione la fecha",
+                keyboardType = KeyboardType.Number,
+                leadingIcon = {
+                    IconButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.calendar_ico),
+                            tint = BotonesNormales,
+                            contentDescription = "Botón de acceso a calendario"
+                        )
+                    }
+                }
+            )
+
+            CustomOutlinedTextField(
+                value = lugarNacimiento,
+                onValueChange = { personaViewModel.updateLugarNacimiento(it) },
+                label = "Lugar de nacimiento",
+                placeholder = "Introduzca el lugar de nacimiento"
+            )
+
+            CustomOutlinedTextField(
+                value = domicilio,
+                onValueChange = { personaViewModel.updateDomicilio(it) },
+                label = "Domicilio",
+                placeholder = "Introduzca el domicilio completo"
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                CustomOutlinedTextField(
+                    value = codigoPostal,
+                    onValueChange = { personaViewModel.updateCodigoPostal(it) },
+                    label = "Código Postal",
+                    placeholder = "C.P.",
+                    keyboardType = KeyboardType.Number,
+                    modifier = Modifier.width(150.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                CustomOutlinedTextField(
+                    value = telefono,
+                    onValueChange = { personaViewModel.updateTelefono(it) },
+                    label = "Teléfono",
+                    placeholder = "Teléfono",
+                    keyboardType = KeyboardType.Phone,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            CustomOutlinedTextField(
+                value = correoElectronico,
+                onValueChange = { personaViewModel.updateEmail(it) },
+                label = "Correo electrónico",
+                placeholder = "Introduzca el correo electrónico, si lo tiene",
+                keyboardType = KeyboardType.Email
+            )
         }
+    }
+
+    if (showDatePicker) {
+        getDateDialog(
+            onDateSelected = { fechaSeleccionada ->
+                personaViewModel.updateFechaNacimiento(fechaSeleccionada)
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false }
+        )
     }
 }
 
+/**
+ * Diálogo para seleccionar una fecha.
+ *
+ * @param onDateSelected Función para manejar la fecha seleccionada.
+ * @param onDismiss Función para cerrar el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropDownSexo() {
+fun getDateDialog(
+    onDateSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val state = rememberDatePickerState()
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = {
+                val selectedDate = state.selectedDateMillis?.let {
+                    val localDate = Instant.ofEpochMilli(it)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate()
+                    // Formatear la fecha en español
+                    val formatter = DateTimeFormatter
+                        .ofPattern("d 'de' MMMM 'de' yyyy", Locale("es", "ES"))
+                    localDate.format(formatter)
+                } ?: ""
+
+                onDateSelected(selectedDate)
+                onDismiss()
+            }) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+/**
+ * Selector desplegable para elegir el género.
+ *
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DropDownSexo(personaViewModel: PersonaViewModel) {
     var isExpandedSexo by remember { mutableStateOf(false) }
     val listSexo = listOf("Masculino", "Femenino")
-
-
-    var selectedText by remember { mutableStateOf(listSexo[0]) }
+    val selectedText by personaViewModel.genero.observeAsState(initial = listSexo[0])
 
     ExposedDropdownMenuBox(
         expanded = isExpandedSexo,
@@ -539,37 +598,27 @@ fun DropDownSexo() {
                 DropdownMenuItem(
                     text = { Text(text = item) },
                     onClick = {
-                        selectedText = item
+                        personaViewModel.updateGenero(item)
                         isExpandedSexo = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                    }
                 )
             }
         }
     }
 }
 
+/**
+ * Selector desplegable para elegir la nacionalidad.
+ *
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropDownNacionalidad() {
+fun DropDownNacionalidad(personaViewModel: PersonaViewModel) {
 
     var isExpandedNacionalidad by remember { mutableStateOf(false) }
-
-    // Inicializas la lista de nacionalidades
-    var listNacionalidad by remember { mutableStateOf(listOf<String>()) }
-    // Obtienes la lista de países (esto debería ser asincrónico en la práctica)
-    listNacionalidad = getPaises()
-
-    var selectedText by remember { mutableStateOf(listNacionalidad[0]) }
-
-
-
-    // Aseguramos que selectedText tenga el primer valor de la lista después de que se haya cargado
-    LaunchedEffect(listNacionalidad) {
-        if (listNacionalidad.isNotEmpty() && selectedText.isEmpty()) {
-            selectedText = listNacionalidad[0]
-        }
-    }
+    val listNacionalidad = getPaises()
+    val selectedText by personaViewModel.nacionalidad.observeAsState(initial = listNacionalidad[0])
 
     ExposedDropdownMenuBox(
         expanded = isExpandedNacionalidad,
@@ -591,10 +640,9 @@ fun DropDownNacionalidad() {
                 DropdownMenuItem(
                     text = { Text(text = item) },
                     onClick = {
-                        selectedText = item
+                        personaViewModel.updateNacionalidad(item)
                         isExpandedNacionalidad = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                    }
                 )
             }
         }
@@ -603,14 +651,21 @@ fun DropDownNacionalidad() {
 
 }
 
+/**
+ * Selector desplegable para elegir el tipo de documento de identidad.
+ *
+ * @param personaViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
+ * @param onTextFieldChanged Función para manejar cambios en el campo de texto del documento.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropDownDocumento() {
+fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (String) -> Unit) {
     var isExpandedDocumento by remember { mutableStateOf(false) }
     val listDocumento = listOf("DNI", "NIE", "Pasaporte", "Per. Nacional Cond.", "Otros")
-
+    val tipoDocumento by personaViewModel.tipoDocumento.observeAsState(initial = "DNI")
+    val documento by personaViewModel.numeroDocumento.observeAsState(initial = "")
     var selectedText by remember { mutableStateOf(listDocumento[0]) }
-    var documento by remember { mutableStateOf("") }
+
 
     ExposedDropdownMenuBox(
         expanded = isExpandedDocumento,
@@ -620,7 +675,7 @@ fun DropDownDocumento() {
             .padding(top = 8.dp)
     ) {
         OutlinedTextField(
-            value = selectedText,
+            value = tipoDocumento,
             onValueChange = {},
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedDocumento) },
@@ -635,12 +690,13 @@ fun DropDownDocumento() {
                 DropdownMenuItem(
                     text = { Text(text = item) },
                     onClick = {
-                        selectedText = item
+                        personaViewModel.updateTipoDocumento(item)
                         isExpandedDocumento = false
                     },
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                 )
             }
+
         }
 
     }
@@ -648,7 +704,7 @@ fun DropDownDocumento() {
 
     OutlinedTextField(
         value = documento,
-        onValueChange = { documento = it },
+        onValueChange = { personaViewModel.updateNumeroDocumento(it) },
         label = { Text("Documento de identidad", color = TextoTerciarios) },
         placeholder = {
             Text(
@@ -662,15 +718,131 @@ fun DropDownDocumento() {
             .fillMaxWidth(1f)
             .padding(end = 5.dp),
         singleLine = true,
-        )
+    )
 }
 
 @Composable
-fun getPaises() :List<String>{
+fun getPaises(): List<String> {
     var context = LocalContext.current
     val myDB = AccesoBaseDatos(context, "paises.db", 1)
 
-    val cursor: List<String> = myDB.query("SELECT nombre FROM paises")
+    return myDB.query("SELECT nombre FROM paises")
+}
 
-    return cursor
+@Composable
+fun DniScannerScreen(onScanButtonClicked: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Button(onClick = onScanButtonClicked) {
+            Text("Escanear DNI")
+        }
+    }
+}
+
+@Composable
+fun CameraPreview(
+    onImageCaptured: (Bitmap) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Crear ImageCapture fuera de AndroidView para garantizar su inicialización
+    val imageCapture = remember { ImageCapture.Builder().build() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                val previewView = PreviewView(ctx)
+                val cameraExecutor = ContextCompat.getMainExecutor(ctx)
+
+                // Crear el objeto Preview
+                val preview = Preview.Builder().build()
+
+                // Vincular el SurfaceProvider del PreviewView al Preview
+                preview.setSurfaceProvider(previewView.surfaceProvider)
+
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+
+                cameraProviderFuture.addListener({
+                    val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+                    try {
+                        cameraProvider.unbindAll()
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            imageCapture
+                        )
+                    } catch (exc: Exception) {
+                        Log.e("CameraPreview", "Use case binding failed", exc)
+                    }
+                }, cameraExecutor)
+
+                previewView
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Botón para capturar la imagen
+        Button(
+            onClick = {
+                val file = File(context.externalCacheDir, "dni_photo.jpg")
+                val outputOptions = ImageCapture.OutputFileOptions.Builder(file).build()
+
+                imageCapture.takePicture(
+                    outputOptions,
+                    ContextCompat.getMainExecutor(context),
+                    object : ImageCapture.OnImageSavedCallback {
+                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                            onImageCaptured(bitmap)
+                        }
+
+                        override fun onError(exc: ImageCaptureException) {
+                            Log.e("CameraCapture", "Error capturing image", exc)
+                        }
+                    }
+                )
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("Capturar Imagen")
+        }
+
+        // Botón para cerrar la cámara
+        IconButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_close),
+                contentDescription = "Cerrar cámara",
+                tint = Color.White
+            )
+        }
+    }
+}
+
+
+fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit) {
+    val image = InputImage.fromBitmap(bitmap, 0)
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+    recognizer.process(image)
+        .addOnSuccessListener { visionText ->
+            val recognizedText = visionText.text
+            onTextRecognized(recognizedText)
+        }
+        .addOnFailureListener { e ->
+            Log.e("Reconocimiento de texto", "Error reconociendo el texto del documento: ", e)
+        }
 }

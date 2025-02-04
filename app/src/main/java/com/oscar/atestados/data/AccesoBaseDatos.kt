@@ -1,4 +1,4 @@
-package com.oscar.atestados.persistence
+package com.oscar.atestados.data
 
 import android.content.ContentValues.TAG
 import android.content.Context

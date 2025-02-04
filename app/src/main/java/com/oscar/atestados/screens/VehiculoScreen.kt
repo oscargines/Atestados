@@ -49,7 +49,7 @@ fun VehiculoScreenContent(navigateToScreen: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ){
             Text(text = "Estamos trabajando para habilitar esta opción." +
-                    " En breve la tendremos activa.\nVEHICULO",
+                    "\nEn breve la tendremos activa.\n\n\nVEHICULO",
                 textAlign = TextAlign.Center,
                 fontSize = 20.sp,
                 color = BotonesNormales

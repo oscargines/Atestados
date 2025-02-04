@@ -7,7 +7,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,14 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.oscar.atestados.ui.theme.AtestadosTheme
 import com.oscar.atestados.navigation.AppNavigation
-import com.oscar.atestados.persistence.AccesoBaseDatos
+import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.BlueGray700
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -47,7 +44,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    // Variable para lanzar la solicitud de permisos
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+
+    // Variables de estado
     private var arePermissionsGranted: Boolean = false
     private var isDatabaseLoaded: Boolean = false
 
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
             // Verifica si todos los permisos han sido concedidos
             arePermissionsGranted = permissions.entries.all { it.value }
             if (!arePermissionsGranted) {
-                Toast.makeText(this, "Los permisos son necesarios para usar la aplicación", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Para el uso de la app se necesitan permisos", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -93,9 +93,11 @@ class MainActivity : ComponentActivity() {
 
     private fun checkAndRequestPermissions() {
         val requiredPermissions = arrayOf(
+            Manifest.permission.CAMERA,
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE
         )
+        // Verifica si los permisos ya han sido concedidos
         arePermissionsGranted = requiredPermissions.all { permission ->
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
@@ -104,7 +106,9 @@ class MainActivity : ComponentActivity() {
             permissionLauncher.launch(requiredPermissions)
         }
     }
-
+    /**
+     * Carga las bases de datos en un hilo de fondo.
+     */
     private fun loadDatabases() {
         // Cargar bases de datos en un hilo de fondo
         lifecycleScope.launch(Dispatchers.IO) {
@@ -126,6 +130,36 @@ class MainActivity : ComponentActivity() {
                         AppNavigation()
                     }
                 }
+            }
+        }
+    }
+}
+/**
+ * Pantalla de Permiso Denegado.
+ */
+@Composable
+fun PermissionDeniedScreen(onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "No se han concedido los permisos necesarios. " +
+                        "Por favor, activa los permisos solicitados para continuar." +
+                        "\nReinicie la aplicación para continuar y conceda los permisos solicitados" +
+                        " si es necesario.",
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onRetry) {
+                Text("Intentar de nuevo")
             }
         }
     }
@@ -191,28 +225,4 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     }
 }
 
-@Composable
-fun PermissionDeniedScreen(onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "No se han concedido los permisos necesarios. Por favor, activa los permisos para continuar.",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text("Intentar de nuevo")
-            }
-        }
-    }
-}
 

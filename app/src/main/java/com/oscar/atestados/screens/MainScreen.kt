@@ -49,7 +49,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.oscar.atestados.R
-import com.oscar.atestados.persistence.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.BotonesNormales
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
@@ -313,7 +312,7 @@ fun Content(
             CreaBoton(
                 onClick = { onNavigate("CarecerScreen") },
                 text = "CARECER DE PERMISO",
-                mensaje = "Este botón se encuentra deshabilitado, estamos trabajando para hacerlo funcionar"
+                mensaje = "Este botón se encuentra deshabilitado,\nestamos trabajando para hacerlo funcionar"
             )
         }
     }
