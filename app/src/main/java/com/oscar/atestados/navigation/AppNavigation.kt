@@ -12,6 +12,7 @@ import com.oscar.atestados.screens.PersonaScreen
 import com.oscar.atestados.screens.SplashScreen
 import com.oscar.atestados.screens.VehiculoScreen
 import com.oscar.atestados.viewModel.PersonaViewModel
+import com.oscar.atestados.viewModel.VehiculoViewModel
 
 /**
  * Función principal de navegación de la aplicación.
@@ -58,10 +59,14 @@ fun AppNavigation() {
 
         // Definición de la pantalla "VehiculoScreen".
         composable("VehiculoScreen") {
-            VehiculoScreen {
-                // Navega de vuelta a la pantalla principal ("MainScreen").
-                navController.navigate("MainScreen")
-            }
+            val vehiculoViewModel = viewModel<VehiculoViewModel>()
+            VehiculoScreen(
+                navigateToScreen = { route ->
+                    // Navega de vuelta a la pantalla principal ("MainScreen").
+                    navController.navigate("MainScreen")
+                },
+                vehiculoViewModel = vehiculoViewModel
+            )
         }
 
         // Definición de la pantalla "Alcoholemia01Screen".

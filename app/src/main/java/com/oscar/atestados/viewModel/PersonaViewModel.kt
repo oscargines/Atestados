@@ -9,7 +9,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.oscar.atestados.screens.dataStore
+import com.oscar.atestados.screens.dataStorePer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -135,7 +135,7 @@ class PersonaViewModel : ViewModel() {
     // Función para guardar los datos en Preferences DataStore
     fun saveData(context: Context) {
         viewModelScope.launch {
-            val dataStore = context.dataStore
+            val dataStore = context.dataStorePer
 
             // Verificar si hay datos para guardar
             val hasDataToSave =
@@ -197,7 +197,7 @@ class PersonaViewModel : ViewModel() {
     // Función para limpiar los datos
     fun clearData(context: Context) {
         viewModelScope.launch {
-            val dataStore = context.dataStore
+            val dataStore = context.dataStorePer
             dataStore.edit { preferences ->
                 preferences.clear() // Limpia todas las preferencias
             }
@@ -222,7 +222,7 @@ class PersonaViewModel : ViewModel() {
     // Función para cargar todos los datos
     fun loadData(context: Context) {
         viewModelScope.launch {
-            val dataStore = context.dataStore
+            val dataStore = context.dataStorePer
 
             // Leer todos los datos del DataStore
             dataStore.data.collect { preferences ->

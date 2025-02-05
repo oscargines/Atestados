@@ -87,7 +87,7 @@ import java.util.Locale
  *
  * @property name Nombre del DataStore, utilizado para identificar el archivo de preferencias.
  */
-val Context.dataStore by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme")
+val Context.dataStorePer by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme")
 
 /**
  * Pantalla principal de la entidad "Persona".
