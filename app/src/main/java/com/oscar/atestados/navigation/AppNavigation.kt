@@ -7,12 +7,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.oscar.atestados.screens.Alcoholemia01Screen
 import com.oscar.atestados.screens.CarecerScreen
+import com.oscar.atestados.screens.GuardiasScreen
 import com.oscar.atestados.screens.MainScreen
 import com.oscar.atestados.screens.PersonaScreen
 import com.oscar.atestados.screens.SplashScreen
 import com.oscar.atestados.screens.VehiculoScreen
 import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.viewModel.VehiculoViewModel
+import com.oscar.atestados.viewModel.GuardiasViewModel
 
 /**
  * Función principal de navegación de la aplicación.
@@ -85,5 +87,20 @@ fun AppNavigation() {
                 }
             }
         }
+        // Definición de la pantalla "GuardiasScreen".
+        composable("GuardiasScreen") {
+            val guardiasViewModel = viewModel<GuardiasViewModel>()
+            GuardiasScreen(
+                navigateToScreen = {
+                    navController.navigate("MainScreen") {
+                        popUpTo("MainScreen") {
+                            inclusive = true
+                        }
+                    }
+                },
+                guardiasViewModel = guardiasViewModel
+            )
+        }
+
     }
 }

@@ -36,7 +36,7 @@ import com.oscar.atestados.ui.theme.TextoBotonesNormales
 fun CarecerScreen(navigateToScreen: (String) -> Unit) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { Toolbar() },
+        topBar = { Toolbar(navigateToScreen) },
         bottomBar = { BottomAppBar() }
     ) {
             paddingValues ->
@@ -45,19 +45,4 @@ fun CarecerScreen(navigateToScreen: (String) -> Unit) {
 
     }
 
-}
-
-@Preview(showBackground = true)
-@Composable
-fun CarecerScreenPreview() {
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = { Toolbar() },
-        bottomBar = { BottomAppBar() }
-    ) {
-            paddingValues ->
-        Content (modifier = Modifier.padding(paddingValues),
-            onNavigate = {  })
-
-    }
 }

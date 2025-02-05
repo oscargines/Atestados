@@ -14,6 +14,8 @@ object VehiculoScreen
 object Alcoholemia01Screen
 @Serializable
 object CarecerScreen
+@Serializable
+object GuardiasScreen
 
 
 

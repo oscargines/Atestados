@@ -60,7 +60,7 @@ fun MainScreen(navigateToScreen: (String) -> Unit) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { Toolbar() },
+        topBar = { Toolbar(navigateToScreen) },
         bottomBar = { BottomAppBar()}
     ) { paddingValues ->
         Content(
@@ -71,25 +71,8 @@ fun MainScreen(navigateToScreen: (String) -> Unit) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Preview(showBackground = true)
 @Composable
-fun ViewContainer() {
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = { Toolbar() },
-        bottomBar = { BottomAppBar()}
-
-    ) { paddingValues ->
-        Content(
-            modifier = Modifier.padding(paddingValues),
-            onNavigate = { }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun Toolbar() {
+fun Toolbar(onNavigate: (String) -> Unit) {
     var isDialogVisible by remember { mutableStateOf(false) }
     val plainTooltipState = rememberTooltipState()
 
@@ -111,7 +94,7 @@ fun Toolbar() {
                         },
                         content = {
                             IconButton(
-                                onClick = { /* Handle left icon click */ },
+                                onClick = { onNavigate("GuardiasScreen") },
                                 modifier = Modifier.fillMaxHeight(1f)
                             ) {
                                 Icon(
