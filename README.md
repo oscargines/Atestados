@@ -52,5 +52,9 @@ El uso de la aplicación supone que el usuario que la maneja podría encontrarse
 Hemos decidido implementar en nuestra aplicación la siguiente paleta de colores: 
 ![Image](https://github.com/user-attachments/assets/925e7438-df8c-48ba-8362-ea20cd540a20)
 
+La interfaz que el usuario debe de utilizar debe de destacar por su simplicidad. En la siguiente página se pueden observar algunas de los screen de la app, como muestra.
+
+![Image](https://github.com/user-attachments/assets/cdd4ee86-b45b-4693-8397-efed090c0060)
+
 
 
