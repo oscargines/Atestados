@@ -33,7 +33,7 @@ class GuardiasViewModel : ViewModel() {
 
     // Estados para el Segundo Interviniente
     private val _rolSegundoInterviniente = MutableLiveData<String>()
-    val segundoInterviniente : LiveData<String> = _rolSegundoInterviniente
+    val rolSegundoInterviniente : LiveData<String> = _rolSegundoInterviniente
 
     private val _segundoTip = MutableLiveData<String>()
     val segundoTip : LiveData<String> = _segundoTip
@@ -96,15 +96,15 @@ class GuardiasViewModel : ViewModel() {
         viewModelScope.launch {
             context.dataStoreGua.data.collect { preferences ->
                 // Primer Interviniente
-                _rolPrimerInterviniente.value = preferences[PreferencesKeys.ROL_PRIMER_INSTERVINIENTE] ?: ""
+                _rolPrimerInterviniente.value = preferences[PreferencesKeys.ROL_PRIMER_INSTERVINIENTE] ?: "Instructor"
                 _primerTip.value = preferences[PreferencesKeys.PRIMER_TIP] ?: ""
-                _empleoPrimerInterviniente.value = preferences[PreferencesKeys.EMPLEO_PRIMER_INSTERVINIENTE] ?: ""
+                _empleoPrimerInterviniente.value = preferences[PreferencesKeys.EMPLEO_PRIMER_INSTERVINIENTE] ?: "Guardia Civil"
                 _primerUnidad.value = preferences[PreferencesKeys.UNIDAD_PRIMER_INSTERVINIENTE] ?: ""
 
                 // Segundo Interviniente
-                _rolSegundoInterviniente.value = preferences[PreferencesKeys.ROL_SEGUNDO_INSTERVINIENTE] ?: ""
+                _rolSegundoInterviniente.value = preferences[PreferencesKeys.ROL_SEGUNDO_INSTERVINIENTE] ?: "Secretario"
                 _segundoTip.value = preferences[PreferencesKeys.SEGUNDO_TIP] ?: ""
-                _empleoSegundoInterviniente.value = preferences[PreferencesKeys.SEGUNDO_GUARDIA] ?: ""
+                _empleoSegundoInterviniente.value = preferences[PreferencesKeys.SEGUNDO_GUARDIA] ?: "Guardia Civil"
                 _segundoUnidad.value = preferences[PreferencesKeys.SEGUNDO_UNIDAD] ?: ""
             }
         }

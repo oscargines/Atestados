@@ -1,6 +1,7 @@
 package com.oscar.atestados.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +24,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,8 +44,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.oscar.atestados.ui.theme.BlueGray200
+import com.oscar.atestados.ui.theme.BlueGray900
+import com.oscar.atestados.ui.theme.BotonesNormales
+import com.oscar.atestados.ui.theme.PrimerComponenteColor
+import com.oscar.atestados.ui.theme.SegundoComponenteColor
+import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.viewModel.GuardiasViewModel
 import com.oscar.atestados.ui.theme.TextoNormales
+import com.oscar.atestados.ui.theme.TextoSecundarios
 
 /**
  * Pantalla principal de Guardias Civiles instructores.
@@ -96,7 +106,7 @@ fun GuardiasContent(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 10.dp, end = 10.dp, bottom = 30.dp, top = 40.dp)
+            .padding(start = 10.dp, end = 10.dp, bottom = 30.dp, top = 20.dp)
     ) {
         Column(
             modifier = Modifier
@@ -108,12 +118,13 @@ fun GuardiasContent(
             Text(
                 text = "Primer Interviniente",
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.Gray,
-                modifier = Modifier.padding(vertical = 8.dp)
+                color = TextoSecundarios,
+                textAlign = TextAlign.Center,
+                fontSize = 20.sp
             )
-            Spacer(modifier = Modifier.height(32.dp))
-            // Primer Interviniente Section
-            DropdownRol(guardiasViewModel)
+            Spacer(modifier = Modifier.size(32.dp))
+
+            DropdownRol(guardiasViewModel, 1, PrimerComponenteColor)
 
             guardiasViewModel.primerTip.value?.let {
                 CustomOutlinedTextField(
@@ -123,9 +134,9 @@ fun GuardiasContent(
                     placeholder = "Introduzca el TIP"
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.size(10.dp))
 
-            DropdownEmpleo(guardiasViewModel)
+            DropdownEmpleo(guardiasViewModel, 1, PrimerComponenteColor)
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -141,6 +152,41 @@ fun GuardiasContent(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Segundo Interviniente Section
+            Text(
+                text = "Segundo Interviniente",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextoSecundarios,
+                textAlign = TextAlign.Center,
+                fontSize = 20.sp
+            )
+            Spacer(modifier = Modifier.size(32.dp))
+
+            DropdownRol(guardiasViewModel, 2, SegundoComponenteColor)
+
+            guardiasViewModel.primerTip.value?.let {
+                CustomOutlinedTextField(
+                    value = it,
+                    onValueChange = { guardiasViewModel.updatePrimerTip(it) },
+                    label = "TIP",
+                    placeholder = "Introduzca el TIP"
+                )
+            }
+            Spacer(modifier = Modifier.size(10.dp))
+
+            DropdownEmpleo(guardiasViewModel, 2, SegundoComponenteColor)
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            guardiasViewModel.primerUnidad.value?.let {
+                CustomOutlinedTextField(
+                    value = it,
+                    onValueChange = { guardiasViewModel.updatePrimerUnidad(it) },
+                    label = "Unidad",
+                    placeholder = "Introduzca la unidad"
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
 
         }
     }
@@ -148,21 +194,35 @@ fun GuardiasContent(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownRol(guardiasViewModel: GuardiasViewModel) {
+fun DropdownRol(guardiasViewModel: GuardiasViewModel,
+                int: Int,
+                containerColor: Color) {
     var isExpandedRol by remember { mutableStateOf(false) }
     val listRol = listOf("Instructor", "Secretario", "Otro rol")
-    val selectedText by guardiasViewModel.rolPrimerInterviniente.observeAsState(initial = listRol[0])
+
+    val selectedTextRol = when (int) {
+        1 -> guardiasViewModel.rolPrimerInterviniente.observeAsState(initial = listRol[0])
+        2 -> guardiasViewModel.rolSegundoInterviniente.observeAsState(initial = listRol[0])
+        else -> guardiasViewModel.rolPrimerInterviniente.observeAsState(initial = listRol[0])
+    }.value
 
     ExposedDropdownMenuBox(
         expanded = isExpandedRol,
         onExpandedChange = { isExpandedRol = !isExpandedRol }
     ) {
         OutlinedTextField(
-            value = selectedText,
+            value = selectedTextRol,
             onValueChange = {},
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedRol) },
             modifier = Modifier.menuAnchor()
+                .background(containerColor),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = containerColor,
+                unfocusedContainerColor = containerColor,
+                focusedTextColor = BlueGray900,
+                unfocusedTextColor = BlueGray900
+            )
         )
 
         ExposedDropdownMenu(
@@ -173,7 +233,10 @@ fun DropdownRol(guardiasViewModel: GuardiasViewModel) {
                 DropdownMenuItem(
                     text = { Text(text = item) },
                     onClick = {
-                        guardiasViewModel.updateRolPrimerInterviniente(item)
+                        when (int) {
+                            1 -> guardiasViewModel.updateRolPrimerInterviniente(item)
+                            2 -> guardiasViewModel.updateRolSegundoInterviniente(item)
+                        }
                         isExpandedRol = false
                     }
                 )
@@ -184,8 +247,10 @@ fun DropdownRol(guardiasViewModel: GuardiasViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel) {
-    var isExpandedRol by remember { mutableStateOf(false) }
+fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel,
+                   int: Int,
+                   containerColor: Color) {
+    var isExpandedEmpleo by remember { mutableStateOf(false) }
     val listRol = listOf(
         "Guardia Civil",
         "Guardia Civil 1ª",
@@ -199,30 +264,46 @@ fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel) {
         "Capitán",
         "Comandante"
     )
-    val selectedText by guardiasViewModel.rolPrimerInterviniente.observeAsState(initial = listRol[0])
+    val selectedTextEmpleo = when (int) {
+        1 -> guardiasViewModel.empleoPrimerInterviniente.observeAsState(initial = listRol[0])
+        2 -> guardiasViewModel.empleoSegundoInterviniente.observeAsState(initial = listRol[0])
+        else -> guardiasViewModel.empleoPrimerInterviniente.observeAsState(initial = listRol[0])
+    }.value
 
     ExposedDropdownMenuBox(
-        expanded = isExpandedRol,
-        onExpandedChange = { isExpandedRol = !isExpandedRol }
+        expanded = isExpandedEmpleo,
+        onExpandedChange = { isExpandedEmpleo = !isExpandedEmpleo }
     ) {
         OutlinedTextField(
-            value = selectedText,
+            value = selectedTextEmpleo,
             onValueChange = {},
             readOnly = true,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedRol) },
-            modifier = Modifier.menuAnchor()
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedEmpleo) },
+            modifier = Modifier
+                .menuAnchor()
+                .background(containerColor),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = containerColor,
+                unfocusedContainerColor = containerColor,
+                focusedTextColor = BlueGray900,
+                unfocusedTextColor = BlueGray900
+            )
+
         )
 
         ExposedDropdownMenu(
-            expanded = isExpandedRol,
-            onDismissRequest = { isExpandedRol = false }
+            expanded = isExpandedEmpleo,
+            onDismissRequest = { isExpandedEmpleo = false }
         ) {
             listRol.forEach { item ->
                 DropdownMenuItem(
                     text = { Text(text = item) },
                     onClick = {
-                        guardiasViewModel.updateRolPrimerInterviniente(item)
-                        isExpandedRol = false
+                        when (int) {
+                            1 -> guardiasViewModel.updateEmpleoPrimerInterviniente(item)
+                            2 -> guardiasViewModel.updateEmpleoSegundoInterviniente(item)
+                        }
+                        isExpandedEmpleo = false
                     }
                 )
             }
@@ -250,11 +331,6 @@ fun BottomAppBarGuardias(
             Button(
                 onClick = {
                     guardiasViewModel.saveData(context)
-                    Toast.makeText(
-                        context,
-                        "Datos guardados correctamente",
-                        Toast.LENGTH_SHORT
-                    ).show()
                     navigateToScreen("MainScreen")
                 },
                 modifier = Modifier
@@ -262,8 +338,8 @@ fun BottomAppBarGuardias(
                     .padding(end = 5.dp),
                 shape = RoundedCornerShape(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.DarkGray,
-                    contentColor = Color.White
+                    containerColor = BotonesNormales,
+                    contentColor = TextoBotonesNormales
                 )
             ) {
                 Text(
@@ -282,8 +358,8 @@ fun BottomAppBarGuardias(
                     .padding(start = 5.dp),
                 shape = RoundedCornerShape(0.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.DarkGray,
-                    contentColor = Color.White
+                    containerColor = BotonesNormales,
+                    contentColor = TextoBotonesNormales
                 )
             ) {
                 Text(
