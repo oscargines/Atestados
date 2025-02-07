@@ -50,12 +50,12 @@ El uso mismo de la aplicación puede tener connotaciones negativas para el usuar
 El uso de la aplicación supone que el usuario que la maneja podría encontrarse en una situación de estrés, lo cual puede dificultar su interacción con la misma. Por lo tanto, debe contar con un entorno lo más simple y accesible posible, evitando la artificialidad o elementos estéticos que no aporten funcionalidad. La simplicidad visual es clave, evitando que el usuario necesite tiempo extra para comprender lo que ve. La app debe ser discreta e intuitiva, permitiendo que la experiencia acumulada en su uso facilite el manejo sin complicaciones.
 
 Hemos decidido implementar en nuestra aplicación la siguiente paleta de colores: 
-![Image](https://github.com/user-attachments/assets/925e7438-df8c-48ba-8362-ea20cd540a20)
+![Image](https://github.com/user-attachments/assets/42372331-07f5-4f99-b9ee-f2c33fe237b4)
 
 La interfaz que el usuario debe de utilizar debe de destacar por su simplicidad. En la siguiente página se pueden observar algunas de los screen de la app, como muestra.
 
-![Image](https://github.com/user-attachments/assets/cdd4ee86-b45b-4693-8397-efed090c0060)
-![Image](https://github.com/user-attachments/assets/bf3d611b-fce3-4c2e-9bbb-b513adc7fa0f)
+![Image](https://github.com/user-attachments/assets/4eb6f3cc-8e73-4619-9287-4d2288d9f802)
+![Image](https://github.com/user-attachments/assets/57b8fdc0-5ad0-41ec-9e05-30c2d251334b)
 
 
 
