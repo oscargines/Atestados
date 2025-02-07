@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,7 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.oscar.atestados.ui.theme.BlueGray200
@@ -53,6 +56,7 @@ import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.viewModel.GuardiasViewModel
 import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
+import com.oscar.atestados.ui.theme.TextoTerciarios
 
 /**
  * Pantalla principal de Guardias Civiles instructores.
@@ -103,100 +107,98 @@ fun GuardiasContent(
     modifier: Modifier = Modifier,
     guardiasViewModel: GuardiasViewModel
 ) {
+    val primerTip by guardiasViewModel.primerTip.observeAsState(initial = "")
+    val segundoTip by guardiasViewModel.segundoTip.observeAsState(initial = "")
+    val primerUnidad by guardiasViewModel.primerUnidad.observeAsState(initial = "")
+    val segundoUnidad by guardiasViewModel.segundoUnidad.observeAsState(initial = "")
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 10.dp, end = 10.dp, bottom = 30.dp, top = 20.dp)
+            .padding(horizontal = 10.dp, vertical = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Primer Interviniente Section
+            // Primer Interviniente
             Text(
                 text = "Primer Interviniente",
                 style = MaterialTheme.typography.titleMedium,
                 color = TextoSecundarios,
+                modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 fontSize = 20.sp
             )
-            Spacer(modifier = Modifier.size(32.dp))
 
             DropdownRol(guardiasViewModel, 1, PrimerComponenteColor)
 
-            guardiasViewModel.primerTip.value?.let {
-                CustomOutlinedTextField(
-                    value = it,
-                    onValueChange = { guardiasViewModel.updatePrimerTip(it) },
-                    label = "TIP",
-                    placeholder = "Introduzca el TIP"
-                )
-            }
-            Spacer(modifier = Modifier.size(10.dp))
+            OutlinedTextFieldCustom(
+                value = primerTip,
+                onValueChange = { guardiasViewModel.updatePrimerTip(it) },
+                label = "TIP",
+                placeholder = "Introduzca el TIP",
+                containerColor = PrimerComponenteColor,
+                backColor = PrimerComponenteColor
+            )
 
             DropdownEmpleo(guardiasViewModel, 1, PrimerComponenteColor)
 
-            Spacer(modifier = Modifier.height(10.dp))
+            OutlinedTextFieldCustom(
+                value = primerUnidad,
+                onValueChange = { guardiasViewModel.updatePrimerUnidad(it) },
+                label = "Unidad",
+                placeholder = "Introduzca la unidad",
+                containerColor = PrimerComponenteColor,
+                backColor = PrimerComponenteColor
+            )
 
-            guardiasViewModel.primerUnidad.value?.let {
-                CustomOutlinedTextField(
-                    value = it,
-                    onValueChange = { guardiasViewModel.updatePrimerUnidad(it) },
-                    label = "Unidad",
-                    placeholder = "Introduzca la unidad"
-                )
-            }
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Segundo Interviniente Section
+            // Segundo Interviniente
             Text(
                 text = "Segundo Interviniente",
                 style = MaterialTheme.typography.titleMedium,
                 color = TextoSecundarios,
+                modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center,
                 fontSize = 20.sp
             )
-            Spacer(modifier = Modifier.size(32.dp))
 
             DropdownRol(guardiasViewModel, 2, SegundoComponenteColor)
 
-            guardiasViewModel.primerTip.value?.let {
-                CustomOutlinedTextField(
-                    value = it,
-                    onValueChange = { guardiasViewModel.updatePrimerTip(it) },
-                    label = "TIP",
-                    placeholder = "Introduzca el TIP"
-                )
-            }
-            Spacer(modifier = Modifier.size(10.dp))
+            OutlinedTextFieldCustom(
+                value = segundoTip,
+                onValueChange = { guardiasViewModel.updateSegundoTip(it) },
+                label = "TIP",
+                placeholder = "Introduzca el TIP",
+                containerColor = SegundoComponenteColor,
+                backColor = SegundoComponenteColor
+            )
 
             DropdownEmpleo(guardiasViewModel, 2, SegundoComponenteColor)
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            guardiasViewModel.primerUnidad.value?.let {
-                CustomOutlinedTextField(
-                    value = it,
-                    onValueChange = { guardiasViewModel.updatePrimerUnidad(it) },
-                    label = "Unidad",
-                    placeholder = "Introduzca la unidad"
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
+            OutlinedTextFieldCustom(
+                value = segundoUnidad,
+                onValueChange = { guardiasViewModel.updateSegundoUnidad(it) },
+                label = "Unidad",
+                placeholder = "Introduzca la unidad",
+                containerColor = SegundoComponenteColor,
+                backColor = SegundoComponenteColor
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownRol(guardiasViewModel: GuardiasViewModel,
-                int: Int,
-                containerColor: Color) {
+fun DropdownRol(
+    guardiasViewModel: GuardiasViewModel,
+    int: Int,
+    containerColor: Color
+) {
     var isExpandedRol by remember { mutableStateOf(false) }
     val listRol = listOf("Instructor", "Secretario", "Otro rol")
 
@@ -207,6 +209,7 @@ fun DropdownRol(guardiasViewModel: GuardiasViewModel,
     }.value
 
     ExposedDropdownMenuBox(
+        modifier = Modifier.fillMaxWidth(),
         expanded = isExpandedRol,
         onExpandedChange = { isExpandedRol = !isExpandedRol }
     ) {
@@ -215,8 +218,10 @@ fun DropdownRol(guardiasViewModel: GuardiasViewModel,
             onValueChange = {},
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedRol) },
-            modifier = Modifier.menuAnchor()
-                .background(containerColor),
+            modifier = Modifier
+                .menuAnchor()
+                .background(containerColor)
+                .fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = containerColor,
                 unfocusedContainerColor = containerColor,
@@ -247,9 +252,11 @@ fun DropdownRol(guardiasViewModel: GuardiasViewModel,
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel,
-                   int: Int,
-                   containerColor: Color) {
+fun DropdownEmpleo(
+    guardiasViewModel: GuardiasViewModel,
+    int: Int,
+    containerColor: Color
+) {
     var isExpandedEmpleo by remember { mutableStateOf(false) }
     val listRol = listOf(
         "Guardia Civil",
@@ -271,6 +278,7 @@ fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel,
     }.value
 
     ExposedDropdownMenuBox(
+        modifier = Modifier.fillMaxWidth(),
         expanded = isExpandedEmpleo,
         onExpandedChange = { isExpandedEmpleo = !isExpandedEmpleo }
     ) {
@@ -281,13 +289,15 @@ fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedEmpleo) },
             modifier = Modifier
                 .menuAnchor()
-                .background(containerColor),
+                .background(containerColor)
+                .fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = containerColor,
                 unfocusedContainerColor = containerColor,
                 focusedTextColor = BlueGray900,
                 unfocusedTextColor = BlueGray900
-            )
+            ),
+            maxLines = 1
 
         )
 
@@ -309,6 +319,47 @@ fun DropdownEmpleo(guardiasViewModel: GuardiasViewModel,
             }
         }
     }
+}
+
+@Composable
+fun OutlinedTextFieldCustom(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    containerColor: Color,
+    backColor: Color
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = {
+            Text(
+                text = label,
+                color = TextoSecundarios // Usar color específico para labels
+            )
+        },
+        placeholder = {
+            Text(
+                text = placeholder,
+                color = TextoTerciarios,
+                textDecoration = TextDecoration.Underline
+            )
+        },
+        shape = MaterialTheme.shapes.extraSmall,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+        modifier = modifier,
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = backColor,
+            unfocusedContainerColor = backColor,
+            focusedTextColor = BlueGray900,
+            unfocusedTextColor = BlueGray900,
+            focusedLabelColor = TextoSecundarios,  // Color cuando está enfocado
+            unfocusedLabelColor = TextoSecundarios // Color cuando no está enfocado
+        )
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

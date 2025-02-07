@@ -35,7 +35,7 @@ val Transparent = Color(0x00000000)
 Colores utilizados para Screen de Componentes
  */
 val PrimerComponenteColor = Color(0xFFC8E6C9) //Primer componente --> Green100
-val SegundoComponenteColor = Color(0xFFB3E5FC) //Segundo componente --> LightBlue100
+val SegundoComponenteColor = Color(0xFFFFD180) //Segundo componente --> OrangeA100
 
 /*
 Colores a utilizar para las screen en general
