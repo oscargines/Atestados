@@ -14,8 +14,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * ViewModel para gestionar los datos personales de un individuo.
+ * Maneja la persistencia de datos utilizando DataStore y expone los datos a través de LiveData.
+ */
 class PersonaViewModel : ViewModel() {
 
+    //LiveData declarations...
     private val _genero = MutableLiveData<String>()
     val genero: LiveData<String> = _genero
 
@@ -58,6 +63,10 @@ class PersonaViewModel : ViewModel() {
     private val _email = MutableLiveData<String>()
     val email: LiveData<String> = _email
 
+    /**
+     * Objeto que contiene las claves para almacenar los datos en DataStore.
+     * Cada clave corresponde a un campo específico de información personal.
+     */
     object PersonaKeys {
         val GENERO = stringPreferencesKey("genero")
         val NACIONALIDAD = stringPreferencesKey("nacionalidad")
@@ -79,11 +88,19 @@ class PersonaViewModel : ViewModel() {
     fun updateGenero(valor: String) {
         _genero.value = valor
     }
-
+    /**
+     * Actualiza el valor de la nacionalidad de la persona.
+     *
+     * @param valor Nueva nacionalidad
+     */
     fun updateNacionalidad(valor: String) {
         _nacionalidad.value = valor
     }
-
+    /**
+     * Actualiza el valor de la nacionalidad de la persona.
+     *
+     * @param valor Nueva nacionalidad
+     */
     fun updateTipoDocumento(valor: String) {
         _tipoDocumento.value = valor
     }
@@ -132,29 +149,31 @@ class PersonaViewModel : ViewModel() {
         _email.value = valor
     }
 
-    // Función para guardar los datos en Preferences DataStore
+    /**
+     * Guarda todos los datos personales en el DataStore.
+     * Muestra una alerta si no hay datos para guardar o un Toast de confirmación si el guardado es exitoso.
+     *
+     * @param context Contexto de la aplicación necesario para acceder al DataStore
+     */
     fun saveData(context: Context) {
         viewModelScope.launch {
             val dataStore = context.dataStorePer
 
             // Verificar si hay datos para guardar
-            val hasDataToSave =
-                _genero.value.isNullOrBlank() &&
-                        _nacionalidad.value.isNullOrBlank() &&
-                        _tipoDocumento.value.isNullOrBlank() &&
-                        _numeroDocumento.value.isNullOrBlank() &&
-                        _nombre.value.isNullOrBlank() &&
-                        _apellidos.value.isNullOrBlank() &&
-                        _nombrePadre.value.isNullOrBlank() &&
-                        _nombreMadre.value.isNullOrBlank() &&
-                        _fechaNacimiento.value.isNullOrBlank() &&
-                        _lugarNacimiento.value.isNullOrBlank() &&
-                        _domicilio.value.isNullOrBlank() &&
-                        _codigoPostal.value.isNullOrBlank() &&
-                        _telefono.value.isNullOrBlank() &&
-                        _email.value.isNullOrBlank()
+            val hasEmptyReqredField =
+                _genero.value.isNullOrBlank() ||
+                        _nacionalidad.value.isNullOrBlank() ||
+                        _tipoDocumento.value.isNullOrBlank() ||
+                        _numeroDocumento.value.isNullOrBlank() ||
+                        _nombre.value.isNullOrBlank() ||
+                        _apellidos.value.isNullOrBlank() ||
+                        _nombrePadre.value.isNullOrBlank() ||
+                        _nombreMadre.value.isNullOrBlank() ||
+                        _fechaNacimiento.value.isNullOrBlank() ||
+                        _lugarNacimiento.value.isNullOrBlank() ||
+                        _domicilio.value.isNullOrBlank()
 
-            if (hasDataToSave) {
+            if (hasEmptyReqredField) {
                 // Mostrar alerta si no hay datos
                 withContext(Dispatchers.Main) {
                     AlertDialog.Builder(context)
@@ -195,7 +214,12 @@ class PersonaViewModel : ViewModel() {
         }
     }
 
-    // Función para limpiar los datos
+    /**
+     * Limpia todos los datos almacenados tanto en el DataStore como en los LiveData.
+     * Establece todos los valores a cadenas vacías.
+     *
+     * @param context Contexto de la aplicación necesario para acceder al DataStore
+     */
     fun clearData(context: Context) {
         viewModelScope.launch {
             val dataStore = context.dataStorePer
@@ -220,7 +244,12 @@ class PersonaViewModel : ViewModel() {
         _email.value = ""
     }
 
-    // Función para cargar todos los datos
+    /**
+     * Carga todos los datos almacenados en el DataStore y los asigna a los LiveData correspondientes.
+     * Si no hay datos almacenados, se utilizan cadenas vacías como valores predeterminados.
+     *
+     * @param context Contexto de la aplicación necesario para acceder al DataStore
+     */
     fun loadData(context: Context) {
         viewModelScope.launch {
             val dataStore = context.dataStorePer

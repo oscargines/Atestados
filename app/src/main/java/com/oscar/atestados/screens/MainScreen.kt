@@ -115,7 +115,7 @@ fun Toolbar(onNavigate: (String) -> Unit) {
                         },
                         content = {
                             IconButton(
-                                onClick = { /* Handle right icon click */ },
+                                onClick = { onNavigate("ImpresoraScreen") },
                                 modifier = Modifier.fillMaxHeight(1f)
                             ) {
                                 Icon(

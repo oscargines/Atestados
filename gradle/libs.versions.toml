@@ -30,6 +30,7 @@ cameraView = "1.4.1"
 cameraLifecycle = "1.4.1"
 visionCommon = "17.3.0"
 playServicesMlkitTextRecognitionCommon = "19.1.0"
+bluetooth = "1.0.0-alpha02"
 
 [libraries]
 androidx-activity-compose-v180 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
@@ -72,6 +73,7 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraLifecycle" }
 vision-common = { group = "com.google.mlkit", name = "vision-common", version.ref = "visionCommon" }
 play-services-mlkit-text-recognition-common = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition-common", version.ref = "playServicesMlkitTextRecognitionCommon" }
+androidx-bluetooth = { group = "androidx.bluetooth", name = "bluetooth", version.ref = "bluetooth" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

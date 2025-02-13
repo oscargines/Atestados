@@ -128,7 +128,18 @@ fun VehiculoScreen(
         )
     }
 }
-
+/**
+ * Contenido principal de la pantalla de vehículos.
+ * Incluye campos de texto y selectores de fecha para gestionar los datos del vehículo.
+ *
+ * @param navigateToScreen Función de navegación para cambiar entre pantallas.
+ * @param vehiculoViewModel ViewModel asociado que maneja la lógica y estado de los datos.
+ * @param onTextFieldChanged Callback para actualizar el valor de los campos de texto.
+ * @param onDatePickerMatriculacionClicked Callback para mostrar el selector de fecha de matriculación.
+ * @param onDatePickerITVClicked Callback para mostrar el selector de fecha de ITV.
+ * @param showDatePickerMatriculacion Estado que controla la visibilidad del selector de fecha de matriculación.
+ * @param showDatePickerITV Estado que controla la visibilidad del selector de fecha de ITV.
+ */
 @Composable
 fun VehiculoScreenContent(
     navigateToScreen: (String) -> Unit,
@@ -155,7 +166,13 @@ fun VehiculoScreenContent(
         )
     }
 }
-
+/**
+ * Barra inferior de la pantalla de vehículos.
+ * Incluye botones con tooltips para guardar y limpiar los datos ingresados.
+ *
+ * @param vehiculoViewModel ViewModel asociado que maneja la lógica y estado de los datos.
+ * @param navigateToScreen Función de navegación para cambiar entre pantallas.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomAppBarVehiculo(
@@ -250,7 +267,10 @@ fun BottomAppBarVehiculo(
         }
     }
 }
-
+/**
+ * Barra superior de la pantalla de vehículos.
+ * Muestra el título "Vehículo" con un estilo centrado y personalizado.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolbarVehiculo() {
@@ -273,7 +293,18 @@ fun ToolbarVehiculo() {
         )
     )
 }
-
+/**
+ * Contenido principal del formulario de vehículos.
+ * Incluye campos de texto y selectores de fecha para gestionar los datos del vehículo.
+ *
+ * @param modifier Modificador de Compose para estilizar el contenedor.
+ * @param onTextFieldChanged Callback para actualizar el valor de los campos de texto.
+ * @param vehiculoViewModel ViewModel asociado que maneja la lógica y estado de los datos.
+ * @param onDatePickerMatriculacionClicked Callback para mostrar el selector de fecha de matriculación.
+ * @param onDatePickerITVClicked Callback para mostrar el selector de fecha de ITV.
+ * @param showDatePickerMatriculacion Estado que controla la visibilidad del selector de fecha de matriculación.
+ * @param showDatePickerITV Estado que controla la visibilidad del selector de fecha de ITV.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VehiculoContent(
@@ -392,6 +423,17 @@ fun VehiculoContent(
     }
 }
 
+/**
+ * Campo de texto personalizado con soporte para etiquetas, marcadores de posición e íconos.
+ *
+ * @param value Valor actual del campo de texto.
+ * @param onValueChange Callback para actualizar el valor del campo de texto.
+ * @param label Etiqueta del campo de texto.
+ * @param placeholder Marcador de posición del campo de texto.
+ * @param keyboardType Tipo de teclado utilizado.
+ * @param modifier Modificador de Compose para estilizar el campo de texto.
+ * @param leadingIcon Ícono opcional que aparece al inicio del campo de texto.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomOutlinedTextField(
@@ -421,7 +463,12 @@ fun CustomOutlinedTextField(
         leadingIcon = leadingIcon
     )
 }
-
+/**
+ * Selector de fecha personalizado para gestionar fechas relacionadas con el vehículo.
+ *
+ * @param onDateSelected Callback para manejar la fecha seleccionada.
+ * @param onDismiss Callback para manejar el cierre del selector de fecha.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun getDateDialogVeh(

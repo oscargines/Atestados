@@ -92,23 +92,41 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int):
         // Aquí puedes manejar la actualización de la base de datos si es necesario
     }
 
-    fun query(query: String): List<String> {
-        val result = mutableListOf<String>()
-        val db = SQLiteDatabase.openDatabase(DB_PATH, null, SQLiteDatabase.OPEN_READONLY)
-        val cursor = db.rawQuery(query, null)
-        if (cursor.moveToFirst()) {
-            do {
-                // Supongamos que la consulta devuelve una sola columna de tipo String
-                val data = cursor.getString(0)
-                result.add(data)
-            } while (cursor.moveToNext())
+    fun query(query: String): List<Map<String, Any>> {
+        return SQLiteDatabase.openDatabase(DB_PATH, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery(query, null).use { cursor ->
+                val result = mutableListOf<Map<String, Any>>()
+                if (cursor.moveToFirst()) {
+                    do {
+                        val row = mutableMapOf<String, Any>()
+                        for (i in 0 until cursor.columnCount) {
+                            row[cursor.getColumnName(i)] = cursor.getString(i)
+                        }
+                        result.add(row)
+                    } while (cursor.moveToNext())
+                }
+                result
+            }
         }
-        cursor.close()
-        db.close()
-        return result
     }
     fun copiaBD(): Boolean{
-        copyDatabase()
-        return checkDatabase()
+        try {
+            copyDatabase()
+            return checkDatabase()
+        }catch (e: IOException){
+            Log.e("AccesoBaseDatos", "Error copiando la base de datos: ${e.message}")
+            return false
+        }
+
+    }
+    fun ensureTableExists() {
+        val db = this.writableDatabase
+        db.execSQL("""
+        CREATE TABLE IF NOT EXISTS dispositivos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            mac TEXT NOT NULL UNIQUE
+        )
+    """)
     }
 }

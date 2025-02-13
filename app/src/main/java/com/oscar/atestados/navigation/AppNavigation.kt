@@ -1,6 +1,11 @@
 package com.oscar.atestados.navigation
 
+import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -8,13 +13,16 @@ import androidx.navigation.compose.rememberNavController
 import com.oscar.atestados.screens.Alcoholemia01Screen
 import com.oscar.atestados.screens.CarecerScreen
 import com.oscar.atestados.screens.GuardiasScreen
+import com.oscar.atestados.screens.ImpresoraScreen
 import com.oscar.atestados.screens.MainScreen
 import com.oscar.atestados.screens.PersonaScreen
 import com.oscar.atestados.screens.SplashScreen
 import com.oscar.atestados.screens.VehiculoScreen
+import com.oscar.atestados.viewModel.BluetoothViewModel
 import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.viewModel.VehiculoViewModel
 import com.oscar.atestados.viewModel.GuardiasViewModel
+import com.oscar.atestados.viewModel.ImpresoraViewModel
 
 /**
  * Función principal de navegación de la aplicación.
@@ -32,6 +40,9 @@ import com.oscar.atestados.viewModel.GuardiasViewModel
 fun AppNavigation() {
     // Controlador de navegación que gestiona la navegación entre las pantallas.
     val navController = rememberNavController()
+
+    // Creamos una instancia del BluetoothViewModel que será compartida
+    val bluetoothViewModel = viewModel<BluetoothViewModel>()
 
     // Configuración del NavHost, que define la estructura de navegación de la aplicación.
     NavHost(
@@ -101,6 +112,43 @@ fun AppNavigation() {
                 guardiasViewModel = guardiasViewModel
             )
         }
+        // Definición de la pantalla "ImpresoraScreen".
+        composable("ImpresoraScreen") {
+            val context = LocalContext.current
+            
+            val factory = remember {
+                    ImpresoraViewModelFactory(
+                        bluetoothViewModel = bluetoothViewModel,
+                        context = navController.context
+                    )
 
+            }
+            val impresoraViewModel: ImpresoraViewModel = viewModel(factory = factory)
+
+            ImpresoraScreen(
+                navigateToScreen = {
+                    navController.navigate("MainScreen") {
+                        popUpTo("MainScreen") {
+                            inclusive = true
+                        }
+                    }
+
+                },
+                impresoraViewModel = impresoraViewModel
+            )
+        }
+    }
+}
+
+class ImpresoraViewModelFactory(
+    private val bluetoothViewModel: BluetoothViewModel,
+    private val context: Context
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ImpresoraViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return ImpresoraViewModel(bluetoothViewModel, context) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

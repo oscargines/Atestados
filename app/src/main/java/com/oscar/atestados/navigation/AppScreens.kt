@@ -7,6 +7,10 @@ object SplashScreen
 @Serializable
 object MainScreen
 @Serializable
+object ImpresoraScreen
+@Serializable
+object GuardiasScreen
+@Serializable
 object PersonaScreen
 @Serializable
 object VehiculoScreen
@@ -14,8 +18,6 @@ object VehiculoScreen
 object Alcoholemia01Screen
 @Serializable
 object CarecerScreen
-@Serializable
-object GuardiasScreen
 
 
 

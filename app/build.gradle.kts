@@ -79,6 +79,7 @@ dependencies {
     implementation(libs.vision.common)
     implementation(libs.play.services.mlkit.text.recognition.common)
     implementation(libs.play.services.mlkit.text.recognition)
+    implementation(libs.androidx.bluetooth)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

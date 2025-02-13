@@ -1,5 +1,6 @@
 package com.oscar.atestados.screens
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.preferencesDataStore
 import com.oscar.atestados.ui.theme.BlueGray200
 import com.oscar.atestados.ui.theme.BlueGray900
 import com.oscar.atestados.ui.theme.BotonesNormales
@@ -58,15 +61,26 @@ import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
 import com.oscar.atestados.ui.theme.TextoTerciarios
 
+val Context.dataStoreGua by preferencesDataStore(name = "GUARDIAS_PREFERENCES")
+
 /**
  * Pantalla principal de Guardias Civiles instructores.
  * Muestra un formulario para gestionar los datos de los instructores intervinientes.
+ *
+ * @param navigateToScreen Función lambda para navegar entre pantallas
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica de la pantalla
  */
 @Composable
 fun GuardiasScreen(
     navigateToScreen: (String) -> Unit,
     guardiasViewModel: GuardiasViewModel
 ) {
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        guardiasViewModel.loadData(context)
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { ToolbarGuardias() },
@@ -78,7 +92,10 @@ fun GuardiasScreen(
         )
     }
 }
-
+/**
+ * Barra superior de la pantalla de Guardias.
+ * Muestra el título "Instructores" en el centro de la barra.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolbarGuardias() {
@@ -101,7 +118,13 @@ fun ToolbarGuardias() {
         )
     )
 }
-
+/**
+ * Contenido principal de la pantalla de Guardias.
+ * Muestra los formularios para dos intervinientes con campos para TIP, rol, empleo y unidad.
+ *
+ * @param modifier Modifier para personalizar el diseño del contenido
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica de la pantalla
+ */
 @Composable
 fun GuardiasContent(
     modifier: Modifier = Modifier,
@@ -191,7 +214,13 @@ fun GuardiasContent(
         }
     }
 }
-
+/**
+ * Menú desplegable para seleccionar el rol del interviniente.
+ *
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica
+ * @param int Identificador del interviniente (1 para el primero, 2 para el segundo)
+ * @param containerColor Color de fondo del componente
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropdownRol(
@@ -249,7 +278,13 @@ fun DropdownRol(
         }
     }
 }
-
+/**
+ * Menú desplegable para seleccionar el empleo del interviniente.
+ *
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica
+ * @param int Identificador del interviniente (1 para el primero, 2 para el segundo)
+ * @param containerColor Color de fondo del componente
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropdownEmpleo(
@@ -320,7 +355,17 @@ fun DropdownEmpleo(
         }
     }
 }
-
+/**
+ * Campo de texto personalizado con estilo y formato específico.
+ *
+ * @param value Valor actual del campo de texto
+ * @param onValueChange Callback que se ejecuta cuando cambia el valor
+ * @param label Etiqueta que describe el campo
+ * @param placeholder Texto de ayuda que se muestra cuando el campo está vacío
+ * @param modifier Modifier para personalizar el diseño del campo
+ * @param containerColor Color del contenedor del campo
+ * @param backColor Color de fondo del campo
+ */
 @Composable
 fun OutlinedTextFieldCustom(
     value: String,
@@ -361,7 +406,13 @@ fun OutlinedTextFieldCustom(
         )
     )
 }
-
+/**
+ * Barra inferior de la pantalla de Guardias.
+ * Contiene botones para guardar y limpiar los datos del formulario.
+ *
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica
+ * @param navigateToScreen Función lambda para navegar entre pantallas
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomAppBarGuardias(

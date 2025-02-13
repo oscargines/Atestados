@@ -44,6 +44,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -119,9 +120,15 @@ fun PersonaScreen(
         CameraPreview(
             onImageCaptured = { bitmap ->
                 showCamera = false
-                processImage(bitmap) { text ->
-                    personaViewModel.updateNombre(text) // Ejemplo: actualizar el nombre
-                }
+                processImage(bitmap,
+                    { text -> personaViewModel.updateNombre(text) },
+                    { error ->
+                        Toast.makeText(
+                            context,
+                            "Se ha producido un error al procesar la imagen",
+                            LENGTH_SHORT
+                        ).show()
+                    })
             },
             onDismiss = { showCamera = false }
         )
@@ -133,6 +140,7 @@ fun PersonaScreen(
         onCameraButtonClicked = onCameraButtonClicked,
         onTextFieldChanged = { text -> personaViewModel.updateNombre(text) }
     )
+
 }
 
 /**
@@ -206,11 +214,6 @@ fun BottomAppBarPersona(
                 Button(
                     onClick = {
                         personaViewModel.saveData(context)
-                        Toast.makeText(
-                            context,
-                            "Datos guardados correctamente",
-                            LENGTH_SHORT
-                        ).show()
                         navigateToScreen("MainScreen")
                     },
                     modifier = Modifier
@@ -327,7 +330,9 @@ fun PersonaContent(
     personaViewModel: PersonaViewModel,
 
     ) {
+    val context = LocalContext.current
     var showDatePicker by remember { mutableStateOf(false) }
+    val paises by remember { mutableStateOf(getPaises(context)) }
 
     //Estados para los campos de texto
     val nombre by personaViewModel.nombre.observeAsState(initial = "")
@@ -361,7 +366,7 @@ fun PersonaContent(
             ) {
                 DropDownSexo(personaViewModel)
                 Spacer(modifier = Modifier.width(8.dp))
-                DropDownNacionalidad(personaViewModel)
+                DropDownNacionalidad(personaViewModel, paises)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -614,11 +619,14 @@ fun DropDownSexo(personaViewModel: PersonaViewModel) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DropDownNacionalidad(personaViewModel: PersonaViewModel) {
-
+fun DropDownNacionalidad(
+    personaViewModel: PersonaViewModel,
+    paises: List<String>
+) {
     var isExpandedNacionalidad by remember { mutableStateOf(false) }
-    val listNacionalidad = getPaises()
-    val selectedText by personaViewModel.nacionalidad.observeAsState(initial = listNacionalidad[0])
+    val selectedText by personaViewModel.nacionalidad.observeAsState(
+        initial = paises.firstOrNull() ?: ""
+    )
 
     ExposedDropdownMenuBox(
         expanded = isExpandedNacionalidad,
@@ -630,13 +638,12 @@ fun DropDownNacionalidad(personaViewModel: PersonaViewModel) {
             readOnly = true,
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedNacionalidad) },
             modifier = Modifier.menuAnchor()
-
         )
         ExposedDropdownMenu(
             expanded = isExpandedNacionalidad,
             onDismissRequest = { isExpandedNacionalidad = false }
         ) {
-            listNacionalidad.forEach { item ->
+            paises.forEach { item ->
                 DropdownMenuItem(
                     text = { Text(text = item) },
                     onClick = {
@@ -646,9 +653,7 @@ fun DropDownNacionalidad(personaViewModel: PersonaViewModel) {
                 )
             }
         }
-
     }
-
 }
 
 /**
@@ -721,12 +726,10 @@ fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (S
     )
 }
 
-@Composable
-fun getPaises(): List<String> {
-    var context = LocalContext.current
+fun getPaises(context: Context): List<String> {
     val myDB = AccesoBaseDatos(context, "paises.db", 1)
 
-    return myDB.query("SELECT nombre FROM paises")
+    return myDB.query("SELECT nombre FROM paises").map { it["nombre"] as String }
 }
 
 @Composable
@@ -752,6 +755,13 @@ fun CameraPreview(
 
     // Crear ImageCapture fuera de AndroidView para garantizar su inicialización
     val imageCapture = remember { ImageCapture.Builder().build() }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraProvider?.unbindAll()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AndroidView(
@@ -832,17 +842,25 @@ fun CameraPreview(
     }
 }
 
+fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit, onError: (Exception) -> Unit) {
+    try {
+        val image = InputImage.fromBitmap(bitmap, 0)
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit) {
-    val image = InputImage.fromBitmap(bitmap, 0)
-    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-
-    recognizer.process(image)
-        .addOnSuccessListener { visionText ->
-            val recognizedText = visionText.text
-            onTextRecognized(recognizedText)
-        }
-        .addOnFailureListener { e ->
-            Log.e("Reconocimiento de texto", "Error reconociendo el texto del documento: ", e)
-        }
+        recognizer.process(image)
+            .addOnSuccessListener { visionText ->
+                if (visionText.text.isNotBlank()) {
+                    onTextRecognized(visionText.text)
+                } else {
+                    onError(Exception("No se pudo detectar texto en la imagen"))
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Reconocimiento de texto", "Error: ", e)
+                onError(e)
+            }
+    } catch (e: Exception) {
+        Log.e("Procesamiento de imagen", "Error: ", e)
+        onError(e)
+    }
 }
