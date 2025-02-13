@@ -177,9 +177,11 @@ class PersonaViewModel : ViewModel() {
                 // Mostrar alerta si no hay datos
                 withContext(Dispatchers.Main) {
                     AlertDialog.Builder(context)
-                        .setTitle("Instroduccion de datos Persona")
+                        .setTitle("Datos de la Persona")
                         .setMessage("No se han introducido los datos necesaios para guardar " +
-                                "y poder confeccionar el atestado.")
+                                "y poder confeccionar el atestado. Vuelva a acceder a la pantalla" +
+                                " e introduzca lo necesario para su correcta confección.\n" +
+                                "No olvide guardar los datos.")
                         .setPositiveButton("Aceptar", null)
                         .show()
                 }
