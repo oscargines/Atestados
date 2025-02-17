@@ -187,6 +187,10 @@ fun BottomAppBar() {
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BotonesNormales,
                             contentColor = TextoBotonesNormales
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 8.dp
                         )
                     ) {
                         Text(
@@ -219,6 +223,10 @@ fun BottomAppBar() {
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BotonesNormales,
                             contentColor = TextoBotonesNormales
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(
+                            defaultElevation = 4.dp,
+                            pressedElevation = 8.dp
                         )
                     ) {
                         Text(
@@ -336,6 +344,10 @@ fun CreaBoton(
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,
                 contentColor = TextoBotonesNormales
+            ),
+            elevation = ButtonDefaults.buttonElevation(
+                defaultElevation = 4.dp,
+                pressedElevation = 8.dp
             ),
             modifier = Modifier
                 .fillMaxWidth()

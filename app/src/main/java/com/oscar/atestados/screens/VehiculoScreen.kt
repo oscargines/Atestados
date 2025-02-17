@@ -220,6 +220,10 @@ fun BottomAppBarVehiculo(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = BotonesNormales,
                         contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
                     )
                 ) {
                     Text(
@@ -255,6 +259,10 @@ fun BottomAppBarVehiculo(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = BotonesNormales,
                         contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
                     )
                 ) {
                     Text(

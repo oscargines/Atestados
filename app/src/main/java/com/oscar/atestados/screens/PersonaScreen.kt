@@ -4,6 +4,8 @@ package com.oscar.atestados.screens
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.nfc.Tag
+import android.nfc.tech.IsoDep
 import android.util.Log
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
@@ -22,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -50,6 +53,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,7 +164,7 @@ fun PersonaScreenContent(
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { ToolbarPersona(onCameraButtonClicked = onCameraButtonClicked) },
+        topBar = { ToolbarPersona(onCameraButtonClicked = onCameraButtonClicked, onNFCClicked = {}) },
         bottomBar = { BottomAppBarPersona(personaViewModel, navigateToScreen) }
     ) { paddingValues ->
         PersonaContent(
@@ -224,6 +228,10 @@ fun BottomAppBarPersona(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = BotonesNormales,
                         contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
                     )
                 ) {
                     Text(
@@ -235,6 +243,7 @@ fun BottomAppBarPersona(
             }
 
             Spacer(modifier = Modifier.width(8.dp))
+
             // Botón "LIMPIAR" con tooltip.
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
@@ -260,6 +269,10 @@ fun BottomAppBarPersona(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = BotonesNormales,
                         contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
                     )
                 ) {
                     Text(
@@ -282,30 +295,39 @@ fun BottomAppBarPersona(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ToolbarPersona(onCameraButtonClicked: () -> Unit) {
-    TopAppBar(
+fun ToolbarPersona(
+    onCameraButtonClicked: () -> Unit,
+    onNFCClicked: () -> Unit
+) {
+    CenterAlignedTopAppBar(
         title = {
             Text(
                 text = "Persona",
-                textAlign = TextAlign.Center,
                 fontSize = 30.sp,
                 color = TextoNormales,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(10.dp),
+                fontWeight = FontWeight.Bold
             )
-            IconButton(
-                onClick = onCameraButtonClicked,
-                modifier = Modifier.fillMaxHeight(1f)
+        },
+        navigationIcon = {
+            Row(
+                modifier = Modifier.padding(start = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.camera_50),
-                    contentDescription = "Botón para capturar información mediante " +
-                            "el uso de la cámara",
-                    tint = BotonesNormales
-                )
+                IconButton(onClick = onCameraButtonClicked) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.camera_50),
+                        contentDescription = "Botón para capturar información mediante el uso de la cámara",
+                        tint = BotonesNormales
+                    )
+                }
+                IconButton(onClick = onNFCClicked) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.nfc_ico),
+                        contentDescription = "Botón para capturar información mediante el uso del sistema NFC",
+                        tint = BotonesNormales
+                    )
+                }
             }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -863,4 +885,5 @@ fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit, onError: (E
         Log.e("Procesamiento de imagen", "Error: ", e)
         onError(e)
     }
+
 }

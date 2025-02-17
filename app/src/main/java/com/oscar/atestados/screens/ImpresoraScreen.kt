@@ -1,7 +1,11 @@
 package com.oscar.atestados.screens
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,25 +14,41 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +70,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.oscar.atestados.R
 import com.oscar.atestados.data.BluetoothDeviceDB
 import com.oscar.atestados.ui.theme.BotonesNormales
+import com.oscar.atestados.ui.theme.TextoBotonesNormales
+import com.oscar.atestados.ui.theme.TextoNormales
+import com.oscar.atestados.ui.theme.TextoSecundarios
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -65,6 +88,7 @@ val Context.dataStoreImp by preferencesDataStore(name = "IMPRESORA_PREFERENCES")
  *
  * @param impresoraViewModel ViewModel con la lógica de negocio.
  */
+@SuppressLint("StateFlowValueCalledInComposition")
 @Composable
 fun ImpresoraScreen(
     navigateToScreen: (String) -> Unit,
@@ -74,52 +98,55 @@ fun ImpresoraScreen(
     val uiState by impresoraViewModel.uiState.collectAsState()
     val savedDevices by impresoraViewModel.savedDevices.collectAsState(emptyList())
     val foundDevices by impresoraViewModel.foundDevices.collectAsState(emptyList())
-
     var selectedOption by remember { mutableStateOf("Dispositivos guardados") }
 
-    LaunchedEffect(true) {
-        impresoraViewModel.loadSavedDevicesDB()
+    LaunchedEffect(impresoraViewModel.uiState.value.isScanning) {
+        if (!impresoraViewModel.uiState.value.isScanning) {
+            impresoraViewModel.loadSavedDevicesDB()
+        }
     }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { ImpresoraTopBar() },
-        floatingActionButton = {
-            if (selectedOption == "Buscar dispositivos" && !uiState.isScanning) {
-                FloatingActionButton(
-                    onClick = {
-                        impresoraViewModel.startDiscovery()
-                    },
-                    containerColor = BotonesNormales
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_search),
-                        contentDescription = "Buscar dispositivos"
-                    )
-                }
-            }
+        bottomBar = {
+            BottomAppBarImpresora(
+                impresoraViewModel = impresoraViewModel,
+                navigateToScreen = navigateToScreen
+            )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(16.dp)) {
-
-            // DropdownMenu para seleccionar opción
-            DropdownMenuSelector(selectedOption) { newSelection ->
-                selectedOption = newSelection
-            }
+                .padding(16.dp)
+                .padding(bottom = 8.dp)
+        ) {
+            DropdownMenuSelector(
+                selectedOption = selectedOption,
+                onOptionSelected = { newSelection ->
+                    selectedOption = newSelection
+                    if (newSelection == "Buscar dispositivos") {
+                        impresoraViewModel.startDiscovery()
+                    }
+                }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             if (uiState.isScanning) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = BotonesNormales
+                )
             }
 
-            // Mostrar lista según la selección
-            LazyColumn {
-                val devicesToShow = if (selectedOption == "Dispositivos guardados")
-                    savedDevices else foundDevices
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                val devicesToShow = when (selectedOption) {
+                    "Dispositivos guardados" -> savedDevices
+                    "Buscar dispositivos" -> foundDevices
+                    else -> emptyList()
+                }
 
                 items(
                     items = devicesToShow,
@@ -128,20 +155,59 @@ fun ImpresoraScreen(
                     DeviceCard(
                         device = device,
                         isPaired = savedDevices.any { it.mac == device.mac },
+                        impresoraViewModel = impresoraViewModel,
                         onActionClick = {
-                            when (impresoraViewModel.handleDeviceAction(device)){
+                            val result = impresoraViewModel.handleDeviceAction(device)
+                            when (result) {
                                 is ImpresoraViewModel.DeviceActionResult.AlreadyPaired -> {
-                                    // Si ya está emparejado, mostrar mensaje
-                                    Toast.makeText(context, "El dispositivo ya está emparejado", Toast.LENGTH_SHORT).show()
-
+                                    Toast.makeText(
+                                        context,
+                                        "Dispositivo ya emparejado",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                                 is ImpresoraViewModel.DeviceActionResult.SuccessfullyPaired -> {
-                                    // Si se ha guardado correctamente, mostrar mensaje
-                                    Toast.makeText(context, "Dispositivo guardado", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Dispositivo guardado y configurado como predeterminado",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             }
                         }
                     )
+                }
+            }
+
+            if (selectedOption == "Buscar dispositivos") {
+                Button(
+                    onClick = {
+                        if (uiState.isScanning) {
+                            impresoraViewModel.stopDiscovery()
+                        } else {
+                            impresoraViewModel.startDiscovery()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BotonesNormales,
+                        contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_search),
+                        contentDescription = "Buscar dispositivos",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = if (uiState.isScanning) "Detener búsqueda" else "Buscar dispositivos")
                 }
             }
         }
@@ -154,53 +220,172 @@ fun ImpresoraScreen(
  * @param selectedOption Opción seleccionada actualmente.
  * @param onOptionSelected Callback para cambiar la opción seleccionada.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropdownMenuSelector(selectedOption: String, onOptionSelected: (String) -> Unit) {
     val options = listOf("Dispositivos guardados", "Buscar dispositivos")
-    var expanded by remember { mutableStateOf(false) }
+    var isExpandedBusquedaImpresora by remember { mutableStateOf(false) }
 
-    Box {
-        Button(onClick = { expanded = true }) {
-            Text(selectedOption)
-            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+    ExposedDropdownMenuBox(
+        expanded = isExpandedBusquedaImpresora,
+        onExpandedChange = { isExpandedBusquedaImpresora = !isExpandedBusquedaImpresora }
+    ) {
+        OutlinedTextField(
+            value = selectedOption,
+            onValueChange = {},
+            readOnly = true,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isExpandedBusquedaImpresora) },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraSmall
+        )
+
+        ExposedDropdownMenu(
+            expanded = isExpandedBusquedaImpresora,
+            onDismissRequest = { isExpandedBusquedaImpresora = false }
+        ) {
             options.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(option) },
                     onClick = {
                         onOptionSelected(option)
-                        expanded = false
+                        isExpandedBusquedaImpresora = false
                     }
                 )
             }
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImpresoraTopBar(onCameraButtonClicked: () -> Unit = {}) {
-    TopAppBar(
+fun ImpresoraTopBar() {
+    CenterAlignedTopAppBar(
         title = {
             Text(
                 text = "Gestión de Impresoras",
-                textAlign = TextAlign.Center,
                 fontSize = 20.sp,
+                color = TextoNormales,
                 fontWeight = FontWeight.Bold
             )
         },
-        actions = {
-            IconButton(onClick = onCameraButtonClicked) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_search),
-                    contentDescription = "Buscar dispositivos",
-                    tint = BotonesNormales
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+            containerColor = Color.Transparent
+        )
     )
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BottomAppBarImpresora(
+    impresoraViewModel: ImpresoraViewModel,
+    navigateToScreen: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    val guardarTooltipState = rememberTooltipState()
+    val limpiarTooltipState = rememberTooltipState()
+    val selectedDevice by impresoraViewModel.selectedDevice.collectAsState()
+    val plainTooltipState = rememberTooltipState()
+
+    Surface(
+        modifier = Modifier.wrapContentHeight(),
+        color = Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            //Botón "GUARDAR" con tooltip.
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                state = plainTooltipState,
+                modifier = Modifier.width(175.dp),
+                tooltip = {
+                    PlainTooltip {
+                        Text("Pulse aquí para guardar el dispositivo seleccionado")
+                    }
+                }
+
+            ) {
+                Button(
+                    onClick = {
+                        if (selectedDevice != null) {
+                            impresoraViewModel.saveSelectedDevice()
+                            navigateToScreen("MainScreen")
+                        } else {
+                            Toast.makeText(context, "Seleccione un dispositivo", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 5.dp),
+                    enabled = selectedDevice != null,
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BotonesNormales,
+                        contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Text(
+                        "GUARDAR",
+                        textAlign = TextAlign.Center,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Botón "LIMPIAR" con tooltip.
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                state = plainTooltipState,
+                modifier = Modifier.width(175.dp),
+                tooltip = {
+                    PlainTooltip {
+                        Text(
+                            "Pulse aquí para limpiar todos los datos almacenados en la aplicación"
+                        )
+                    }
+                }
+            ) {
+                Button(
+                    onClick = {
+                        impresoraViewModel.clearAllDevices()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp),
+                    enabled = true,
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BotonesNormales,
+                        contentColor = TextoBotonesNormales
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Text(
+                        "LIMPIAR",
+                        textAlign = TextAlign.Center,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 /**
  * Componente que representa una tarjeta de dispositivo Bluetooth.
@@ -213,24 +398,44 @@ fun ImpresoraTopBar(onCameraButtonClicked: () -> Unit = {}) {
 fun DeviceCard(
     device: BluetoothDeviceDB,
     isPaired: Boolean,
+    impresoraViewModel: ImpresoraViewModel,
     onActionClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable { impresoraViewModel.selectDevice(device) },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color.LightGray)
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(device.nombre ?: "Dispositivo desconocido", fontWeight = FontWeight.Bold)
-                Text(device.mac, color = Color.Gray, fontSize = 12.sp)
+                Text(
+                    device.nombre ?: "Dispositivo desconocido",
+                    fontWeight = FontWeight.Bold,
+                    color = TextoNormales
+                )
+                Text(
+                    device.mac,
+                    color = TextoSecundarios,
+                    fontSize = 12.sp
+                )
             }
 
             Button(
                 onClick = onActionClick,
-                colors = ButtonDefaults.buttonColors(containerColor = if (isPaired) Color.Gray else BotonesNormales)
+                shape = RoundedCornerShape(4.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isPaired) Color.Gray else BotonesNormales,
+                    contentColor = TextoBotonesNormales
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 4.dp
+                )
             ) {
                 Text(if (isPaired) "Emparejado" else "Guardar")
             }

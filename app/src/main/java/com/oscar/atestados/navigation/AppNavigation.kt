@@ -84,7 +84,13 @@ fun AppNavigation() {
 
         // Definición de la pantalla "Alcoholemia01Screen".
         composable("Alcoholemia01Screen") {
-            Alcoholemia01Screen()
+            Alcoholemia01Screen(
+                navigateToScreen = { route ->
+                    // Navega de vuelta a la pantalla principal ("MainScreen").
+                    navController.navigate("MainScreen")
+                },
+                alcoholemiaUnoViewModel = viewModel()
+            )
         }
 
         // Definición de la pantalla "CarecerScreen".
