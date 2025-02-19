@@ -17,7 +17,11 @@ object VehiculoScreen
 @Serializable
 object Alcoholemia01Screen
 @Serializable
+object Alcoholemia02Screen
+@Serializable
 object CarecerScreen
+@Serializable
+object OtrosDocumentosScreen
 
 
 

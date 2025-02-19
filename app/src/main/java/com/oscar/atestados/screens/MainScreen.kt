@@ -61,7 +61,7 @@ fun MainScreen(navigateToScreen: (String) -> Unit) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { Toolbar(navigateToScreen) },
-        bottomBar = { BottomAppBar()}
+        bottomBar = { BottomAppBar(navigateToScreen)}
     ) { paddingValues ->
         Content(
             modifier = Modifier.padding(paddingValues),
@@ -153,7 +153,9 @@ fun Toolbar(onNavigate: (String) -> Unit) {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BottomAppBar() {
+fun BottomAppBar(
+    onNavigate: (String) -> Unit
+) {
     val context = LocalContext.current
     val plainTooltipState = rememberTooltipState()
 
@@ -178,7 +180,7 @@ fun BottomAppBar() {
                     }
                 ) {
                     Button(
-                        onClick = { /* Acción del botón "OTROS DOCUMENTOS" */ },
+                        onClick = { onNavigate("OtrosDocumentosScreen") },
                         modifier = Modifier
                             .weight(1f)
                             .padding(horizontal = 5.dp),

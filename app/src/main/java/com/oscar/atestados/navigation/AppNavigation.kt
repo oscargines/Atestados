@@ -15,6 +15,7 @@ import com.oscar.atestados.screens.CarecerScreen
 import com.oscar.atestados.screens.GuardiasScreen
 import com.oscar.atestados.screens.ImpresoraScreen
 import com.oscar.atestados.screens.MainScreen
+import com.oscar.atestados.screens.OtrosDocumentosScreen
 import com.oscar.atestados.screens.PersonaScreen
 import com.oscar.atestados.screens.SplashScreen
 import com.oscar.atestados.screens.VehiculoScreen
@@ -96,6 +97,17 @@ fun AppNavigation() {
         // Definición de la pantalla "CarecerScreen".
         composable("CarecerScreen") {
             CarecerScreen {
+                // Navega de vuelta a la pantalla principal ("MainScreen") y limpia la pila de navegación.
+                navController.navigate("MainScreen") {
+                    popUpTo("MainScreen") {
+                        inclusive = true  // Elimina todas las pantallas anteriores de la pila.
+                    }
+                }
+            }
+        }
+        // Definición de la pantalla "CarecerScreen".
+        composable("OtrosDocumentosScreen") {
+            OtrosDocumentosScreen {
                 // Navega de vuelta a la pantalla principal ("MainScreen") y limpia la pila de navegación.
                 navController.navigate("MainScreen") {
                     popUpTo("MainScreen") {
