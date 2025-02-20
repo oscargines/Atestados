@@ -43,7 +43,9 @@ Colores a utilizar para las screen en general
 val BotonesNormales = BlueGray900
 val TextoBotonesNormales = BlueGray50
 val BotonesSecundarios = Green800
-val TextpBotonesSecundarios = BlueGray900
+val TextoBotonesSecundarios = BlueGray900
 val TextoNormales = BlueGray900
 val TextoSecundarios = BlueGray600
 val TextoTerciarios = BlueGray300
+val ItemSelected = BlueGray400
+val TextoInformacion = Orange800

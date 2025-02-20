@@ -1,15 +1,18 @@
 package com.oscar.atestados
-
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,11 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.oscar.atestados.ui.theme.AtestadosTheme
@@ -49,227 +54,183 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-    // Variable para lanzar la solicitud de permisos
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+    private var requiredPermissions = emptyArray<String>()
 
-    // Variables de estado
+    // Estados
     private var arePermissionsGranted by mutableStateOf(false)
     private var isDatabaseLoaded by mutableStateOf(false)
     private var loadingStatus by mutableStateOf("")
 
-    override fun onCreate(savedInstanceState: Bundle?) { // Agregar el parámetro correctamente
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Inicializa el lanzador de permisos
+        configurePermissionLauncher()
+        checkAndRequestPermissions()
+
+        setContent {
+            AtestadosTheme {
+                ContentRouter()
+            }
+        }
+    }
+
+    @Composable
+    private fun ContentRouter() {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            when {
+                !arePermissionsGranted -> PermissionDeniedScreen(
+                    onRetry = { checkAndRequestPermissions() },
+                    onOpenSettings = { openAppSettings() }
+                )
+
+                !isDatabaseLoaded -> SplashScreen(loadingStatus = loadingStatus)
+
+                else -> AppNavigation()
+            }
+        }
+    }
+
+    private fun configurePermissionLauncher() {
         permissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
-            // Verifica si todos los permisos han sido concedidos
-            arePermissionsGranted = permissions.entries.all { it.value }
-            if (!arePermissionsGranted) {
-                Toast.makeText(this, "Para el uso de la app se necesitan permisos", Toast.LENGTH_LONG).show()
-            }
-        }
-
-        // Solicitar permisos si no están concedidos
-        checkAndRequestPermissions()
-
-        // Configuración de la interfaz
-        setContent {
-            AtestadosTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    when {
-                        !arePermissionsGranted -> {
-                            PermissionDeniedScreen(onRetry = { checkAndRequestPermissions() })
-                        }
-                        !isDatabaseLoaded -> {
-                            SplashScreen(
-                                onSplashFinished = { loadDatabases() },
-                                loadingStatus = loadingStatus
-                            )
-                        }
-                        else -> {
-                            AppNavigation() // Navega en la app si los permisos están concedidos y la BD está cargada
-                        }
-                    }
-                }
-            }
+            arePermissionsGranted = permissions.all { it.value }
+            if (arePermissionsGranted) loadDatabases()
+            else showDeniedToast()
         }
     }
 
     private fun checkAndRequestPermissions() {
-        val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.ACCESS_FINE_LOCATION // Opcional según versión
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.BLUETOOTH,
-                Manifest.permission.BLUETOOTH_ADMIN,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )
-        }.plus(
-            arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-            )
-        )
-        // Verifica si los permisos ya han sido concedidos
-        arePermissionsGranted = requiredPermissions.all { permission ->
-            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+        requiredPermissions = buildList {
+            // Permisos Bluetooth
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+            } else {
+                add(Manifest.permission.BLUETOOTH)
+                add(Manifest.permission.BLUETOOTH_ADMIN)
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+
+            // Permisos almacenamiento
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+
+            add(Manifest.permission.CAMERA)
+        }.toTypedArray()
+
+        arePermissionsGranted = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
 
         if (!arePermissionsGranted) {
-            permissionLauncher.launch(requiredPermissions)
+            if (shouldShowRationale()) showPermissionRationaleDialog()
+            else permissionLauncher.launch(requiredPermissions)
+        } else {
+            loadDatabases()
         }
     }
-    /**
-     * Carga las bases de datos en un hilo de fondo.
-     */
-    private fun loadDatabases() {
-        // Cargar bases de datos en un hilo de fondo
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                loadingStatus = "Cargando paises.db..."
-                val dbHelperPais = AccesoBaseDatos(this@MainActivity, "paises.db", 1)
-                dbHelperPais.createDatabase()
-                dbHelperPais.close()
 
-                loadingStatus = "Cargando juzgados.db..."
-                val dbHelperJuzgados = AccesoBaseDatos(this@MainActivity, "juzgados.db", 1)
-                dbHelperJuzgados.createDatabase()
-                dbHelperJuzgados.close()
+    private fun shouldShowRationale() = requiredPermissions.any {
+        ActivityCompat.shouldShowRequestPermissionRationale(this, it)
+    }
 
-                loadingStatus = "Cargando dispositivos.db..."
-                val dbHelperDispositivos = AccesoBaseDatos(this@MainActivity, "dispositivos.db", 1)
-                dbHelperDispositivos.createDatabase()
-                dbHelperDispositivos.close()
+    private fun showPermissionRationaleDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Permisos Requeridos")
+            .setMessage("La aplicación necesita acceder a estos recursos para funcionar correctamente.")
+            .setPositiveButton("Conceder") { _, _ -> permissionLauncher.launch(requiredPermissions) }
+            .setNegativeButton("Configuración") { _, _ -> openAppSettings() }
+            .show()
+    }
 
-                loadingStatus = "Creada las bases de datos con éxito"
+    private fun openAppSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", packageName, null)
+        })
+    }
 
-            } catch (e: Exception) {
-                Log.e("CargarBasesDatos", "Error cargando la base de datos: ${e.message}")
-                loadingStatus = "Error cargando bases de datos"
-            } finally {
-                isDatabaseLoaded = true
-                withContext(Dispatchers.Main) {
-                    // Cambiar la UI para navegar a la pantalla principal
-                    setContent {
-                        AppNavigation()
-                    }
-                }
+    private fun showDeniedToast() {
+        Toast.makeText(this, "Funcionalidad limitada sin permisos", Toast.LENGTH_LONG).show()
+        loadDatabases() // Cargar BD incluso sin permisos si es posible
+    }
+
+    private fun loadDatabases() = lifecycleScope.launch(Dispatchers.IO) {
+        try {
+            listOf("paises.db", "juzgados.db", "dispositivos.db").forEach { dbName ->
+                loadingStatus = "Cargando $dbName..."
+                AccesoBaseDatos(this@MainActivity, dbName, 1).use { it.createDatabase() }
             }
+            loadingStatus = "Bases de datos listas"
+        } catch (e: Exception) {
+            Log.e("DB_LOAD", "Error: ${e.message}")
+            loadingStatus = "Error cargando datos"
+        } finally {
+            withContext(Dispatchers.Main) { isDatabaseLoaded = true }
         }
     }
 }
-/**
- * Pantalla de Permiso Denegado.
- */
+
 @Composable
-fun PermissionDeniedScreen(onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "No se han concedido los permisos necesarios. " +
-                        "Por favor, activa los permisos solicitados para continuar." +
-                        "\nReinicie la aplicación para continuar y conceda los permisos solicitados" +
-                        " si es necesario.",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium
+                text = "Se requieren permisos para el funcionamiento completo de la aplicación",
+                textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(Modifier.height(24.dp))
+
             Button(onClick = onRetry) {
-                Text("Intentar de nuevo")
+                Text("Reintentar permisos")
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Button(onClick = onOpenSettings) {
+                Text("Abrir Configuración")
             }
         }
     }
 }
 
 @Composable
-fun SplashScreen(
-    onSplashFinished: () -> Unit,
-    loadingStatus: String
-) {
-    var isDelayCompleted by remember { mutableStateOf(false) }
+fun SplashScreen(loadingStatus: String) {
+    val context = LocalContext.current
+    var showLoadingStatus by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
-        delay(3000) // Espera 3 segundos para la animación del splash
-        isDelayCompleted = true
-    }
-    LaunchedEffect(Unit) {
-        delay(3000) // Espera 3 segundos para la animación del splash
-        onSplashFinished()
+        delay(1000) // Animación mínima del splash
+        showLoadingStatus = true
     }
 
-    AtestadosTheme(darkTheme = false, dynamicColor = false) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.escudo_bw),
-                    contentDescription = "Logo",
-                    modifier = Modifier.size(200.dp)
-                )
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Image(
+                painter = painterResource(R.drawable.escudo_bw),
+                contentDescription = "Logo",
+                modifier = Modifier.size(200.dp)
+            )
 
-                Spacer(modifier = Modifier.height(40.dp))
+            Spacer(Modifier.height(24.dp))
 
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 4.dp
+            )
+
+            if (showLoadingStatus) {
+                Spacer(Modifier.height(16.dp))
                 Text(
-                    text = "Atestados",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Text(
-                    text = "App para la creación de atestados\nen carretera",
+                    text = loadingStatus,
                     fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(10.dp),
-                    color = BlueGray700
-                )
-
-                Spacer(modifier = Modifier.height(30.dp))
-
-                CircularProgressIndicator(
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 4.dp,
-                    modifier = Modifier.size(40.dp)
-                )
-                Spacer(modifier = Modifier.height(30.dp))
-                Text(
-                    text = if (isDelayCompleted) {
-                        // Muestra el estado de la carga después de 3 segundos
-                        loadingStatus.ifEmpty { "Cargando bases de datos..." }
-                    } else {
-                        "Estamos comprobando\npermisos y bases de datos"
-                    },
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Normal,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(10.dp),
                     color = BlueGray700
                 )
             }
         }
     }
 }
-
-

@@ -14,145 +14,121 @@ import com.oscar.atestados.screens.Alcoholemia01Screen
 import com.oscar.atestados.screens.CarecerScreen
 import com.oscar.atestados.screens.GuardiasScreen
 import com.oscar.atestados.screens.ImpresoraScreen
+import com.oscar.atestados.screens.LecturaDerechosScreen
 import com.oscar.atestados.screens.MainScreen
 import com.oscar.atestados.screens.OtrosDocumentosScreen
 import com.oscar.atestados.screens.PersonaScreen
 import com.oscar.atestados.screens.SplashScreen
 import com.oscar.atestados.screens.VehiculoScreen
+import com.oscar.atestados.viewModel.AlcoholemiaUnoViewModel
 import com.oscar.atestados.viewModel.BluetoothViewModel
 import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.viewModel.VehiculoViewModel
 import com.oscar.atestados.viewModel.GuardiasViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModel
+import com.oscar.atestados.viewModel.LecturaDerechosViewModel
 
-/**
- * Función principal de navegación de la aplicación.
- * Define la estructura de navegación entre las diferentes pantallas de la aplicación utilizando Jetpack Navigation.
- *
- * Esta función configura un [NavHost] que gestiona la navegación entre las pantallas definidas en la aplicación.
- * Cada pantalla está asociada a una ruta específica y se define mediante el método [composable].
- *
- * @see NavHost
- * @see NavController
- * @see rememberNavController
- * @see composable
- */
 @Composable
 fun AppNavigation() {
-    // Controlador de navegación que gestiona la navegación entre las pantallas.
     val navController = rememberNavController()
+    val bluetoothViewModel: BluetoothViewModel = viewModel()
 
-    // Creamos una instancia del BluetoothViewModel que será compartida
-    val bluetoothViewModel = viewModel<BluetoothViewModel>()
-
-    // Configuración del NavHost, que define la estructura de navegación de la aplicación.
     NavHost(
         navController = navController,
-        startDestination = "MainScreen"  // Pantalla inicial de la aplicación.
+        startDestination = "MainScreen"
     ) {
-        // Definición de la pantalla "MainScreen".
         composable("MainScreen") {
             MainScreen { route ->
-                // Navega a la pantalla especificada por la ruta.
                 navController.navigate(route)
             }
         }
 
-        // Definición de la pantalla "PersonaScreen".
         composable("PersonaScreen") {
-            // Obtiene una instancia de ViewModel asociada a la pantalla.
-            val personaViewModel = viewModel<PersonaViewModel>()
+            val personaViewModel: PersonaViewModel = viewModel()
             PersonaScreen(
                 navigateToScreen = { route ->
-                    // Navega de vuelta a la pantalla principal ("MainScreen").
                     navController.navigate("MainScreen")
                 },
                 personaViewModel = personaViewModel
             )
         }
 
-        // Definición de la pantalla "VehiculoScreen".
         composable("VehiculoScreen") {
-            val vehiculoViewModel = viewModel<VehiculoViewModel>()
+            val vehiculoViewModel: VehiculoViewModel = viewModel()
             VehiculoScreen(
                 navigateToScreen = { route ->
-                    // Navega de vuelta a la pantalla principal ("MainScreen").
                     navController.navigate("MainScreen")
                 },
                 vehiculoViewModel = vehiculoViewModel
             )
         }
 
-        // Definición de la pantalla "Alcoholemia01Screen".
         composable("Alcoholemia01Screen") {
+            val alcoholemiaUnoViewModel: AlcoholemiaUnoViewModel = viewModel()
             Alcoholemia01Screen(
                 navigateToScreen = { route ->
-                    // Navega de vuelta a la pantalla principal ("MainScreen").
-                    navController.navigate("MainScreen")
+                    navController.navigate(route)
                 },
-                alcoholemiaUnoViewModel = viewModel()
+                alcoholemiaUnoViewModel = alcoholemiaUnoViewModel
             )
         }
 
-        // Definición de la pantalla "CarecerScreen".
         composable("CarecerScreen") {
             CarecerScreen {
-                // Navega de vuelta a la pantalla principal ("MainScreen") y limpia la pila de navegación.
                 navController.navigate("MainScreen") {
-                    popUpTo("MainScreen") {
-                        inclusive = true  // Elimina todas las pantallas anteriores de la pila.
-                    }
+                    popUpTo("MainScreen") { inclusive = true }
                 }
             }
         }
-        // Definición de la pantalla "CarecerScreen".
+
         composable("OtrosDocumentosScreen") {
             OtrosDocumentosScreen {
-                // Navega de vuelta a la pantalla principal ("MainScreen") y limpia la pila de navegación.
                 navController.navigate("MainScreen") {
-                    popUpTo("MainScreen") {
-                        inclusive = true  // Elimina todas las pantallas anteriores de la pila.
-                    }
+                    popUpTo("MainScreen") { inclusive = true }
                 }
             }
         }
-        // Definición de la pantalla "GuardiasScreen".
+
         composable("GuardiasScreen") {
-            val guardiasViewModel = viewModel<GuardiasViewModel>()
+            val guardiasViewModel: GuardiasViewModel = viewModel()
             GuardiasScreen(
                 navigateToScreen = {
                     navController.navigate("MainScreen") {
-                        popUpTo("MainScreen") {
-                            inclusive = true
-                        }
+                        popUpTo("MainScreen") { inclusive = true }
                     }
                 },
                 guardiasViewModel = guardiasViewModel
             )
         }
-        // Definición de la pantalla "ImpresoraScreen".
-        composable("ImpresoraScreen") {
-            val context = LocalContext.current
-            
-            val factory = remember {
-                    ImpresoraViewModelFactory(
-                        bluetoothViewModel = bluetoothViewModel,
-                        context = navController.context
-                    )
 
+        composable("ImpresoraScreen") {
+            val factory = remember {
+                ImpresoraViewModelFactory(
+                    bluetoothViewModel = bluetoothViewModel,
+                    context = navController.context
+                )
             }
             val impresoraViewModel: ImpresoraViewModel = viewModel(factory = factory)
 
             ImpresoraScreen(
                 navigateToScreen = {
                     navController.navigate("MainScreen") {
-                        popUpTo("MainScreen") {
-                            inclusive = true
-                        }
+                        popUpTo("MainScreen") { inclusive = true }
                     }
-
                 },
                 impresoraViewModel = impresoraViewModel
+            )
+        }
+
+        composable("LecturaDerechosScreen") {
+            val lecturaDerechosViewModel: LecturaDerechosViewModel = viewModel()
+            LecturaDerechosScreen(
+                navigateToScreen = {
+                    navController.navigate("MainScreen") {
+                        popUpTo("MainScreen") { inclusive = true }
+                    }
+                },
+                lecturaDerechosViewModel = lecturaDerechosViewModel
             )
         }
     }

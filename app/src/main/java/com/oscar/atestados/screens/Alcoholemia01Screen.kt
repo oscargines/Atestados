@@ -83,7 +83,7 @@ private fun AlcoholemiaBottomBar(
         Button(
             onClick = {
                 viewModel.guardarDatos(context)
-                navigateToScreen("MainScreen")
+                navigateToScreen("LecturaDerechosScreen")
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,
@@ -316,13 +316,13 @@ private fun AlcoholemiaContent(
             Text(
                 "Primera prueba",
                 modifier = Modifier
-                    .weight(1.5f)
+                    .weight(1.2f)
                     .padding(end = 8.dp),
                 color = TextoNormales,
                 fontWeight = FontWeight.Bold
             )
             OutlinedTextField(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(0.8f),
                 value = primeraTasa,
                 onValueChange = { alcoholemiaUnoViewModel.updatePrimeraTasa(it) },
                 label = { Text("Tasa", color = TextoTerciarios) },
@@ -356,13 +356,13 @@ private fun AlcoholemiaContent(
             Text(
                 "Segunda prueba",
                 modifier = Modifier
-                    .weight(1.5f)
+                    .weight(1.2f)
                     .padding(end = 8.dp),
                 color = TextoNormales,
                 fontWeight = FontWeight.Bold
             )
             OutlinedTextField(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(0.8f),
                 value = segundaTasa,
                 onValueChange = { alcoholemiaUnoViewModel.updateSegundaTasa(it) },
                 label = { Text("Tasa", color = TextoTerciarios) },

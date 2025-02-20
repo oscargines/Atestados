@@ -129,4 +129,7 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int):
         )
     """)
     }
+    fun execSQL(query: String, args: Array<Any?> = emptyArray()) {
+        writableDatabase.execSQL(query, args)
+    }
 }

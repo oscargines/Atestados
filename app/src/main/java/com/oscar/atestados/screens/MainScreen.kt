@@ -54,7 +54,6 @@ import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
 
-
 @Composable
 fun MainScreen(navigateToScreen: (String) -> Unit) {
 

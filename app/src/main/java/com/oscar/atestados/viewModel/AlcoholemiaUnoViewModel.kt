@@ -14,7 +14,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "alcoholemia_uno_settings")
+val Context.dataStoreAlcoholemia: DataStore<Preferences> by preferencesDataStore(name = "alcoholemia_uno_settings")
 
 class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(application) {
     // Claves para DataStore
@@ -123,7 +123,7 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
     // Operaciones de guardado y limpieza
     fun guardarDatos(context: Context) {
         viewModelScope.launch {
-            context.dataStore.edit { preferences ->
+            context.dataStoreAlcoholemia.edit { preferences ->
                 _opcionMotivo.value?.let { preferences[PreferencesKeys.OPCION_MOTIVO] = it }
                 _opcionErrores.value?.let { preferences[PreferencesKeys.OPCION_ERRORES] = it }
                 _opcionDeseaPruebas.value?.let { preferences[PreferencesKeys.OPCION_PRUEBAS] = it }
@@ -141,7 +141,7 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
 
     fun limpiarDatos() {
         viewModelScope.launch {
-            getApplication<Application>().dataStore.edit { preferences ->
+            getApplication<Application>().dataStoreAlcoholemia.edit { preferences ->
                 preferences.clear()
             }
 
@@ -160,7 +160,7 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
     }
     private fun loadSavedData() {
         viewModelScope.launch {
-            val preferences = getApplication<Application>().dataStore.data.first()
+            val preferences = getApplication<Application>().dataStoreAlcoholemia.data.first()
 
             _opcionMotivo.value = preferences[PreferencesKeys.OPCION_MOTIVO] ?: ""
             _opcionErrores.value = preferences[PreferencesKeys.OPCION_ERRORES] ?: ""

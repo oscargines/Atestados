@@ -11,14 +11,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.data.BluetoothDeviceDB
-import com.oscar.atestados.screens.dataStoreImp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,11 +70,6 @@ class ImpresoraViewModel(
         }
         setupBluetoothObservers()
     }
-    private suspend fun saveDefaultPrinter(mac: String) {
-        context.dataStoreImp.edit { preferences ->
-            preferences[stringPreferencesKey("DEFAULT_PRINTER")] = mac
-        }
-    }
 
     fun selectDevice(device: BluetoothDeviceDB) {
         _selectedDevice.value = device
@@ -90,10 +82,14 @@ class ImpresoraViewModel(
             // Guardar en base de datos si no existe
             if (!isDeviceSaved(device.mac)) {
                 saveDeviceToDatabase(device)
+                Log.d("ImpresoraViewModel", "Dispositivo guardado: ${device.nombre}")
             }
 
-            // Guardar en DataStore como predeterminado
-            saveDefaultPrinter(device.mac)
+            // Guardar en DataStore
+            context.dataStoreAlcoholemia.edit { preferences ->
+                preferences[stringPreferencesKey("DEFAULT_PRINTER_NAME")] = device.nombre
+                preferences[stringPreferencesKey("DEFAULT_PRINTER_MAC")] = device.mac
+            }
 
             // Actualizar lista
             loadSavedDevicesDB()
@@ -139,7 +135,7 @@ class ImpresoraViewModel(
                 nombre = device.name ?: "Dispositivo desconocido",
                 mac = device.address
             )
-        }
+        }.distinctBy { it.mac } // Elimina dispositivos duplicados
     }
 
     /**
@@ -168,6 +164,8 @@ class ImpresoraViewModel(
      */
     fun startDiscovery() {
         viewModelScope.launch {
+            stopDiscovery()
+            delay(500)
             _foundDevices.value = emptyList()
             bluetoothViewModel.startScan()
         }
@@ -202,13 +200,15 @@ class ImpresoraViewModel(
     fun saveDeviceToDatabase(device: BluetoothDeviceDB) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                database.query(
-                    "INSERT OR IGNORE INTO dispositivos (nombre, mac) VALUES " +
-                            "('${device.nombre}', '${device.mac}')"
-                )
+                if (!isDeviceSaved(device.mac)) {
+                    database.execSQL(
+                        "INSERT OR IGNORE INTO dispositivos (nombre, mac) VALUES (?, ?)",
+                        arrayOf(device.nombre, device.mac)
+                    )
+                }
                 loadSavedDevicesDB()
             } catch (e: Exception) {
-                Log.e("ImpresoraViewModel", "Error saving device: ${e.message}")
+                Log.e("ImpresoraViewModel", "Error guardando el dispositivio: ${e.message}")
             }
         }
     }
@@ -231,13 +231,29 @@ class ImpresoraViewModel(
      * Elimina todos los dispositivos guardados de la base de datos
      * @throws SQLException Si ocurre un error en la operación de borrado
      */
-    fun clearAllDevices() {
+    fun clearAllDevices(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                database.query("DELETE FROM dispositivos")
+                // Limpiar base de datos
+                database.execSQL("DELETE FROM dispositivos")
+
+                // Limpiar preferencias
+                context.dataStoreAlcoholemia.edit { preferences ->
+                    preferences.clear()
+                }
+
+                // Resetear estados
+                _selectedDevice.value = null
                 loadSavedDevicesDB()
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Datos borrados correctamente", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
                 Log.e("ImpresoraViewModel", "Error clearing devices: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error al borrar los datos", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
