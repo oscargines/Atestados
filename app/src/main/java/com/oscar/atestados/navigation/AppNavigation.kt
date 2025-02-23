@@ -3,14 +3,15 @@ package com.oscar.atestados.navigation
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.oscar.atestados.screens.Alcoholemia01Screen
+import com.oscar.atestados.screens.Alcoholemia02Screen
 import com.oscar.atestados.screens.CarecerScreen
 import com.oscar.atestados.screens.GuardiasScreen
 import com.oscar.atestados.screens.ImpresoraScreen
@@ -18,8 +19,10 @@ import com.oscar.atestados.screens.LecturaDerechosScreen
 import com.oscar.atestados.screens.MainScreen
 import com.oscar.atestados.screens.OtrosDocumentosScreen
 import com.oscar.atestados.screens.PersonaScreen
-import com.oscar.atestados.screens.SplashScreen
+import com.oscar.atestados.screens.TomaDerechosScreen
+import com.oscar.atestados.screens.TomaManifestacionAlcoholScreen
 import com.oscar.atestados.screens.VehiculoScreen
+import com.oscar.atestados.viewModel.AlcoholemiaDosViewModel
 import com.oscar.atestados.viewModel.AlcoholemiaUnoViewModel
 import com.oscar.atestados.viewModel.BluetoothViewModel
 import com.oscar.atestados.viewModel.PersonaViewModel
@@ -27,9 +30,11 @@ import com.oscar.atestados.viewModel.VehiculoViewModel
 import com.oscar.atestados.viewModel.GuardiasViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
+import com.oscar.atestados.viewModel.TomaDerechosViewModel
+import com.oscar.atestados.viewModel.TomaManifestacionAlcoholViewModel
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(navController: NavHostController) {
     val navController = rememberNavController()
     val bluetoothViewModel: BluetoothViewModel = viewModel()
 
@@ -123,12 +128,37 @@ fun AppNavigation() {
         composable("LecturaDerechosScreen") {
             val lecturaDerechosViewModel: LecturaDerechosViewModel = viewModel()
             LecturaDerechosScreen(
-                navigateToScreen = {
-                    navController.navigate("MainScreen") {
-                        popUpTo("MainScreen") { inclusive = true }
-                    }
+                navigateToScreen = { route ->
+                    navController.navigate(route)
                 },
                 lecturaDerechosViewModel = lecturaDerechosViewModel
+            )
+        }
+        composable("TomaDerechosScreen") {
+            val tomaDerechosViewModel: TomaDerechosViewModel = viewModel()
+            TomaDerechosScreen(
+                navigateToScreen = { route ->
+                    navController.navigate(route)
+                },
+                tomaDerechosViewModel = tomaDerechosViewModel
+            )
+        }
+        composable("TomaManifestacionAlcoholScreen") {
+            val tomaManifestacionAlcoholViewModel: TomaManifestacionAlcoholViewModel = viewModel()
+            TomaManifestacionAlcoholScreen(
+                navigateToScreen = { route ->
+                    navController.navigate(route)
+                },
+                tomaManifestacionAlcoholViewModel = tomaManifestacionAlcoholViewModel
+            )
+        }
+        composable("Alcoholemia02Screen") {
+            val alcoholemiaDosViewModel: AlcoholemiaDosViewModel = viewModel()
+            Alcoholemia02Screen(
+                navigateToScreen = { route ->
+                    navController.navigate(route)
+                },
+                alcoholemiaDosViewModel = alcoholemiaDosViewModel
             )
         }
     }

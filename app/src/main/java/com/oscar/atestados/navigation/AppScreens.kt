@@ -21,6 +21,10 @@ object Alcoholemia02Screen
 @Serializable
 object CarecerScreen
 @Serializable
+object TomaDerechosScreen
+@Serializable
+object TomaManifestacionAlcoholemiaScreen
+@Serializable
 object OtrosDocumentosScreen
 
 

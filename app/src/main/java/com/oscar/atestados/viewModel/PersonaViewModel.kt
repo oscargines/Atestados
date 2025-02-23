@@ -9,6 +9,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.oscar.atestados.screens.DniData
 import com.oscar.atestados.screens.dataStorePer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,6 +64,9 @@ class PersonaViewModel : ViewModel() {
     private val _email = MutableLiveData<String>()
     val email: LiveData<String> = _email
 
+    private val _codigoCan = MutableLiveData<String>()
+    val codigoCan: LiveData<String> = _codigoCan
+
     /**
      * Objeto que contiene las claves para almacenar los datos en DataStore.
      * Cada clave corresponde a un campo específico de información personal.
@@ -82,12 +86,14 @@ class PersonaViewModel : ViewModel() {
         val CODIGO_POSTAL = stringPreferencesKey("codigo_postal")
         val TELEFONO = stringPreferencesKey("telefono")
         val EMAIL = stringPreferencesKey("email")
+        val CODIGO_CAN = stringPreferencesKey("codigo_can")
     }
 
     // Funciones para actualizar valores
     fun updateGenero(valor: String) {
         _genero.value = valor
     }
+
     /**
      * Actualiza el valor de la nacionalidad de la persona.
      *
@@ -96,6 +102,7 @@ class PersonaViewModel : ViewModel() {
     fun updateNacionalidad(valor: String) {
         _nacionalidad.value = valor
     }
+
     /**
      * Actualiza el valor de la nacionalidad de la persona.
      *
@@ -149,6 +156,10 @@ class PersonaViewModel : ViewModel() {
         _email.value = valor
     }
 
+    fun updateCodigoCan(valor: String) {
+        _codigoCan.value = valor
+    }
+
     /**
      * Guarda todos los datos personales en el DataStore.
      * Muestra una alerta si no hay datos para guardar o un Toast de confirmación si el guardado es exitoso.
@@ -178,10 +189,12 @@ class PersonaViewModel : ViewModel() {
                 withContext(Dispatchers.Main) {
                     AlertDialog.Builder(context)
                         .setTitle("Datos de la Persona")
-                        .setMessage("No se han introducido los datos necesaios para guardar " +
-                                "y poder confeccionar el atestado. Vuelva a acceder a la pantalla" +
-                                " e introduzca lo necesario para su correcta confección.\n" +
-                                "No olvide guardar los datos.")
+                        .setMessage(
+                            "No se han introducido los datos necesaios para guardar " +
+                                    "y poder confeccionar el atestado. Vuelva a acceder a la pantalla" +
+                                    " e introduzca lo necesario para su correcta confección.\n" +
+                                    "No olvide guardar los datos."
+                        )
                         .setPositiveButton("Aceptar", null)
                         .show()
                 }
@@ -202,6 +215,7 @@ class PersonaViewModel : ViewModel() {
                     preferences[PersonaKeys.CODIGO_POSTAL] = _codigoPostal.value ?: ""
                     preferences[PersonaKeys.TELEFONO] = _telefono.value ?: ""
                     preferences[PersonaKeys.EMAIL] = _email.value ?: ""
+                    preferences[PersonaKeys.CODIGO_CAN] = _codigoCan.value ?: ""
                 }
 
                 // Mostrar un Toast cuando los datos se guarden correctamente
@@ -244,6 +258,7 @@ class PersonaViewModel : ViewModel() {
         _codigoPostal.value = ""
         _telefono.value = ""
         _email.value = ""
+        _codigoCan.value = ""
     }
 
     /**
@@ -272,8 +287,8 @@ class PersonaViewModel : ViewModel() {
                 _codigoPostal.value = preferences[PersonaKeys.CODIGO_POSTAL] ?: ""
                 _telefono.value = preferences[PersonaKeys.TELEFONO] ?: ""
                 _email.value = preferences[PersonaKeys.EMAIL] ?: ""
+                _codigoCan.value = preferences[PersonaKeys.CODIGO_CAN] ?: ""
             }
         }
     }
-
 }

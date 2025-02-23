@@ -4,8 +4,6 @@ package com.oscar.atestados.screens
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.nfc.Tag
-import android.nfc.tech.IsoDep
 import android.util.Log
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
@@ -22,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -42,7 +41,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTooltipState
@@ -53,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,6 +82,15 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import android.nfc.NfcAdapter
+import android.nfc.Tag
+import android.nfc.tech.IsoDep
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import java.io.IOException
+import java.nio.charset.StandardCharsets
+import java.text.SimpleDateFormat
 
 /**
  * Configuración de DataStore para almacenar preferencias de la aplicación.
@@ -95,6 +101,38 @@ import java.util.Locale
 val Context.dataStorePer by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme")
 
 /**
+ * Clase de datos para almacenar la información extraída del DNI electrónico.
+ *
+ * @param numeroDocumento Número del documento de identidad
+ * @param nombre Nombre del titular
+ * @param apellidos Apellidos del titular
+ * @param fechaNacimiento Fecha de nacimiento formateada
+ * @param sexo Género del titular ("Masculino" o "Femenino")
+ * @param nacionalidad Nacionalidad del titular (por defecto "España")
+ */
+data class DniData(
+    val numeroDocumento: String = "",
+    val nombre: String = "",
+    val apellidos: String = "",
+    val fechaNacimiento: String = "",
+    val sexo: String = "",
+    val nacionalidad: String = "España"
+)
+/**
+ * Convierte un String hexadecimal a un array de bytes.
+ *
+ * @return ByteArray con los valores convertidos
+ */
+fun String.hexStringToByteArray(): ByteArray {
+    val len = length
+    val data = ByteArray(len / 2)
+    for (i in 0 until len step 2) {
+        data[i / 2] = ((Character.digit(this[i], 16) shl 4) +
+                Character.digit(this[i + 1], 16)).toByte()
+    }
+    return data
+}
+/**
  * Pantalla principal de la entidad "Persona".
  * Muestra un formulario para ingresar datos personales y permite la captura de imágenes mediante la cámara.
  *
@@ -104,19 +142,49 @@ val Context.dataStorePer by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme
 @Composable
 fun PersonaScreen(
     navigateToScreen: (String) -> Unit,
-    personaViewModel: PersonaViewModel
+    personaViewModel: PersonaViewModel,
+    nfcTag: Tag? = null // Parámetro opcional para recibir el Tag NFC
 ) {
-    var showCamera by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    var showCamera by remember { mutableStateOf(false) }
+    var showCanDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val nfcAdapter = NfcAdapter.getDefaultAdapter(context)
+    var isReadingNfc by remember { mutableStateOf(false) }
 
     // Función para manejar el clic en el botón de la cámara
     val onCameraButtonClicked = {
         showCamera = true
     }
+    // Función para manejar el botón del NFC
+    val onNfcButtonClicked = {
+        if (nfcAdapter?.isEnabled == true) {
+            showCanDialog = true
+        } else {
+            Toast.makeText(context, "Por favor, active el NFC", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // Cargar datos al iniciar la pantalla
     LaunchedEffect(Unit) {
         personaViewModel.loadData(context)
+    }
+    // Manejar Tag NFC cuando esté disponible
+    LaunchedEffect(nfcTag) {
+        if (nfcTag != null && isReadingNfc) {
+            val canCode = personaViewModel.codigoCan.value ?: return@LaunchedEffect
+            coroutineScope.launch {
+                try {
+                    val dniData = readDniData(nfcTag, canCode, context)
+                    updatePersonaViewModel(personaViewModel, dniData)
+                    Toast.makeText(context, "Datos del DNI leídos correctamente", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error al leer el DNI: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    isReadingNfc = false
+                }
+            }
+        }
     }
 
     // Mostrar la cámara si showCamera es true
@@ -137,14 +205,113 @@ fun PersonaScreen(
             onDismiss = { showCamera = false }
         )
     }
+    if (showCanDialog) {
+        CanDialog(
+            onConfirm = { canCode ->
+                personaViewModel.updateCodigoCan(canCode)
+                showCanDialog = false
+                isReadingNfc = true
+                Toast.makeText(context, "Acerque el DNI al lector NFC", Toast.LENGTH_LONG).show()
+                // La lectura real ocurrirá cuando el sistema detecte el Tag
+            },
+            onDismiss = { showCanDialog = false }
+        )
+    }
     // Contenido principal de la pantalla.
     PersonaScreenContent(
         navigateToScreen = navigateToScreen,
         personaViewModel = personaViewModel,
         onCameraButtonClicked = onCameraButtonClicked,
+        onNfcButtonClicked = onNfcButtonClicked,
         onTextFieldChanged = { text -> personaViewModel.updateNombre(text) }
     )
 
+}
+/**
+ * Lee los datos del DNI electrónico usando el protocolo NFC.
+ *
+ * @param tag Tag NFC detectado
+ * @param canCode Código CAN del DNI
+ * @param context Contexto de la aplicación
+ * @return DniData con los datos extraídos del DNI
+ * @throws IOException si falla la comunicación NFC o la autenticación
+ */
+private fun readDniData(tag: Tag, canCode: String, context: Context): DniData {
+    val isoDep = IsoDep.get(tag)
+    try {
+        isoDep.connect()
+        isoDep.timeout = 5000
+
+        val selectAID = byteArrayOf(
+            0x00, 0xA4.toByte(), 0x04, 0x00, 0x07,
+            0x4D, 0x61, 0x73, 0x74, 0x65, 0x72, 0x2E
+        )
+        val canCommand = "00A4020C0F$canCode".hexStringToByteArray()
+
+        isoDep.transceive(selectAID)
+        val response = isoDep.transceive(canCommand)
+
+        if (response[response.size - 2] != 0x90.toByte() || response[response.size - 1] != 0x00.toByte()) {
+            throw IOException("Autenticación CAN fallida")
+        }
+
+        val readDG1 = byteArrayOf(0x00, 0xB0.toByte(), 0x81.toByte(), 0x00, 0xFF.toByte())
+        val dg1Data = isoDep.transceive(readDG1)
+
+        return parseDniData(dg1Data)
+    } finally {
+        isoDep.close()
+    }
+}
+
+/**
+ * Parsea los datos brutos del DNI en un objeto DniData.
+ *
+ * @param data Datos brutos obtenidos del NFC
+ * @return DniData con la información extraída
+ * @throws IOException si el formato de los datos es inválido
+ */
+private fun parseDniData(data: ByteArray): DniData {
+    val mrzString = String(data, StandardCharsets.UTF_8)
+    val lines = mrzString.split("\n").filter { it.isNotEmpty() }
+
+    if (lines.size >= 2) {
+        val documentNumber = lines[0].substring(0, 9)
+        val birthDate = lines[1].substring(13, 19) // YYMMDD
+        val formattedDate = SimpleDateFormat("yyMMdd").parse(birthDate)?.let { date ->
+            SimpleDateFormat("d 'de' MMMM 'de' yyyy'", Locale("es", "ES")).format(date)
+        } ?: ""
+
+        val nameFields = lines[1].substring(30).split("<<")
+        val apellidos = nameFields[0].replace("<", " ").trim()
+        val nombre = nameFields.getOrNull(1)?.replace("<", " ")?.trim() ?: ""
+        val sexo = if (lines[1][20] == 'M') "Masculino" else "Femenino"
+
+        return DniData(
+            numeroDocumento = documentNumber,
+            nombre = nombre,
+            apellidos = apellidos,
+            fechaNacimiento = formattedDate,
+            sexo = sexo,
+            nacionalidad = "España"
+        )
+    }
+    throw IOException("Formato de datos inválido")
+}
+/**
+ * Actualiza el ViewModel con los datos extraídos del DNI.
+ *
+ * @param viewModel ViewModel a actualizar
+ * @param data Datos del DNI a aplicar
+ */
+private fun updatePersonaViewModel(viewModel: PersonaViewModel, data: DniData) {
+    viewModel.updateTipoDocumento("DNI")
+    viewModel.updateNumeroDocumento(data.numeroDocumento)
+    viewModel.updateNombre(data.nombre)
+    viewModel.updateApellidos(data.apellidos)
+    viewModel.updateFechaNacimiento(data.fechaNacimiento)
+    viewModel.updateGenero(data.sexo)
+    viewModel.updateNacionalidad(data.nacionalidad)
 }
 
 /**
@@ -160,11 +327,15 @@ fun PersonaScreenContent(
     navigateToScreen: (String) -> Unit,
     personaViewModel: PersonaViewModel,
     onCameraButtonClicked: () -> Unit,
+    onNfcButtonClicked: () -> Unit,
     onTextFieldChanged: (String) -> Unit
 ) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { ToolbarPersona(onCameraButtonClicked = onCameraButtonClicked, onNFCClicked = {}) },
+        topBar = { ToolbarPersona(
+            onCameraButtonClicked = onCameraButtonClicked,
+            onNFCClicked = onNfcButtonClicked
+        ) },
         bottomBar = { BottomAppBarPersona(personaViewModel, navigateToScreen) }
     ) { paddingValues ->
         PersonaContent(
@@ -886,4 +1057,47 @@ fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit, onError: (E
         onError(e)
     }
 
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CanDialog(
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var canCode by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Código CAN del DNI") },
+        text = {
+            Column {
+                Text("Por favor, introduzca el código CAN de 6 dígitos del DNI")
+                OutlinedTextField(
+                    value = canCode,
+                    onValueChange = {
+                        if (it.length <= 6) canCode = it.filter { char -> char.isDigit() }
+                    },
+                    label = { Text("Código CAN") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (canCode.length == 6) {
+                        onConfirm(canCode)
+                    } else {
+                        Toast.makeText(context, "El código CAN debe tener 6 dígitos", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            ) { Text("Aceptar") }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }

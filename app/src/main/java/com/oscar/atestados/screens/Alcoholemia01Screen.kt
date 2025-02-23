@@ -53,13 +53,28 @@ fun Alcoholemia01Screen(
 private fun AlcoholemiaTopBar() {
     CenterAlignedTopAppBar(
         title = {
-            Text(
-                text = "Alcoholemia",
-                fontSize = 30.sp,
-                style = MaterialTheme.typography.titleLarge,
-                color = TextoNormales,
-                fontWeight = FontWeight.Bold
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Alcoholemia",
+                    textAlign = TextAlign.Center,
+                    fontSize = 30.sp,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextoNormales,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Datos etilómetro y alcoholemia",
+                    textAlign = TextAlign.Center,
+                    fontSize = 18.sp,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextoSecundarios
+                )
+                Spacer(modifier = Modifier.height(15.dp))
+            }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
             containerColor = Color.Transparent
@@ -179,17 +194,7 @@ private fun AlcoholemiaContent(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // Sección Datos del etilómetro
-        Text(
-            text = "Datos etilómetro y alcoholemia",
-            style = MaterialTheme.typography.titleSmall,
-            color = TextoTerciarios,
-            modifier = Modifier
-                .padding(vertical = 8.dp)
-                .fillMaxSize(),
-            textAlign = TextAlign.Center,
-            fontSize = 20.sp
-        )
+
         val opcionSeleccionada by alcoholemiaUnoViewModel.opcionMotivo.observeAsState()
 
         Column {

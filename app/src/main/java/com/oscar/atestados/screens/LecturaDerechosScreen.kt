@@ -31,8 +31,10 @@ fun LecturaDerechosScreen(
             title = {
                 Text(
                     "ATENCIÓN",
+                    textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.titleLarge,
-                    color = TextoNormales
+                    color = TextoNormales,
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
@@ -155,6 +157,7 @@ private fun LecturaDerechosContent(
             value = resumenHechos,
             onValueChange = { lecturaDerechosViewModel.updateResumenHechos(it) },
             label = "Breve resumen de los hechos",
+            modifier = Modifier.height(150.dp),
             singleLine = false,
             maxLines = 5
         )
@@ -163,6 +166,7 @@ private fun LecturaDerechosContent(
             value = calificacionHechos,
             onValueChange = { lecturaDerechosViewModel.updateCalificacionHechos(it) },
             label = "Calificación provisional de los hechos",
+            modifier = Modifier.height(100.dp),
             singleLine = false,
             maxLines = 3
         )
@@ -171,8 +175,9 @@ private fun LecturaDerechosContent(
             value = relacionIndicios,
             onValueChange = { lecturaDerechosViewModel.updateRelacionIndicios(it) },
             label = "Relación de indicios de los que se deduce la investigación",
+            modifier = Modifier.height(250.dp),
             singleLine = false,
-            maxLines = 5
+            maxLines = 10
         )
     }
 }
@@ -191,7 +196,7 @@ private fun LecturaDerechosBottomBar(
         Button(
             onClick = {
                 viewModel.guardarDatos()
-                navigateToScreen("SiguientePantalla")
+                navigateToScreen("TomaDerechosScreen")
             },
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,

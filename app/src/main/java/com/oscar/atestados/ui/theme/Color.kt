@@ -26,6 +26,7 @@ val Gray800 = Color(0xFF424242)
 val Orange800 = Color(0xFFEF6C00)
 val LightBlue800 = Color(0xFF0277BD)
 val Green800 = Color(0xFF2E7D32)
+val Indigo900 = Color(0XFF1A237E)
 
 val White = Color(0xFFFFFFFF)
 val Black = Color(0xFF000000)
@@ -42,10 +43,12 @@ Colores a utilizar para las screen en general
 */
 val BotonesNormales = BlueGray900
 val TextoBotonesNormales = BlueGray50
-val BotonesSecundarios = Green800
+val BotonesSecundarios = BlueGray700
 val TextoBotonesSecundarios = BlueGray900
 val TextoNormales = BlueGray900
 val TextoSecundarios = BlueGray600
 val TextoTerciarios = BlueGray300
 val ItemSelected = BlueGray400
 val TextoInformacion = Orange800
+val BotonesFirmaAjena = Green800
+val FirmaColor = Indigo900
