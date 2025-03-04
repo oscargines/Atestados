@@ -1,8 +1,11 @@
+
+import com.android.build.api.dsl.Packaging
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose) // Esto reemplaza a kotlin("compose")
-    alias(libs.plugins.jetbrainsKotlinSerialization)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -12,11 +15,13 @@ android {
     defaultConfig {
         applicationId = "com.oscar.atestados"
         minSdk = 31
-        targetSdk = 35 // Alineamos con compileSdk para usar lo último
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["nfcPermission"] = "android.permission.NFC"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders["nfcPermission"] = "android.permission.NFC"
     }
 
     buildTypes {
@@ -25,6 +30,20 @@ android {
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
+            )
+        }
+    }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "AndroidManifest.xml",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/*.kotlin_module"
             )
         }
     }
@@ -43,17 +62,18 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.10" // Compatible con Kotlin 1.9.22
+        kotlinCompilerExtensionVersion = "1.5.11" // Compatible con Kotlin 1.9.22
     }
+    buildToolsVersion = "35.0.0"
 }
 
 dependencies {
     // Core y utilidades
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.activity.compose) // Única versión necesaria
+    implementation(libs.androidx.activity.compose)
 
-    // Jetpack Compose - Usamos BOM para consistencia
+    // Jetpack Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -63,7 +83,7 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.jetbrains.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.android)
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
@@ -88,12 +108,23 @@ dependencies {
     // Bluetooth
     implementation(libs.androidx.bluetooth)
 
+    // NFC y DNIeDroid
+    implementation(files("libs/dniedroid-release.aar"))
+    implementation("org.bouncycastle:bcprov-jdk18on:1.74")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.74")
+    implementation("org.bouncycastle:bcutil-jdk18on:1.74")
+    implementation(libs.jmrtd)
+    implementation(libs.scuba.smartcards)
+
     // Gson
     implementation(libs.gson)
 
     // Coil para imágenes
     implementation(libs.coil.compose)
     implementation(libs.androidx.runtime.livedata)
+
+    // Zebra
+    implementation(files("libs/ZSDK_ANDROID_API.jar"))
 
     // Pruebas
     testImplementation(libs.junit)
@@ -103,4 +134,13 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+// Forzar versión 1.78 para BouncyCastle
+configurations.all {
+    resolutionStrategy {
+        force("org.bouncycastle:bcprov-jdk18on:1.74")
+        force ("org.bouncycastle:bcpkix-jdk18on:1.74")
+        force ("org.bouncycastle:bcutil-jdk18on:1.74")
+    }
 }

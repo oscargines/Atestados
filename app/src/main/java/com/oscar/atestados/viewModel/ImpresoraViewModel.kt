@@ -1,5 +1,6 @@
 package com.oscar.atestados.viewModel
 
+import ZebraPrinterHelper
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context
@@ -208,5 +209,9 @@ class ImpresoraViewModel(
     sealed class DeviceActionResult {
         object AlreadyPaired : DeviceActionResult()
         object SuccessfullyPaired : DeviceActionResult()
+    }
+    suspend fun printZplFile(assetFileName: String): Result<Unit> {
+        val printerHelper = ZebraPrinterHelper(context)
+        return printerHelper.printZplFromAsset(assetFileName)
     }
 }

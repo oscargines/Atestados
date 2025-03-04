@@ -421,7 +421,8 @@ fun BottomAppBarGuardias(
 ) {
     val context = LocalContext.current
     Surface(
-        modifier = Modifier.wrapContentHeight(),
+        modifier = Modifier.wrapContentHeight()
+            .padding(bottom = 20.dp),
         color = Color.Transparent
     ) {
         Row(

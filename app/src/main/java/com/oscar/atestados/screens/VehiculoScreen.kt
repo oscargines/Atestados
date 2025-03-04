@@ -182,7 +182,8 @@ fun BottomAppBarVehiculo(
     val context = LocalContext.current
     val plainTooltipState = rememberTooltipState()
     Surface(
-        modifier = Modifier.wrapContentHeight(),
+        modifier = Modifier.wrapContentHeight()
+            .padding(bottom = 30.dp),
         color = Color.Transparent
     ) {
         Row(

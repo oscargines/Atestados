@@ -2,6 +2,7 @@ package com.oscar.atestados.viewModel
 
 import android.app.AlertDialog
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -9,9 +10,11 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.oscar.atestados.screens.DniData
 import com.oscar.atestados.screens.dataStorePer
+import com.oscar.atestados.utils.DniData
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -21,7 +24,7 @@ import kotlinx.coroutines.withContext
  */
 class PersonaViewModel : ViewModel() {
 
-    //LiveData declarations...
+    // LiveData declarations...
     private val _genero = MutableLiveData<String>()
     val genero: LiveData<String> = _genero
 
@@ -64,8 +67,8 @@ class PersonaViewModel : ViewModel() {
     private val _email = MutableLiveData<String>()
     val email: LiveData<String> = _email
 
-    private val _codigoCan = MutableLiveData<String>()
-    val codigoCan: LiveData<String> = _codigoCan
+    private val _codigoCan = MutableLiveData<String?>(null)
+    val codigoCan: LiveData<String?> = _codigoCan
 
     /**
      * Objeto que contiene las claves para almacenar los datos en DataStore.
@@ -94,20 +97,10 @@ class PersonaViewModel : ViewModel() {
         _genero.value = valor
     }
 
-    /**
-     * Actualiza el valor de la nacionalidad de la persona.
-     *
-     * @param valor Nueva nacionalidad
-     */
     fun updateNacionalidad(valor: String) {
         _nacionalidad.value = valor
     }
 
-    /**
-     * Actualiza el valor de la nacionalidad de la persona.
-     *
-     * @param valor Nueva nacionalidad
-     */
     fun updateTipoDocumento(valor: String) {
         _tipoDocumento.value = valor
     }
@@ -156,8 +149,30 @@ class PersonaViewModel : ViewModel() {
         _email.value = valor
     }
 
-    fun updateCodigoCan(valor: String) {
+    fun updateCodigoCan(valor: String?) {
         _codigoCan.value = valor
+        Log.d("PersonaViewModel", "Código CAN actualizado: $valor")
+    }
+
+    fun clearCodigoCan() {
+        _codigoCan.value = null
+        Log.d("PersonaViewModel", "Código CAN limpiado")
+    }
+
+    // Nuevo método para actualizar todos los datos desde DniData
+    fun updateFromDniData(dniData: DniData) {
+        _tipoDocumento.value = "DNI"
+        _numeroDocumento.value = dniData.numeroDocumento
+        _nombre.value = dniData.nombre
+        _apellidos.value = dniData.apellidos
+        _fechaNacimiento.value = dniData.fechaNacimiento
+        _genero.value = dniData.sexo
+        _nacionalidad.value = dniData.nacionalidad
+        _nombrePadre.value = dniData.nombrePadre
+        _nombreMadre.value = dniData.nombreMadre
+        _lugarNacimiento.value = dniData.lugarNacimiento
+        _domicilio.value = dniData.domicilio
+        Log.d("PersonaViewModel", "Datos actualizados desde DniData: $dniData")
     }
 
     /**
@@ -171,7 +186,7 @@ class PersonaViewModel : ViewModel() {
             val dataStore = context.dataStorePer
 
             // Verificar si hay datos para guardar
-            val hasEmptyReqredField =
+            val hasEmptyRequiredField =
                 _genero.value.isNullOrBlank() ||
                         _nacionalidad.value.isNullOrBlank() ||
                         _tipoDocumento.value.isNullOrBlank() ||
@@ -184,13 +199,12 @@ class PersonaViewModel : ViewModel() {
                         _lugarNacimiento.value.isNullOrBlank() ||
                         _domicilio.value.isNullOrBlank()
 
-            if (hasEmptyReqredField) {
-                // Mostrar alerta si no hay datos
+            if (hasEmptyRequiredField) {
                 withContext(Dispatchers.Main) {
                     AlertDialog.Builder(context)
                         .setTitle("Datos de la Persona")
                         .setMessage(
-                            "No se han introducido los datos necesaios para guardar " +
+                            "No se han introducido los datos necesarios para guardar " +
                                     "y poder confeccionar el atestado. Vuelva a acceder a la pantalla" +
                                     " e introduzca lo necesario para su correcta confección.\n" +
                                     "No olvide guardar los datos."
@@ -199,7 +213,6 @@ class PersonaViewModel : ViewModel() {
                         .show()
                 }
             } else {
-                // Guardar los datos en el DataStore
                 dataStore.edit { preferences ->
                     preferences[PersonaKeys.GENERO] = _genero.value ?: ""
                     preferences[PersonaKeys.NACIONALIDAD] = _nacionalidad.value ?: ""
@@ -218,7 +231,6 @@ class PersonaViewModel : ViewModel() {
                     preferences[PersonaKeys.CODIGO_CAN] = _codigoCan.value ?: ""
                 }
 
-                // Mostrar un Toast cuando los datos se guarden correctamente
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
@@ -230,20 +242,23 @@ class PersonaViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Limpia todos los datos almacenados tanto en el DataStore como en los LiveData.
-     * Establece todos los valores a cadenas vacías.
-     *
-     * @param context Contexto de la aplicación necesario para acceder al DataStore
-     */
+    fun saveCodigoCan(context: Context, codigoCan: String) {
+        viewModelScope.launch {
+            context.dataStorePer.edit { preferences ->
+                preferences[PersonaKeys.CODIGO_CAN] = codigoCan
+            }
+            _codigoCan.value = codigoCan
+            Log.d("PersonaViewModel", "Código CAN guardado en DataStore: $codigoCan")
+        }
+    }
+
     fun clearData(context: Context) {
         viewModelScope.launch {
             val dataStore = context.dataStorePer
             dataStore.edit { preferences ->
-                preferences.clear() // Limpia todas las preferencias
+                preferences.clear()
             }
         }
-        // También limpia los LiveData
         _genero.value = ""
         _nacionalidad.value = ""
         _tipoDocumento.value = ""
@@ -261,34 +276,46 @@ class PersonaViewModel : ViewModel() {
         _codigoCan.value = ""
     }
 
-    /**
-     * Carga todos los datos almacenados en el DataStore y los asigna a los LiveData correspondientes.
-     * Si no hay datos almacenados, se utilizan cadenas vacías como valores predeterminados.
-     *
-     * @param context Contexto de la aplicación necesario para acceder al DataStore
-     */
+    fun clearCodigoCan(context: Context) {
+        viewModelScope.launch {
+            context.dataStorePer.edit { preferences ->
+                preferences.remove(PersonaKeys.CODIGO_CAN)
+            }
+            _codigoCan.value = null
+            Log.d("PersonaViewModel", "Código CAN limpiado de DataStore")
+        }
+    }
+
     fun loadData(context: Context) {
         viewModelScope.launch {
             val dataStore = context.dataStorePer
+            val preferences = dataStore.data.firstOrNull()
+            _genero.value = preferences?.get(PersonaKeys.GENERO) ?: ""
+            _nacionalidad.value = preferences?.get(PersonaKeys.NACIONALIDAD) ?: ""
+            _tipoDocumento.value = preferences?.get(PersonaKeys.TIPO_DOCUMENTO) ?: ""
+            _numeroDocumento.value = preferences?.get(PersonaKeys.NUMERO_DOCUMENTO) ?: ""
+            _nombre.value = preferences?.get(PersonaKeys.NOMBRE) ?: ""
+            _apellidos.value = preferences?.get(PersonaKeys.APELLIDOS) ?: ""
+            _nombrePadre.value = preferences?.get(PersonaKeys.NOMBRE_PADRE) ?: ""
+            _nombreMadre.value = preferences?.get(PersonaKeys.NOMBRE_MADRE) ?: ""
+            _fechaNacimiento.value = preferences?.get(PersonaKeys.FECHA_NACIMIENTO) ?: ""
+            _lugarNacimiento.value = preferences?.get(PersonaKeys.LUGAR_NACIMIENTO) ?: ""
+            _domicilio.value = preferences?.get(PersonaKeys.DOMICILIO) ?: ""
+            _codigoPostal.value = preferences?.get(PersonaKeys.CODIGO_POSTAL) ?: ""
+            _telefono.value = preferences?.get(PersonaKeys.TELEFONO) ?: ""
+            _email.value = preferences?.get(PersonaKeys.EMAIL) ?: ""
+            _codigoCan.value = preferences?.get(PersonaKeys.CODIGO_CAN) ?: ""
+            Log.d("PersonaViewModel", "Datos cargados desde DataStore - canCode: ${_codigoCan.value}")
+        }
+    }
 
-            // Leer todos los datos del DataStore
-            dataStore.data.collect { preferences ->
-                _genero.value = preferences[PersonaKeys.GENERO] ?: ""
-                _nacionalidad.value = preferences[PersonaKeys.NACIONALIDAD] ?: ""
-                _tipoDocumento.value = preferences[PersonaKeys.TIPO_DOCUMENTO] ?: ""
-                _numeroDocumento.value = preferences[PersonaKeys.NUMERO_DOCUMENTO] ?: ""
-                _nombre.value = preferences[PersonaKeys.NOMBRE] ?: ""
-                _apellidos.value = preferences[PersonaKeys.APELLIDOS] ?: ""
-                _nombrePadre.value = preferences[PersonaKeys.NOMBRE_PADRE] ?: ""
-                _nombreMadre.value = preferences[PersonaKeys.NOMBRE_MADRE] ?: ""
-                _fechaNacimiento.value = preferences[PersonaKeys.FECHA_NACIMIENTO] ?: ""
-                _lugarNacimiento.value = preferences[PersonaKeys.LUGAR_NACIMIENTO] ?: ""
-                _domicilio.value = preferences[PersonaKeys.DOMICILIO] ?: ""
-                _codigoPostal.value = preferences[PersonaKeys.CODIGO_POSTAL] ?: ""
-                _telefono.value = preferences[PersonaKeys.TELEFONO] ?: ""
-                _email.value = preferences[PersonaKeys.EMAIL] ?: ""
-                _codigoCan.value = preferences[PersonaKeys.CODIGO_CAN] ?: ""
-            }
+    fun loadCodigoCan(context: Context) {
+        viewModelScope.launch {
+            val codigoCan = context.dataStorePer.data
+                .map { preferences -> preferences[PersonaKeys.CODIGO_CAN] }
+                .firstOrNull()
+            _codigoCan.value = codigoCan
+            Log.d("PersonaViewModel", "Código CAN cargado desde DataStore: $codigoCan")
         }
     }
 }
