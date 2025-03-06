@@ -14,60 +14,106 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+/**
+ * Configuración de DataStore para almacenar preferencias relacionadas con la pantalla de alcoholemia uno.
+ */
 val Context.dataStoreAlcoholemia: DataStore<Preferences> by preferencesDataStore(name = "alcoholemia_uno_settings")
 
+/**
+ * ViewModel para gestionar los datos relacionados con la pantalla de alcoholemia uno.
+ * Utiliza LiveData para observar cambios en los datos y DataStore para persistirlos.
+ *
+ * @property application Aplicación Android necesaria para inicializar el ViewModel y acceder al contexto.
+ */
 class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(application) {
-    // Claves para DataStore
+
+    /**
+     * Objeto interno que define las claves utilizadas para almacenar datos en DataStore.
+     */
     private object PreferencesKeys {
+        /** Clave para la opción seleccionada como motivo de las diligencias. */
         val OPCION_MOTIVO = stringPreferencesKey("opcion_motivo")
+        /** Clave para la opción seleccionada sobre errores permitidos. */
         val OPCION_ERRORES = stringPreferencesKey("opcion_errores")
+        /** Clave para la opción seleccionada sobre deseo de pruebas. */
         val OPCION_PRUEBAS = stringPreferencesKey("opcion_pruebas")
+        /** Clave para la marca del dispositivo de medición. */
         val MARCA = stringPreferencesKey("marca")
+        /** Clave para el modelo del dispositivo de medición. */
         val MODELO = stringPreferencesKey("modelo")
+        /** Clave para el número de serie del dispositivo de medición. */
         val SERIE = stringPreferencesKey("serie")
+        /** Clave para la fecha de caducidad del dispositivo de medición. */
         val CADUCIDAD = stringPreferencesKey("caducidad")
+        /** Clave para el resultado de la primera tasa de alcoholemia. */
         val PRIMERA_TASA = stringPreferencesKey("primera_tasa")
+        /** Clave para la hora de la primera prueba de alcoholemia. */
         val PRIMERA_HORA = stringPreferencesKey("primera_hora")
+        /** Clave para el resultado de la segunda tasa de alcoholemia. */
         val SEGUNDA_TASA = stringPreferencesKey("segunda_tasa")
+        /** Clave para la hora de la segunda prueba de alcoholemia. */
         val SEGUNDA_HORA = stringPreferencesKey("segunda_hora")
     }
+
     // Opciones del motivo por el que se instruyen diligencias
+    /** LiveData privado para la opción de motivo. */
     private val _opcionMotivo = MutableLiveData<String>()
+    /** LiveData público para observar la opción de motivo. */
     val opcionMotivo: LiveData<String> = _opcionMotivo
 
     // Opciones de errores permitidos
+    /** LiveData privado para la opción de errores. */
     private val _opcionErrores = MutableLiveData<String>()
+    /** LiveData público para observar la opción de errores. */
     val opcionErrores: LiveData<String> = _opcionErrores
 
     // Opciones de si desea pruebas
+    /** LiveData privado para la opción de deseo de pruebas. */
     private val _opcionDeseaPruebas = MutableLiveData<String>()
+    /** LiveData público para observar la opción de deseo de pruebas. */
     val opcionDeseaPruebas: LiveData<String> = _opcionDeseaPruebas
 
     // Campos de texto
+    /** LiveData privado para la marca del dispositivo. */
     private val _marca = MutableLiveData<String>()
+    /** LiveData público para observar la marca del dispositivo. */
     val marca: LiveData<String> = _marca
 
+    /** LiveData privado para el modelo del dispositivo. */
     private val _modelo = MutableLiveData<String>()
+    /** LiveData público para observar el modelo del dispositivo. */
     val modelo: LiveData<String> = _modelo
 
+    /** LiveData privado para el número de serie del dispositivo. */
     private val _serie = MutableLiveData<String>()
+    /** LiveData público para observar el número de serie del dispositivo. */
     val serie: LiveData<String> = _serie
 
+    /** LiveData privado para la fecha de caducidad del dispositivo. */
     private val _caducidad = MutableLiveData<String>()
+    /** LiveData público para observar la fecha de caducidad del dispositivo. */
     val caducidad: LiveData<String> = _caducidad
 
     // Primera prueba
+    /** LiveData privado para la primera tasa de alcoholemia. */
     private val _primeraTasa = MutableLiveData<String>()
+    /** LiveData público para observar la primera tasa de alcoholemia. */
     val primeraTasa: LiveData<String> = _primeraTasa
 
+    /** LiveData privado para la hora de la primera prueba. */
     private val _primeraHora = MutableLiveData<String>()
+    /** LiveData público para observar la hora de la primera prueba. */
     val primeraHora: LiveData<String> = _primeraHora
 
     // Segunda prueba
+    /** LiveData privado para la segunda tasa de alcoholemia. */
     private val _segundaTasa = MutableLiveData<String>()
+    /** LiveData público para observar la segunda tasa de alcoholemia. */
     val segundaTasa: LiveData<String> = _segundaTasa
 
+    /** LiveData privado para la hora de la segunda prueba. */
     private val _segundaHora = MutableLiveData<String>()
+    /** LiveData público para observar la hora de la segunda prueba. */
     val segundaHora: LiveData<String> = _segundaHora
 
     init {
@@ -75,52 +121,112 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
     }
 
     // Funciones para actualizar opciones
+    /**
+     * Establece la opción seleccionada como motivo de las diligencias.
+     *
+     * @param opcionMotivo Opción seleccionada para el motivo.
+     */
     fun setOpcionMotivo(opcionMotivo: String) {
         _opcionMotivo.value = opcionMotivo
     }
 
+    /**
+     * Establece la opción seleccionada sobre errores permitidos.
+     *
+     * @param opcionErrores Opción seleccionada para los errores.
+     */
     fun setOpcionErrores(opcionErrores: String) {
         _opcionErrores.value = opcionErrores
     }
 
+    /**
+     * Establece la opción seleccionada sobre el deseo de realizar pruebas.
+     *
+     * @param opcionDeseaPruebas Opción seleccionada para el deseo de pruebas.
+     */
     fun setOpcionDeseaPruebas(opcionDeseaPruebas: String) {
         _opcionDeseaPruebas.value = opcionDeseaPruebas
     }
 
     // Actualizadores de campos
+    /**
+     * Actualiza la marca del dispositivo de medición.
+     *
+     * @param value Nueva marca del dispositivo.
+     */
     fun updateMarca(value: String) {
         _marca.value = value
     }
 
+    /**
+     * Actualiza el modelo del dispositivo de medición.
+     *
+     * @param value Nuevo modelo del dispositivo.
+     */
     fun updateModelo(value: String) {
         _modelo.value = value
     }
 
+    /**
+     * Actualiza el número de serie del dispositivo de medición.
+     *
+     * @param value Nuevo número de serie del dispositivo.
+     */
     fun updateSerie(value: String) {
         _serie.value = value
     }
 
+    /**
+     * Actualiza la fecha de caducidad del dispositivo de medición.
+     *
+     * @param value Nueva fecha de caducidad del dispositivo.
+     */
     fun updateCaducidad(value: String) {
         _caducidad.value = value
     }
 
+    /**
+     * Actualiza el resultado de la primera tasa de alcoholemia.
+     *
+     * @param value Nueva primera tasa de alcoholemia.
+     */
     fun updatePrimeraTasa(value: String) {
         _primeraTasa.value = value
     }
 
+    /**
+     * Actualiza la hora de la primera prueba de alcoholemia.
+     *
+     * @param value Nueva hora de la primera prueba.
+     */
     fun updatePrimeraHora(value: String) {
         _primeraHora.value = value
     }
 
+    /**
+     * Actualiza el resultado de la segunda tasa de alcoholemia.
+     *
+     * @param value Nueva segunda tasa de alcoholemia.
+     */
     fun updateSegundaTasa(value: String) {
         _segundaTasa.value = value
     }
 
+    /**
+     * Actualiza la hora de la segunda prueba de alcoholemia.
+     *
+     * @param value Nueva hora de la segunda prueba.
+     */
     fun updateSegundaHora(value: String) {
         _segundaHora.value = value
     }
 
     // Operaciones de guardado y limpieza
+    /**
+     * Guarda los datos actuales en DataStore de manera asíncrona.
+     *
+     * @param context Contexto necesario para acceder a DataStore.
+     */
     fun guardarDatos(context: Context) {
         viewModelScope.launch {
             context.dataStoreAlcoholemia.edit { preferences ->
@@ -139,6 +245,9 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    /**
+     * Limpia todos los datos almacenados en DataStore y restablece los valores en el ViewModel.
+     */
     fun limpiarDatos() {
         viewModelScope.launch {
             getApplication<Application>().dataStoreAlcoholemia.edit { preferences ->
@@ -158,6 +267,10 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
             _segundaHora.value = ""
         }
     }
+
+    /**
+     * Carga los datos guardados en DataStore al inicializar el ViewModel.
+     */
     private fun loadSavedData() {
         viewModelScope.launch {
             val preferences = getApplication<Application>().dataStoreAlcoholemia.data.first()

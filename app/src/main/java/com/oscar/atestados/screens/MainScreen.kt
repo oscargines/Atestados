@@ -1,51 +1,24 @@
 package com.oscar.atestados.screens
 
+import android.R.attr.bottom
+import android.R.attr.end
+import android.R.attr.start
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomAppBar
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTooltipState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.oscar.atestados.R
@@ -54,31 +27,55 @@ import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
 
+
+/**
+ * Pantalla principal de la aplicación.
+ *
+ * Esta pantalla sirve como punto de entrada, mostrando opciones para navegar a diferentes
+ * funcionalidades de la aplicación, como gestionar personas, vehículos, alcoholemias, etc.
+ *
+ * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
+ */
 @Composable
 fun MainScreen(navigateToScreen: (String) -> Unit) {
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { Toolbar(navigateToScreen) },
-        bottomBar = { BottomAppBar(navigateToScreen)}
+        topBar = { ToolbarMain(navigateToScreen) },
+        bottomBar = { BottomAppBar(navigateToScreen) }
     ) { paddingValues ->
         Content(
-            modifier = Modifier.padding(paddingValues),
+            modifier = Modifier
+                .padding(
+                    start = paddingValues.calculateStartPadding(LocalLayoutDirection.current),
+                    end = paddingValues.calculateEndPadding(LocalLayoutDirection.current),
+                    bottom = paddingValues.calculateBottomPadding()
+                ), // Eliminamos el padding superior por defecto
             onNavigate = navigateToScreen
         )
     }
 }
 
+/**
+ * Barra superior de la pantalla principal.
+ *
+ * Contiene botones para acceder a la gestión de actuantes e impresoras, y un botón de versión
+ * que muestra un diálogo con información de contacto.
+ *
+ * @param onNavigate Función lambda para navegar a otra pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Toolbar(onNavigate: (String) -> Unit) {
+fun ToolbarMain(onNavigate: (String) -> Unit) {
     var isDialogVisible by remember { mutableStateOf(false) }
     val plainTooltipState = rememberTooltipState()
 
     TopAppBar(
         title = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .padding(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -127,7 +124,7 @@ fun Toolbar(onNavigate: (String) -> Unit) {
                     )
                 }
 
-                // TextButton for version info
+                // Botón de versión
                 TextButton(onClick = { isDialogVisible = true }) {
                     Text(
                         text = "Versión 1.0",
@@ -150,6 +147,14 @@ fun Toolbar(onNavigate: (String) -> Unit) {
         message = "Para informar de errores o mandar sugerencias, mande un correo electrónico a oscargines@guardiacivil.es.\nPor favor, tenga paciencia en la contestación."
     )
 }
+
+/**
+ * Barra inferior de la pantalla principal.
+ *
+ * Contiene botones para acceder a otros documentos y limpiar datos de la aplicación.
+ *
+ * @param onNavigate Función lambda para navegar a otra pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomAppBar(
@@ -159,10 +164,9 @@ fun BottomAppBar(
     val plainTooltipState = rememberTooltipState()
 
     BottomAppBar(
-        //modifier = Modifier.height(60.dp),
         modifier = Modifier.wrapContentHeight(),
         containerColor = Color.Transparent,
-        content = { // Aquí añadimos explícitamente el content
+        content = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,6 +246,15 @@ fun BottomAppBar(
     )
 }
 
+/**
+ * Contenido principal de la pantalla.
+ *
+ * Muestra el logotipo de la Agrupación de Tráfico y botones de navegación a las diferentes
+ * secciones de la aplicación.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param onNavigate Función lambda para navegar a otra pantalla.
+ */
 @Composable
 fun Content(
     modifier: Modifier = Modifier,
@@ -253,10 +266,12 @@ fun Content(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(bottom = 60.dp)
+            .padding(vertical = 60.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
@@ -284,7 +299,7 @@ fun Content(
             )
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Navigation buttons
+            // Botones de navegación
             CreaBoton(
                 onClick = { onNavigate("PersonaScreen") },
                 text = "PERSONA",
@@ -299,7 +314,7 @@ fun Content(
             CreaBoton(
                 onClick = { onNavigate("Alcoholemia01Screen") },
                 text = "ALCOHOLEMIA",
-                mensaje = "Pulse aquí para inicar un Atestado por Alcoholemia"
+                mensaje = "Pulse aquí para iniciar un Atestado por Alcoholemia"
             )
             CreaBoton(
                 onClick = { onNavigate("CarecerScreen") },
@@ -314,12 +329,22 @@ fun Content(
         onDismiss = { isDialogVisible = false },
         title = "Información de la app",
         message = "Esta app ha sido creada como proyecto final del Ciclo de " +
-                "Grado Superior de Darrollo de Aplicaciones Multiplataforma." +
+                "Grado Superior de Desarrollo de Aplicaciones Multiplataforma." +
                 "\nCreada por el Guardia Civil Óscar I. Ginés R., destinado en" +
                 " el Destacamento de Tráfico de Ribadesella, Asturias."
     )
 }
 
+/**
+ * Botón personalizado con tooltip.
+ *
+ * Crea un botón con un mensaje emergente (tooltip) que describe su función.
+ *
+ * @param onClick Callback que se ejecuta al hacer clic en el botón.
+ * @param text Texto mostrado en el botón.
+ * @param mensaje Mensaje del tooltip que describe la acción del botón.
+ * @param enabled Indica si el botón está habilitado (por defecto, true).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreaBoton(
@@ -360,6 +385,16 @@ fun CreaBoton(
     }
 }
 
+/**
+ * Diálogo de alerta genérico.
+ *
+ * Muestra un diálogo con un título, mensaje y un botón de confirmación.
+ *
+ * @param showDialog Indica si el diálogo debe mostrarse.
+ * @param onDismiss Callback que se ejecuta al cerrar el diálogo.
+ * @param title Título del diálogo.
+ * @param message Mensaje mostrado en el diálogo.
+ */
 @Composable
 fun LanzaAlert(
     showDialog: Boolean,
@@ -380,4 +415,3 @@ fun LanzaAlert(
         )
     }
 }
-

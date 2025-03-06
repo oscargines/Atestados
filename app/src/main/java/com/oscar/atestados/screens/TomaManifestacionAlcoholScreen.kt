@@ -18,6 +18,15 @@ import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
 import com.oscar.atestados.viewModel.TomaManifestacionAlcoholViewModel
 
+/**
+ * Pantalla para la toma de manifestación en un atestado por alcoholemia.
+ *
+ * Permite al usuario registrar la declaración del investigado respecto al consumo de alcohol
+ * y otros detalles relevantes, con opciones para guardar o limpiar los datos.
+ *
+ * @param navigateToScreen Función lambda para navegar a otra pantalla, recibe una [String] con el nombre de la pantalla destino.
+ * @param tomaManifestacionAlcoholViewModel ViewModel que gestiona los datos de la toma de manifestación.
+ */
 @Composable
 fun TomaManifestacionAlcoholScreen(
     navigateToScreen: (String) -> Unit,
@@ -35,6 +44,11 @@ fun TomaManifestacionAlcoholScreen(
     }
 }
 
+/**
+ * Barra superior de la pantalla TomaManifestacionAlcoholScreen.
+ *
+ * Muestra el título "Toma de manifestación" y el subtítulo "Alcoholemia".
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TomaManifestacionAlcoholTopBar() {
@@ -70,6 +84,15 @@ private fun TomaManifestacionAlcoholTopBar() {
     )
 }
 
+/**
+ * Contenido principal de la pantalla TomaManifestacionAlcoholScreen.
+ *
+ * Incluye interruptores y campos de texto para registrar la declaración del investigado
+ * relacionada con un control de alcoholemia.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param viewModel ViewModel que contiene los datos de la toma de manifestación.
+ */
 @Composable
 private fun TomaManifestacionAlcoholContent(
     modifier: Modifier = Modifier,
@@ -166,8 +189,7 @@ private fun TomaManifestacionAlcoholContent(
             maxLines = 3
         )
         Text(
-            text = "¿Cuánto hace de la última vez que tomó alcohol, anterior al control " +
-                    "de alcoholemia?",
+            text = "¿Cuánto hace de la última vez que tomó alcohol, anterior al control de alcoholemia?",
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 8.dp)
         )
@@ -181,8 +203,7 @@ private fun TomaManifestacionAlcoholContent(
             maxLines = 1
         )
         Text(
-            text = "¿Es consciente de los peligros y de la falta de facultades que entraña " +
-                    "conducir habiendo consumido bebidas alcohólicas?",
+            text = "¿Es consciente de los peligros y de la falta de facultades que entraña conducir habiendo consumido bebidas alcohólicas?",
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(vertical = 8.dp)
         )
@@ -212,6 +233,14 @@ private fun TomaManifestacionAlcoholContent(
     }
 }
 
+/**
+ * Barra inferior de la pantalla TomaManifestacionAlcoholScreen.
+ *
+ * Contiene botones para guardar los datos y continuar, o limpiar los datos ingresados.
+ *
+ * @param viewModel ViewModel que gestiona los datos de la toma de manifestación.
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
+ */
 @Composable
 private fun TomaManifestacionAlcoholBottomBar(
     viewModel: TomaManifestacionAlcoholViewModel,
@@ -246,6 +275,13 @@ private fun TomaManifestacionAlcoholBottomBar(
     }
 }
 
+/**
+ * Componente de interruptor (switch) con texto descriptivo.
+ *
+ * @param text Texto que describe la opción del interruptor.
+ * @param checked Estado actual del interruptor (activado/desactivado).
+ * @param onCheckedChange Callback que se ejecuta al cambiar el estado del interruptor.
+ */
 @Composable
 private fun SwitchOption(
     text: String,
@@ -270,6 +306,16 @@ private fun SwitchOption(
     }
 }
 
+/**
+ * Campo de texto personalizado con borde.
+ *
+ * @param value Valor actual del campo.
+ * @param onValueChange Callback para actualizar el valor del campo.
+ * @param label Etiqueta del campo.
+ * @param modifier Modificador para personalizar el diseño.
+ * @param singleLine Indica si el campo es de una sola línea.
+ * @param maxLines Número máximo de líneas permitidas.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomTextField(
@@ -291,4 +337,3 @@ private fun CustomTextField(
         maxLines = maxLines
     )
 }
-

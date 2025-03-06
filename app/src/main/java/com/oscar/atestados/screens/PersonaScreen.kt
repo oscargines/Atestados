@@ -60,9 +60,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
+/** Delegate para el DataStore de preferencias de persona. */
 val Context.dataStorePer by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme")
 private const val TAG = "PersonaScreen"
 
+/**
+ * Pantalla para gestionar los datos de una persona en la aplicación.
+ *
+ * Esta pantalla permite introducir datos manualmente, capturarlos mediante NFC o cámara,
+ * y guardarlos o limpiarlos. Incluye diálogos para manejo de errores y confirmaciones.
+ *
+ * @param navigateToScreen Función lambda para navegar a otra pantalla, recibe una [String] con el nombre de la pantalla destino.
+ * @param personaViewModel ViewModel que gestiona los datos de la persona.
+ * @param nfcTag Etiqueta NFC detectada, si existe, para leer datos del DNI.
+ * @param onTagProcessed Callback que se ejecuta al finalizar el procesamiento del tag NFC.
+ * @param onCameraButtonClicked Callback que se ejecuta al hacer clic en el botón de la cámara.
+ */
 @Composable
 fun PersonaScreen(
     navigateToScreen: (String) -> Unit,
@@ -114,7 +127,7 @@ fun PersonaScreen(
                     withContext(Dispatchers.Main) {
                         Log.i(TAG, "Datos del DNI leídos: $readDniData")
                         dniData = readDniData
-                        personaViewModel.updateFromDniData(readDniData) // Usar el nuevo método
+                        personaViewModel.updateFromDniData(readDniData)
                         showSuccessAlert = true
                     }
                 } catch (e: IOException) {
@@ -246,6 +259,9 @@ fun PersonaScreen(
     )
 }
 
+/**
+ * Diálogo que se muestra mientras se lee el DNI mediante NFC.
+ */
 @Composable
 fun ReadingNfcDialog() {
     AlertDialog(
@@ -258,6 +274,13 @@ fun ReadingNfcDialog() {
     )
 }
 
+/**
+ * Diálogo que muestra los datos leídos del DNI.
+ *
+ * @param dniData Datos del DNI a mostrar.
+ * @param onConfirm Callback que se ejecuta al confirmar los datos.
+ * @param onDismiss Callback que se ejecuta al cerrar el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DniDataDialog(
@@ -291,10 +314,27 @@ fun DniDataDialog(
     )
 }
 
+/**
+ * Actualiza el ViewModel con los datos leídos del DNI.
+ *
+ * @param viewModel ViewModel de la persona a actualizar.
+ * @param data Datos del DNI a aplicar.
+ */
 private fun updatePersonaViewModel(viewModel: PersonaViewModel, data: DniData) {
-    viewModel.updateFromDniData(data) // Usar el nuevo método
+    viewModel.updateFromDniData(data)
 }
 
+/**
+ * Contenido principal de la pantalla PersonaScreen.
+ *
+ * Gestiona la interfaz de usuario con barra superior, inferior y campos de entrada.
+ *
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
+ * @param personaViewModel ViewModel que contiene los datos de la persona.
+ * @param onCameraButtonClicked Callback para el botón de la cámara.
+ * @param onNfcButtonClicked Callback para el botón de NFC.
+ * @param onTextFieldChanged Callback para cambios en los campos de texto.
+ */
 @Composable
 fun PersonaScreenContent(
     navigateToScreen: (String) -> Unit,
@@ -321,9 +361,14 @@ fun PersonaScreenContent(
     }
 }
 
-// Resto del código (BottomAppBarPersona, ToolbarPersona, PersonaContent, etc.) permanece igual
-// ...
-
+/**
+ * Barra inferior de la pantalla PersonaScreen.
+ *
+ * Contiene botones para guardar o limpiar los datos ingresados.
+ *
+ * @param personaViewModel ViewModel que gestiona los datos de la persona.
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomAppBarPersona(
@@ -421,6 +466,14 @@ fun BottomAppBarPersona(
     }
 }
 
+/**
+ * Barra superior de la pantalla PersonaScreen.
+ *
+ * Incluye el título y botones para acceder a la cámara y al lector NFC.
+ *
+ * @param onCameraButtonClicked Callback que se ejecuta al hacer clic en el botón de la cámara.
+ * @param onNFCClicked Callback que se ejecuta al hacer clic en el botón de NFC.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolbarPersona(
@@ -464,6 +517,15 @@ fun ToolbarPersona(
     )
 }
 
+/**
+ * Contenido principal de la pantalla PersonaScreen.
+ *
+ * Muestra los campos de entrada para los datos de la persona.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param onTextFieldChanged Callback que se ejecuta al cambiar el texto de los campos.
+ * @param personaViewModel ViewModel que contiene los datos de la persona.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonaContent(
@@ -517,6 +579,17 @@ fun PersonaContent(
                 )
             }
 
+            /**
+             * Campo de texto personalizado con borde.
+             *
+             * @param value Valor actual del campo.
+             * @param onValueChange Callback para actualizar el valor del campo.
+             * @param label Etiqueta del campo.
+             * @param placeholder Texto de marcador de posición.
+             * @param keyboardType Tipo de teclado a mostrar.
+             * @param modifier Modificador para personalizar el diseño.
+             * @param leadingIcon Icono opcional al inicio del campo.
+             */
             @Composable
             fun CustomOutlinedTextField(
                 value: String,
@@ -654,6 +727,12 @@ fun PersonaContent(
     }
 }
 
+/**
+ * Diálogo para seleccionar una fecha.
+ *
+ * @param onDateSelected Callback que recibe la fecha seleccionada como [String].
+ * @param onDismiss Callback que se ejecuta al cerrar el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun getDateDialog(
@@ -688,6 +767,11 @@ fun getDateDialog(
     }
 }
 
+/**
+ * Menú desplegable para seleccionar el sexo.
+ *
+ * @param personaViewModel ViewModel que gestiona el género seleccionado.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownSexo(personaViewModel: PersonaViewModel) {
@@ -724,6 +808,12 @@ fun DropDownSexo(personaViewModel: PersonaViewModel) {
     }
 }
 
+/**
+ * Menú desplegable para seleccionar la nacionalidad.
+ *
+ * @param personaViewModel ViewModel que gestiona la nacionalidad seleccionada.
+ * @param paises Lista de países disponibles para seleccionar.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownNacionalidad(
@@ -763,6 +853,12 @@ fun DropDownNacionalidad(
     }
 }
 
+/**
+ * Menú desplegable para seleccionar el tipo de documento y campo para el número.
+ *
+ * @param personaViewModel ViewModel que gestiona el tipo y número de documento.
+ * @param onTextFieldChanged Callback para cambios en el campo de texto del número de documento.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (String) -> Unit) {
@@ -822,11 +918,23 @@ fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (S
     )
 }
 
+/**
+ * Obtiene la lista de países desde la base de datos.
+ *
+ * @param context Contexto de la aplicación.
+ * @return Lista de nombres de países.
+ */
 fun getPaises(context: Context): List<String> {
     val myDB = AccesoBaseDatos(context, "paises.db", 1)
     return myDB.query("SELECT nombre FROM paises").map { it["nombre"] as String }
 }
 
+/**
+ * Vista previa de la cámara para capturar imágenes.
+ *
+ * @param onImageCaptured Callback que recibe el [Bitmap] capturado.
+ * @param onDismiss Callback que se ejecuta al cerrar la vista previa.
+ */
 @Composable
 fun CameraPreview(
     onImageCaptured: (Bitmap) -> Unit,
@@ -913,6 +1021,13 @@ fun CameraPreview(
     }
 }
 
+/**
+ * Procesa una imagen para extraer texto mediante reconocimiento OCR.
+ *
+ * @param bitmap Imagen a procesar.
+ * @param onTextRecognized Callback que recibe el texto reconocido.
+ * @param onError Callback que se ejecuta si ocurre un error.
+ */
 fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit, onError: (Exception) -> Unit) {
     try {
         val image = InputImage.fromBitmap(bitmap, 0)
@@ -935,6 +1050,12 @@ fun processImage(bitmap: Bitmap, onTextRecognized: (String) -> Unit, onError: (E
     }
 }
 
+/**
+ * Diálogo para ingresar el código CAN del DNI.
+ *
+ * @param onConfirm Callback que recibe el código CAN ingresado.
+ * @param onDismiss Callback que se ejecuta al cerrar el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CanDialog(

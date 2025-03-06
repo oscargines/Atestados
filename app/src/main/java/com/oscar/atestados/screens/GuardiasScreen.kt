@@ -61,14 +61,20 @@ import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
 import com.oscar.atestados.ui.theme.TextoTerciarios
 
+/**
+ * Delegate para acceder al DataStore de preferencias usado para almacenar datos de guardias.
+ */
 val Context.dataStoreGua by preferencesDataStore(name = "GUARDIAS_PREFERENCES")
 
 /**
- * Pantalla principal de Guardias Civiles instructores.
- * Muestra un formulario para gestionar los datos de los instructores intervinientes.
+ * Pantalla principal para gestionar datos de Guardias Civiles instructores.
  *
- * @param navigateToScreen Función lambda para navegar entre pantallas
- * @param guardiasViewModel ViewModel que gestiona el estado y la lógica de la pantalla
+ * Esta pantalla muestra un formulario con campos para registrar información de dos intervinientes,
+ * como su TIP, rol, empleo y unidad. Utiliza un [Scaffold] con una barra superior y otra inferior
+ * para navegación y acciones.
+ *
+ * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica de los datos de la pantalla.
  */
 @Composable
 fun GuardiasScreen(
@@ -77,6 +83,7 @@ fun GuardiasScreen(
 ) {
     val context = LocalContext.current
 
+    // Carga los datos al iniciar la pantalla
     LaunchedEffect(Unit) {
         guardiasViewModel.loadData(context)
     }
@@ -92,9 +99,11 @@ fun GuardiasScreen(
         )
     }
 }
+
 /**
  * Barra superior de la pantalla de Guardias.
- * Muestra el título "Instructores" en el centro de la barra.
+ *
+ * Muestra un título centrado con el texto "Instructores" utilizando un estilo definido por el tema.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,7 +119,7 @@ fun ToolbarGuardias() {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(10.dp),
+                    .padding(10.dp)
             )
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -118,12 +127,15 @@ fun ToolbarGuardias() {
         )
     )
 }
+
 /**
  * Contenido principal de la pantalla de Guardias.
- * Muestra los formularios para dos intervinientes con campos para TIP, rol, empleo y unidad.
  *
- * @param modifier Modifier para personalizar el diseño del contenido
- * @param guardiasViewModel ViewModel que gestiona el estado y la lógica de la pantalla
+ * Organiza los formularios para registrar información de dos intervinientes en una columna
+ * desplazable. Incluye campos para TIP, rol, empleo y unidad.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica de los datos.
  */
 @Composable
 fun GuardiasContent(
@@ -214,12 +226,16 @@ fun GuardiasContent(
         }
     }
 }
+
 /**
- * Menú desplegable para seleccionar el rol del interviniente.
+ * Menú desplegable para seleccionar el rol de un interviniente.
  *
- * @param guardiasViewModel ViewModel que gestiona el estado y la lógica
- * @param int Identificador del interviniente (1 para el primero, 2 para el segundo)
- * @param containerColor Color de fondo del componente
+ * Permite al usuario elegir entre "Instructor", "Secretario" u "Otro rol" y actualiza el estado
+ * en el ViewModel según el interviniente seleccionado.
+ *
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica.
+ * @param int Identificador del interviniente (1 para el primero, 2 para el segundo).
+ * @param containerColor Color de fondo del componente.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -278,12 +294,16 @@ fun DropdownRol(
         }
     }
 }
+
 /**
- * Menú desplegable para seleccionar el empleo del interviniente.
+ * Menú desplegable para seleccionar el empleo de un interviniente.
  *
- * @param guardiasViewModel ViewModel que gestiona el estado y la lógica
- * @param int Identificador del interviniente (1 para el primero, 2 para el segundo)
- * @param containerColor Color de fondo del componente
+ * Ofrece una lista de empleos militares (Guardia Civil, Cabo, Sargento, etc.) y actualiza el estado
+ * en el ViewModel según el interviniente seleccionado.
+ *
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica.
+ * @param int Identificador del interviniente (1 para el primero, 2 para el segundo).
+ * @param containerColor Color de fondo del componente.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -333,7 +353,6 @@ fun DropdownEmpleo(
                 unfocusedTextColor = BlueGray900
             ),
             maxLines = 1
-
         )
 
         ExposedDropdownMenu(
@@ -355,16 +374,20 @@ fun DropdownEmpleo(
         }
     }
 }
+
 /**
- * Campo de texto personalizado con estilo y formato específico.
+ * Campo de texto personalizado con estilo específico para la pantalla de Guardias.
  *
- * @param value Valor actual del campo de texto
- * @param onValueChange Callback que se ejecuta cuando cambia el valor
- * @param label Etiqueta que describe el campo
- * @param placeholder Texto de ayuda que se muestra cuando el campo está vacío
- * @param modifier Modifier para personalizar el diseño del campo
- * @param containerColor Color del contenedor del campo
- * @param backColor Color de fondo del campo
+ * Permite al usuario introducir texto con una etiqueta y un placeholder personalizados, aplicando
+ * colores definidos por el tema.
+ *
+ * @param value Valor actual del campo de texto.
+ * @param onValueChange Callback que se ejecuta cuando el valor del campo cambia.
+ * @param label Etiqueta descriptiva del campo.
+ * @param placeholder Texto de ayuda que aparece cuando el campo está vacío.
+ * @param modifier Modificador para personalizar el diseño del campo.
+ * @param containerColor Color del contenedor del campo.
+ * @param backColor Color de fondo del campo.
  */
 @Composable
 fun OutlinedTextFieldCustom(
@@ -382,7 +405,7 @@ fun OutlinedTextFieldCustom(
         label = {
             Text(
                 text = label,
-                color = TextoSecundarios // Usar color específico para labels
+                color = TextoSecundarios
             )
         },
         placeholder = {
@@ -401,17 +424,20 @@ fun OutlinedTextFieldCustom(
             unfocusedContainerColor = backColor,
             focusedTextColor = BlueGray900,
             unfocusedTextColor = BlueGray900,
-            focusedLabelColor = TextoSecundarios,  // Color cuando está enfocado
-            unfocusedLabelColor = TextoSecundarios // Color cuando no está enfocado
+            focusedLabelColor = TextoSecundarios,
+            unfocusedLabelColor = TextoSecundarios
         )
     )
 }
+
 /**
- * Barra inferior de la pantalla de Guardias.
- * Contiene botones para guardar y limpiar los datos del formulario.
+ * Barra inferior de la pantalla de Guardias con botones de acción.
  *
- * @param guardiasViewModel ViewModel que gestiona el estado y la lógica
- * @param navigateToScreen Función lambda para navegar entre pantallas
+ * Contiene dos botones: "GUARDAR" para salvar los datos y navegar a la pantalla principal, y
+ * "LIMPIAR" para borrar los datos del formulario.
+ *
+ * @param guardiasViewModel ViewModel que gestiona el estado y la lógica.
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -421,7 +447,8 @@ fun BottomAppBarGuardias(
 ) {
     val context = LocalContext.current
     Surface(
-        modifier = Modifier.wrapContentHeight()
+        modifier = Modifier
+            .wrapContentHeight()
             .padding(bottom = 20.dp),
         color = Color.Transparent
     ) {

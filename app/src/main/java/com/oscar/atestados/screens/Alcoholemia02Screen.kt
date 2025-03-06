@@ -36,6 +36,16 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/**
+ * Pantalla para la gestión de los datos iniciales de diligencias de alcoholemia.
+ *
+ * Esta pantalla permite al usuario introducir información relacionada con el inicio de diligencias
+ * de alcoholemia, incluyendo fecha y hora, lugar de la investigación, opciones de firma y
+ * datos sobre la inmovilización del vehículo y segundo conductor.
+ *
+ * @param navigateToScreen Función lambda que permite la navegación entre pantallas de la aplicación.
+ * @param alcoholemiaDosViewModel ViewModel que gestiona los estados y datos relacionados con esta pantalla.
+ */
 @Composable
 fun Alcoholemia02Screen(
     navigateToScreen: (String) -> Unit,
@@ -66,6 +76,21 @@ fun Alcoholemia02Screen(
     }
 }
 
+/**
+ * Contenido principal de la pantalla de alcoholemia.
+ *
+ * Muestra todos los campos para introducir la información relacionada con
+ * el inicio de diligencias de alcoholemia, organizados en secciones:
+ * - Fecha y hora de inicio
+ * - Lugar de la investigación
+ * - Opciones adicionales (firma, inmovilización, segundo conductor)
+ * - Botones para captura de firmas
+ *
+ * @param modifier Modificador para ajustar la apariencia y comportamiento del componente.
+ * @param alcoholemiaDosViewModel ViewModel que gestiona los estados y datos relacionados con esta pantalla.
+ * @param onDatePickerFechaDiligenciasClicked Función lambda que se ejecuta al hacer clic para seleccionar la fecha.
+ * @param showDatePickerFechaDiligencias Estado booleano que controla la visibilidad del selector de fecha.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Alcoholemia02Content(
@@ -360,6 +385,12 @@ private fun Alcoholemia02Content(
     }
 }
 
+/**
+ * Componente que muestra la barra superior de la pantalla de alcoholemia.
+ *
+ * Contiene el título principal "Alcoholemia" y el subtítulo "Datos inicio diligencias"
+ * centrados en la parte superior de la pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlcoholemiaTopBar() {
@@ -395,6 +426,16 @@ private fun AlcoholemiaTopBar() {
     )
 }
 
+/**
+ * Componente que muestra la barra inferior de la pantalla de alcoholemia.
+ *
+ * Contiene los botones de "GUARDAR" y "LIMPIAR" para gestionar los datos del formulario.
+ * El botón "GUARDAR" almacena los datos en el sistema y navega a la pantalla principal.
+ * El botón "LIMPIAR" restaura todos los campos a sus valores por defecto.
+ *
+ * @param viewModel ViewModel que contiene los métodos para guardar y limpiar los datos.
+ * @param navigateToScreen Función lambda que permite la navegación entre pantallas de la aplicación.
+ */
 @Composable
 private fun AlcoholemiaBottomBar(
     viewModel: AlcoholemiaDosViewModel,
@@ -439,6 +480,18 @@ private fun AlcoholemiaBottomBar(
     }
 }
 
+/**
+ * Campo de texto personalizado para introducir datos en el formulario.
+ *
+ * Proporciona un TextField estilizado con etiqueta y placeholder para
+ * facilitar la entrada de datos en el formulario.
+ *
+ * @param value Valor actual del campo de texto.
+ * @param onValueChange Función lambda que se ejecuta cuando cambia el valor del campo.
+ * @param label Etiqueta descriptiva que se muestra sobre el campo.
+ * @param modifier Modificador opcional para ajustar la apariencia del componente.
+ * @param enabled Estado que determina si el campo está habilitado o no.
+ */
 @Composable
 private fun CustomTextField(
     value: String,
@@ -465,6 +518,21 @@ private fun CustomTextField(
         }
     )
 }
+
+/**
+ * Campo de texto personalizado específico para la pantalla de alcoholemia.
+ *
+ * Proporciona un TextField estilizado con soporte para iconos, etiquetas y
+ * configuración de teclado específica para los campos de la pantalla de alcoholemia.
+ *
+ * @param value Valor actual del campo de texto.
+ * @param onValueChange Función lambda que se ejecuta cuando cambia el valor del campo.
+ * @param label Etiqueta descriptiva que se muestra sobre el campo.
+ * @param placeholder Texto sugerido que se muestra cuando el campo está vacío.
+ * @param keyboardType Tipo de teclado que se mostrará al editar el campo.
+ * @param modifier Modificador opcional para ajustar la apariencia del componente.
+ * @param leadingIcon Icono opcional que se muestra al inicio del campo.
+ */
 @Composable
 private fun CustomOutlinedTextFieldAlcohol(
     value: String,
@@ -494,6 +562,16 @@ private fun CustomOutlinedTextFieldAlcohol(
     )
 }
 
+/**
+ * Componente que muestra una opción de casilla de verificación con texto.
+ *
+ * Crea una fila con una casilla de verificación (checkbox) y un texto descriptivo
+ * que permite seleccionar opciones binarias en el formulario.
+ *
+ * @param text Texto descriptivo que se muestra junto a la casilla.
+ * @param checked Estado actual de la casilla (marcada o desmarcada).
+ * @param onCheckedChange Función lambda que se ejecuta cuando cambia el estado de la casilla.
+ */
 @Composable
 private fun CheckboxOption(
     text: String,
@@ -522,6 +600,15 @@ private fun CheckboxOption(
     }
 }
 
+/**
+ * Diálogo para seleccionar una fecha para las diligencias.
+ *
+ * Muestra un selector de fecha en formato calendario que permite al usuario
+ * elegir una fecha para las diligencias de alcoholemia.
+ *
+ * @param onDateSelected Función lambda que recibe la fecha seleccionada formateada.
+ * @param onDismiss Función lambda que se ejecuta cuando se cierra el diálogo sin seleccionar fecha.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun getDateDialogDiligencias(

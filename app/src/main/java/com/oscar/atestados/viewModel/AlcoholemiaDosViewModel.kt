@@ -18,122 +18,233 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 
+/**
+ * Configuración de DataStore para almacenar preferencias relacionadas con la pantalla de alcoholemia dos.
+ */
 val Context.dataStoreAlcoholemiaDos: DataStore<Preferences> by preferencesDataStore(name = "alcoholemia_dos_settings")
 
+/**
+ * ViewModel para gestionar los datos relacionados con la pantalla de alcoholemia dos.
+ * Utiliza LiveData para observar cambios en los datos y DataStore para persistirlos.
+ *
+ * @property application Aplicación Android necesaria para inicializar el ViewModel y acceder al contexto.
+ */
 class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(application) {
-    // Claves para DataStore
+
+    /**
+     * Objeto interno que define las claves utilizadas para almacenar datos en DataStore.
+     */
     private object PreferencesKeys {
+        /** Clave para la fecha de inicio de las diligencias. */
         val FECHA_INICIO = stringPreferencesKey("fecha_inicio")
+        /** Clave para la hora de inicio de las diligencias. */
         val HORA_INICIO = stringPreferencesKey("hora_inicio")
+        /** Clave para indicar si el lugar coincide con otro evento. */
         val LUGAR_COINCIDE = booleanPreferencesKey("lugar_coincide")
+        /** Clave para el lugar donde se realizan las diligencias. */
         val LUGAR_DILIGENCIAS = stringPreferencesKey("lugar_diligencias")
+        /** Clave para indicar si el investigado desea firmar. */
         val DESEA_FIRMAR = booleanPreferencesKey("desea_firmar")
+        /** Clave para indicar si se inmoviliza el vehículo. */
         val INMOVILIZA_VEHICULO = booleanPreferencesKey("inmoviliza_vehiculo")
+        /** Clave para indicar si hay un segundo conductor. */
         val HAY_SEGUNDO_CONDUCTOR = booleanPreferencesKey("hay_segundo_conductor")
+        /** Clave para el nombre del segundo conductor. */
         val NOMBRE_SEGUNDO_CONDUCTOR = stringPreferencesKey("nombre_segundo_conductor")
     }
 
     // Fecha y hora de inicio
+    /** LiveData privado para la fecha de inicio. */
     private val _fechaInicio = MutableLiveData<String>("")
+    /** LiveData público para observar la fecha de inicio. */
     val fechaInicio: LiveData<String> = _fechaInicio
 
+    /** LiveData privado para la hora de inicio. */
     private val _horaInicio = MutableLiveData<String>("")
+    /** LiveData público para observar la hora de inicio. */
     val horaInicio: LiveData<String> = _horaInicio
 
     // Lugar de la investigación
+    /** LiveData privado para indicar si el lugar coincide. */
     private val _lugarCoincide = MutableLiveData<Boolean>(false)
+    /** LiveData público para observar si el lugar coincide. */
     val lugarCoincide: LiveData<Boolean> = _lugarCoincide
 
+    /** LiveData privado para el lugar de las diligencias. */
     private val _lugarDiligencias = MutableLiveData<String>("")
+    /** LiveData público para observar el lugar de las diligencias. */
     val lugarDiligencias: LiveData<String> = _lugarDiligencias
 
     // Opciones de firma y vehículo
+    /** LiveData privado para indicar si el investigado desea firmar. */
     private val _deseaFirmar = MutableLiveData<Boolean>(false)
+    /** LiveData público para observar si el investigado desea firmar. */
     val deseaFirmar: LiveData<Boolean> = _deseaFirmar
 
+    /** LiveData privado para indicar si se inmoviliza el vehículo. */
     private val _inmovilizaVehiculo = MutableLiveData<Boolean>(false)
+    /** LiveData público para observar si se inmoviliza el vehículo. */
     val inmovilizaVehiculo: LiveData<Boolean> = _inmovilizaVehiculo
 
+    /** LiveData privado para indicar si hay un segundo conductor. */
     private val _haySegundoConductor = MutableLiveData<Boolean>(false)
+    /** LiveData público para observar si hay un segundo conductor. */
     val haySegundoConductor: LiveData<Boolean> = _haySegundoConductor
 
+    /** LiveData privado para el nombre del segundo conductor. */
     private val _nombreSegundoConductor = MutableLiveData<String>("")
+    /** LiveData público para observar el nombre del segundo conductor. */
     val nombreSegundoConductor: LiveData<String> = _nombreSegundoConductor
 
     // Firmas de intervinientes
+    /** LiveData privado para la firma del investigado. */
     private val _firmaInvestigado = MutableLiveData<Bitmap?>()
+    /** LiveData público para observar la firma del investigado. */
     val firmaInvestigado: LiveData<Bitmap?> = _firmaInvestigado
 
+    /** LiveData privado para la firma del segundo conductor. */
     private val _firmaSegundoConductor = MutableLiveData<Bitmap?>()
+    /** LiveData público para observar la firma del segundo conductor. */
     val firmaSegundoConductor: LiveData<Bitmap?> = _firmaSegundoConductor
 
+    /** LiveData privado para la firma del instructor. */
     private val _firmaInstructor = MutableLiveData<Bitmap?>()
+    /** LiveData público para observar la firma del instructor. */
     val firmaInstructor: LiveData<Bitmap?> = _firmaInstructor
 
+    /** LiveData privado para la firma del secretario. */
     private val _firmaSecretario = MutableLiveData<Bitmap?>()
+    /** LiveData público para observar la firma del secretario. */
     val firmaSecretario: LiveData<Bitmap?> = _firmaSecretario
 
     init {
         loadSavedData()
+        loadSavedFirmas()
     }
 
     // Funciones para actualizar datos
+    /**
+     * Actualiza la fecha de inicio si el valor no está vacío.
+     *
+     * @param value Nueva fecha de inicio.
+     */
     fun updateFechaInicio(value: String) {
         if (value.isNotEmpty()) {
             _fechaInicio.value = value
         }
     }
 
+    /**
+     * Actualiza la hora de inicio si el valor no está vacío.
+     *
+     * @param value Nueva hora de inicio.
+     */
     fun updateHoraInicio(value: String) {
         if (value.isNotEmpty()) {
             _horaInicio.value = value
         }
     }
 
+    /**
+     * Actualiza si el lugar coincide con otro evento.
+     *
+     * @param value Indicador de coincidencia de lugar.
+     */
     fun updateLugarCoincide(value: Boolean) {
         _lugarCoincide.value = value
     }
 
+    /**
+     * Actualiza el lugar de las diligencias si el valor no está vacío.
+     *
+     * @param value Nuevo lugar de las diligencias.
+     */
     fun updateLugarDiligencias(value: String) {
         if (value.isNotEmpty()) {
             _lugarDiligencias.value = value
         }
     }
 
+    /**
+     * Actualiza si el investigado desea firmar.
+     *
+     * @param value Indicador de deseo de firmar.
+     */
     fun updateDeseaFirmar(value: Boolean) {
         _deseaFirmar.value = value
     }
 
+    /**
+     * Actualiza si el vehículo se inmoviliza.
+     *
+     * @param value Indicador de inmovilización del vehículo.
+     */
     fun updateInmovilizaVehiculo(value: Boolean) {
         _inmovilizaVehiculo.value = value
     }
 
+    /**
+     * Actualiza si hay un segundo conductor.
+     *
+     * @param value Indicador de existencia de segundo conductor.
+     */
     fun updateHaySegundoConductor(value: Boolean) {
         _haySegundoConductor.value = value
     }
 
+    /**
+     * Actualiza el nombre del segundo conductor si el valor no está vacío.
+     *
+     * @param value Nombre del segundo conductor.
+     */
     fun updateNombreSegundoConductor(value: String) {
         if (value.isNotEmpty()) {
             _nombreSegundoConductor.value = value
         }
     }
+
+    /**
+     * Actualiza la firma del investigado.
+     *
+     * @param bitmap Firma en formato Bitmap.
+     */
     fun updateFirmaInvestigado(bitmap: Bitmap) {
         _firmaInvestigado.value = bitmap
     }
 
+    /**
+     * Actualiza la firma del segundo conductor.
+     *
+     * @param bitmap Firma en formato Bitmap.
+     */
     fun updateFirmaSegundoConductor(bitmap: Bitmap) {
         _firmaSegundoConductor.value = bitmap
     }
 
+    /**
+     * Actualiza la firma del instructor.
+     *
+     * @param bitmap Firma en formato Bitmap.
+     */
     fun updateFirmaInstructor(bitmap: Bitmap) {
         _firmaInstructor.value = bitmap
     }
 
+    /**
+     * Actualiza la firma del secretario.
+     *
+     * @param bitmap Firma en formato Bitmap.
+     */
     fun updateFirmaSecretario(bitmap: Bitmap) {
         _firmaSecretario.value = bitmap
     }
 
     // Guardar y limpiar datos
+    /**
+     * Guarda los datos actuales en DataStore de manera asíncrona.
+     *
+     * @param context Contexto necesario para acceder a DataStore.
+     */
     fun guardarDatos(context: Context) {
         viewModelScope.launch {
             context.dataStoreAlcoholemiaDos.edit { preferences ->
@@ -149,6 +260,9 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    /**
+     * Limpia todos los datos almacenados en DataStore y restablece los valores en el ViewModel.
+     */
     fun limpiarDatos() {
         viewModelScope.launch {
             getApplication<Application>().dataStoreAlcoholemiaDos.edit { preferences ->
@@ -166,6 +280,9 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    /**
+     * Carga los datos guardados en DataStore al inicializar el ViewModel.
+     */
     private fun loadSavedData() {
         viewModelScope.launch {
             val preferences = getApplication<Application>().dataStoreAlcoholemiaDos.data.first()
@@ -180,11 +297,21 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
             _nombreSegundoConductor.value = preferences[PreferencesKeys.NOMBRE_SEGUNDO_CONDUCTOR] ?: ""
         }
     }
+
+    /** Clave para la firma del investigado en DataStore. */
     private val FIRMA_INVESTIGADO = stringPreferencesKey("firma_investigado")
+    /** Clave para la firma del segundo conductor en DataStore. */
     private val FIRMA_SEGUNDO_CONDUCTOR = stringPreferencesKey("firma_segundo_conductor")
+    /** Clave para la firma del instructor en DataStore. */
     private val FIRMA_INSTRUCTOR = stringPreferencesKey("firma_instructor")
+    /** Clave para la firma del secretario en DataStore. */
     private val FIRMA_SECRETARIO = stringPreferencesKey("firma_secretario")
 
+    /**
+     * Guarda las firmas en DataStore convirtiéndolas a cadenas de bytes.
+     *
+     * @param context Contexto necesario para acceder a DataStore.
+     */
     fun guardarFirmas(context: Context) {
         viewModelScope.launch {
             context.dataStoreAlcoholemiaDos.edit { preferences ->
@@ -211,6 +338,10 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
             }
         }
     }
+
+    /**
+     * Carga las firmas guardadas en DataStore y las convierte de nuevo a Bitmap.
+     */
     private fun loadSavedFirmas() {
         viewModelScope.launch {
             val preferences = getApplication<Application>().dataStoreAlcoholemiaDos.data.first()

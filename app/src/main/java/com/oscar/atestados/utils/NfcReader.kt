@@ -16,10 +16,19 @@ import de.tsenger.androsmex.mrtd.DG1_Dnie
 import de.tsenger.androsmex.mrtd.DG11
 import de.tsenger.androsmex.mrtd.DG13
 
+/** Etiqueta utilizada para los logs de esta clase. */
 private const val TAG = "NfcReader"
 
+/**
+ * Clase para leer datos de un DNI electrónico utilizando tecnología NFC.
+ * Gestiona la interacción con el proveedor DnieProvider y procesa los datos de los grupos de datos MRTD (DG1, DG11, DG13).
+ *
+ * @property context Contexto de la aplicación necesario para inicializar el proveedor y obtener la actividad.
+ * @property tag Etiqueta NFC que contiene los datos del DNI.
+ */
 class NfcReader(private val context: Context, private val tag: Tag) {
 
+    /** Proveedor de seguridad para el DNI electrónico. */
     private val dnieProvider = DnieProvider()
 
     init {
@@ -32,6 +41,14 @@ class NfcReader(private val context: Context, private val tag: Tag) {
         }
     }
 
+    /**
+     * Lee los datos del DNI utilizando el código CAN y el tag NFC proporcionados.
+     * Procesa los grupos de datos DG1, DG11 y DG13 y retorna un objeto [DniData] con la información extraída.
+     *
+     * @param canCode Código CAN del DNI necesario para autenticarse con el proveedor.
+     * @return Objeto [DniData] con los datos procesados del DNI.
+     * @throws IOException Si ocurre un error al leer el DNI o si DG1 no está disponible.
+     */
     fun readDni(canCode: String): DniData {
         try {
             Security.insertProviderAt(dnieProvider, 1)
@@ -120,6 +137,15 @@ class NfcReader(private val context: Context, private val tag: Tag) {
         }
     }
 
+    /**
+     * Procesa los datos extraídos de los grupos DG1, DG11 y DG13 para construir un objeto [DniData].
+     * Formatea la fecha de nacimiento y traduce el sexo al español.
+     *
+     * @param dg1 Grupo de datos DG1 que contiene información básica del DNI (obligatorio).
+     * @param dg11 Grupo de datos DG11 con información adicional (opcional).
+     * @param dg13 Grupo de datos DG13 con información extendida (opcional).
+     * @return Objeto [DniData] con los datos procesados del DNI.
+     */
     private fun parseDniData(dg1: DG1_Dnie, dg11: DG11?, dg13: DG13?): DniData {
         val documentNumber = dg1.optData
         val birthDate = dg1.dateOfBirth
@@ -152,6 +178,12 @@ class NfcReader(private val context: Context, private val tag: Tag) {
         )
     }
 
+    /**
+     * Obtiene la actividad subyacente a partir de un contexto, desenvolviendo los ContextWrapper si es necesario.
+     *
+     * @param context Contexto desde el cual buscar la actividad.
+     * @return La actividad encontrada o null si no se encuentra ninguna.
+     */
     private fun getActivityFromContext(context: Context): android.app.Activity? {
         var currentContext = context
         while (currentContext is ContextWrapper) {
@@ -164,6 +196,20 @@ class NfcReader(private val context: Context, private val tag: Tag) {
     }
 }
 
+/**
+ * Modelo de datos que representa la información extraída de un DNI electrónico.
+ *
+ * @property numeroDocumento Número del documento del DNI.
+ * @property nombre Nombre del titular.
+ * @property apellidos Apellidos del titular.
+ * @property fechaNacimiento Fecha de nacimiento formateada en español.
+ * @property sexo Sexo del titular ("Masculino" o "Femenino").
+ * @property nacionalidad Nacionalidad del titular (por defecto "España").
+ * @property nombrePadre Nombre del padre del titular.
+ * @property nombreMadre Nombre de la madre del titular.
+ * @property lugarNacimiento Lugar de nacimiento del titular.
+ * @property domicilio Domicilio actual del titular.
+ */
 data class DniData(
     val numeroDocumento: String = "",
     val nombre: String = "",

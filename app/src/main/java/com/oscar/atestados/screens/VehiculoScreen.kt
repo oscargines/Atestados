@@ -69,16 +69,15 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Configuración de DataStore para almacenar preferencias de la aplicación.
- * Se utiliza para guardar y recuperar datos persistentes relacionados con la entidad "Persona".
+ * Se utiliza para guardar y recuperar datos persistentes relacionados con la entidad "Vehículo".
  *
  * @property name Nombre del DataStore, utilizado para identificar el archivo de preferencias.
  */
 val Context.dataStoreVeh by preferencesDataStore(name = "VEHICULO_PREFERENCES_Nme")
 
-
 /**
  * Pantalla principal de la entidad "Vehículos".
- * Muestra un formulario para ingresar datos relacionados con un vehículo.
+ * Muestra un formulario para ingresar datos relacionados con un vehículo y gestiona la navegación y el estado mediante un ViewModel.
  *
  * @param navigateToScreen Función de navegación para cambiar a otras pantallas.
  * @param vehiculoViewModel ViewModel que gestiona el estado y la lógica de la pantalla.
@@ -111,26 +110,27 @@ fun VehiculoScreen(
     if (showDatePickerMatriculacion) {
         getDateDialogVeh(
             onDateSelected = { fechaSeleccionada ->
-                vehiculoViewModel.updateFechaMatriculacion(fechaSeleccionada) // Actualiza el ViewModel con la fecha seleccionada
-                showDatePickerMatriculacion = false // Cierra el DatePicker
+                vehiculoViewModel.updateFechaMatriculacion(fechaSeleccionada)
+                showDatePickerMatriculacion = false
             },
-            onDismiss = { showDatePickerMatriculacion = false } // Cierra el DatePicker si se cancela
+            onDismiss = { showDatePickerMatriculacion = false }
         )
     }
 
     if (showDatePickerITV) {
         getDateDialogVeh(
             onDateSelected = { fechaSeleccionada ->
-                vehiculoViewModel.updateFechaITV(fechaSeleccionada) // Actualiza el ViewModel con la fecha seleccionada
-                showDatePickerITV = false // Cierra el DatePicker
+                vehiculoViewModel.updateFechaITV(fechaSeleccionada)
+                showDatePickerITV = false
             },
-            onDismiss = { showDatePickerITV = false } // Cierra el DatePicker si se cancela
+            onDismiss = { showDatePickerITV = false }
         )
     }
 }
+
 /**
  * Contenido principal de la pantalla de vehículos.
- * Incluye campos de texto y selectores de fecha para gestionar los datos del vehículo.
+ * Incluye campos de texto y selectores de fecha para gestionar los datos del vehículo dentro de un Scaffold.
  *
  * @param navigateToScreen Función de navegación para cambiar entre pantallas.
  * @param vehiculoViewModel ViewModel asociado que maneja la lógica y estado de los datos.
@@ -166,6 +166,7 @@ fun VehiculoScreenContent(
         )
     }
 }
+
 /**
  * Barra inferior de la pantalla de vehículos.
  * Incluye botones con tooltips para guardar y limpiar los datos ingresados.
@@ -276,6 +277,7 @@ fun BottomAppBarVehiculo(
         }
     }
 }
+
 /**
  * Barra superior de la pantalla de vehículos.
  * Muestra el título "Vehículo" con un estilo centrado y personalizado.
@@ -302,9 +304,10 @@ fun ToolbarVehiculo() {
         )
     )
 }
+
 /**
  * Contenido principal del formulario de vehículos.
- * Incluye campos de texto y selectores de fecha para gestionar los datos del vehículo.
+ * Incluye campos de texto y selectores de fecha para gestionar los datos del vehículo en un formulario desplazable.
  *
  * @param modifier Modificador de Compose para estilizar el contenedor.
  * @param onTextFieldChanged Callback para actualizar el valor de los campos de texto.
@@ -362,7 +365,7 @@ fun VehiculoContent(
                 keyboardType = KeyboardType.Text,
                 leadingIcon = {
                     IconButton(
-                        onClick = onDatePickerMatriculacionClicked, // Muestra el DatePicker cuando se hace clic en el ícono
+                        onClick = onDatePickerMatriculacionClicked,
                         modifier = Modifier.size(35.dp)
                     ) {
                         Icon(
@@ -417,7 +420,7 @@ fun VehiculoContent(
                 keyboardType = KeyboardType.Text,
                 leadingIcon = {
                     IconButton(
-                        onClick = onDatePickerITVClicked, // Muestra el DatePicker cuando se hace clic en el ícono
+                        onClick = onDatePickerITVClicked,
                         modifier = Modifier.size(35.dp)
                     ) {
                         Icon(
@@ -434,12 +437,13 @@ fun VehiculoContent(
 
 /**
  * Campo de texto personalizado con soporte para etiquetas, marcadores de posición e íconos.
+ * Diseñado para ser reutilizable en formularios con un estilo consistente.
  *
  * @param value Valor actual del campo de texto.
  * @param onValueChange Callback para actualizar el valor del campo de texto.
  * @param label Etiqueta del campo de texto.
  * @param placeholder Marcador de posición del campo de texto.
- * @param keyboardType Tipo de teclado utilizado.
+ * @param keyboardType Tipo de teclado utilizado (por defecto, texto).
  * @param modifier Modificador de Compose para estilizar el campo de texto.
  * @param leadingIcon Ícono opcional que aparece al inicio del campo de texto.
  */
@@ -472,10 +476,12 @@ fun CustomOutlinedTextField(
         leadingIcon = leadingIcon
     )
 }
+
 /**
  * Selector de fecha personalizado para gestionar fechas relacionadas con el vehículo.
+ * Permite seleccionar una fecha y formatearla en español antes de devolverla.
  *
- * @param onDateSelected Callback para manejar la fecha seleccionada.
+ * @param onDateSelected Callback para manejar la fecha seleccionada en formato legible.
  * @param onDismiss Callback para manejar el cierre del selector de fecha.
  */
 @OptIn(ExperimentalMaterial3Api::class)

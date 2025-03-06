@@ -1,7 +1,6 @@
 package com.oscar.atestados.screens
 
 import android.content.Context
-import com.oscar.atestados.viewModel.TomaDerechosViewModel
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,17 +19,38 @@ import androidx.compose.ui.unit.sp
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.oscar.atestados.ui.theme.*
+import com.oscar.atestados.viewModel.TomaDerechosViewModel
 import java.io.InputStream
 
+/**
+ * Modelo de datos que contiene una lista de derechos.
+ *
+ * @property derechos Lista de mensajes con los derechos a mostrar.
+ */
 data class Mensajes(
     val derechos: List<String>
 )
 
+/**
+ * Modelo de datos que contiene elementos esenciales y sus mensajes asociados.
+ *
+ * @property item Lista de elementos esenciales.
+ * @property mensaje Lista de mensajes correspondientes a los elementos esenciales.
+ */
 data class ElementosEsenciales(
     val item: List<String>,
     val mensaje: List<String>
 )
 
+/**
+ * Pantalla para la toma de derechos en un atestado.
+ *
+ * Permite al usuario registrar opciones relacionadas con los derechos del investigado,
+ * como prestar declaración, asistencia letrada y acceso a elementos esenciales.
+ *
+ * @param navigateToScreen Función lambda para navegar a otra pantalla, recibe una [String] con el nombre de la pantalla destino.
+ * @param tomaDerechosViewModel ViewModel que gestiona los datos de la toma de derechos.
+ */
 @Composable
 fun TomaDerechosScreen(
     navigateToScreen: (String) -> Unit,
@@ -57,6 +77,11 @@ fun TomaDerechosScreen(
     }
 }
 
+/**
+ * Barra superior de la pantalla TomaDerechosScreen.
+ *
+ * Muestra el título "Lectura de derechos" y un subtítulo descriptivo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TomaDerechosTopBar() {
@@ -92,6 +117,15 @@ private fun TomaDerechosTopBar() {
     )
 }
 
+/**
+ * Contenido principal de la pantalla TomaDerechosScreen.
+ *
+ * Incluye opciones de selección (switches), menús desplegables y campos de texto para registrar
+ * los datos relacionados con los derechos del investigado.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param tomaDerechosViewModel ViewModel que contiene los datos de la toma de derechos.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TomaDerechosContent(
@@ -99,12 +133,8 @@ private fun TomaDerechosContent(
     tomaDerechosViewModel: TomaDerechosViewModel
 ) {
     val prestarDeclaracion by tomaDerechosViewModel.prestarDeclaracion.observeAsState(true)
-    val renunciaAsistenciaLetrada by tomaDerechosViewModel.renunciaAsistenciaLetrada.observeAsState(
-        true
-    )
-    val asistenciaLetradoParticular by tomaDerechosViewModel.asistenciaLetradoParticular.observeAsState(
-        false
-    )
+    val renunciaAsistenciaLetrada by tomaDerechosViewModel.renunciaAsistenciaLetrada.observeAsState(true)
+    val asistenciaLetradoParticular by tomaDerechosViewModel.asistenciaLetradoParticular.observeAsState(false)
     val nombreLetrado by tomaDerechosViewModel.nombreLetrado.observeAsState("")
     val asistenciaLetradoOficio by tomaDerechosViewModel.asistenciaLetradoOficio.observeAsState(true)
     val accesoElementos by tomaDerechosViewModel.accesoElementos.observeAsState(false)
@@ -125,12 +155,7 @@ private fun TomaDerechosContent(
     var textoOtros by remember { mutableStateOf("") }
 
     var elementosEsenciales by remember {
-        mutableStateOf(
-            ElementosEsenciales(
-                emptyList(),
-                emptyList()
-            )
-        )
+        mutableStateOf(ElementosEsenciales(emptyList(), emptyList()))
     }
     var showDialog by remember { mutableStateOf(false) }
 
@@ -150,7 +175,6 @@ private fun TomaDerechosContent(
     } else {
         textoElementosEsenciales // Si es "Otros", mostrar el texto ingresado por el usuario
     }
-
 
     Column(
         modifier = modifier
@@ -180,7 +204,6 @@ private fun TomaDerechosContent(
         )
 
         // Campo de texto para el nombre del letrado
-
         CustomTextField(
             value = nombreLetrado,
             onValueChange = { tomaDerechosViewModel.setNombreLetrado(it) },
@@ -259,33 +282,21 @@ private fun TomaDerechosContent(
         if (selectedOption != "Otros") {
             if (showDialog) {
                 AlertDialog(
-                    onDismissRequest = { showDialog = false }, // Cerrar el diálogo al tocar fuera
-                    title = {
-                        Text("INFORMACIÓN IMPORTANTE")
-                    },
+                    onDismissRequest = { showDialog = false },
+                    title = { Text("INFORMACIÓN IMPORTANTE") },
                     text = {
                         when (selectedOption) {
                             "Se muestra hoja de síntomas" -> {
                                 Text("ESTA INFORMACIÓN SOLO SERÁ MOSTRADA EN CASOS MUY EXCEPCIONALES Y DEBE VALORAR LA CONVENIENCIA DE HACERLO Y ANTE QUIEN HACERLO.")
                             }
-
                             "Recibe explicación por siniestro" -> {
                                 Text("Realice una valoración sobre la conveniencia o no de mostrar este tipo de información")
                             }
-
-                            else -> {
-                                Text("")
-                            }
+                            else -> { Text("") }
                         }
                     },
                     confirmButton = {
-                        TextButton(
-                            onClick = {
-                                showDialog = false
-                            } // Cerrar el diálogo al pulsar "Continuar"
-                        ) {
-                            Text("Continuar")
-                        }
+                        TextButton(onClick = { showDialog = false }) { Text("Continuar") }
                     }
                 )
             }
@@ -299,12 +310,20 @@ private fun TomaDerechosContent(
             label = if (selectedOption == "Otros") "Especifique otros detalles" else "Elementos esenciales",
             singleLine = false,
             maxLines = 5,
-            enabled = selectedOption == "Otros",// Solo editable si "Otros" está seleccionado
-            readOnly = selectedOption != "Otros"// Solo lectura si no es "Otros"
+            enabled = selectedOption == "Otros",
+            readOnly = selectedOption != "Otros"
         )
     }
 }
 
+/**
+ * Barra inferior de la pantalla TomaDerechosScreen.
+ *
+ * Contiene botones para guardar los datos y continuar, o limpiar los datos ingresados.
+ *
+ * @param viewModel ViewModel que gestiona los datos de la toma de derechos.
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
+ */
 @Composable
 private fun LecturaDerechosDosBottomBar(
     viewModel: TomaDerechosViewModel,
@@ -347,6 +366,13 @@ private fun LecturaDerechosDosBottomBar(
     }
 }
 
+/**
+ * Componente de interruptor (switch) con texto descriptivo.
+ *
+ * @param text Texto que describe la opción del interruptor.
+ * @param checked Estado actual del interruptor (activado/desactivado).
+ * @param onCheckedChange Callback que se ejecuta al cambiar el estado del interruptor.
+ */
 @Composable
 private fun SwitchOption(
     text: String,
@@ -377,6 +403,18 @@ private fun SwitchOption(
     }
 }
 
+/**
+ * Campo de texto personalizado con borde.
+ *
+ * @param value Valor actual del campo.
+ * @param onValueChange Callback para actualizar el valor del campo.
+ * @param label Etiqueta del campo.
+ * @param modifier Modificador para personalizar el diseño.
+ * @param singleLine Indica si el campo es de una sola línea.
+ * @param maxLines Número máximo de líneas permitidas.
+ * @param enabled Indica si el campo está habilitado para edición.
+ * @param readOnly Indica si el campo es solo de lectura.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomTextField(
@@ -403,13 +441,18 @@ private fun CustomTextField(
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedBorderColor = if (enabled) TextoSecundarios else ItemSelected,
             focusedBorderColor = if (enabled) BotonesNormales else ItemSelected,
-            disabledTextColor = TextoSecundarios, // Color del texto cuando no está habilitado
-            disabledBorderColor = BlueGray50, // Color del borde cuando no está habilitado
-            disabledLabelColor = BlueGray50 // Color del label cuando no está habilitado
+            disabledTextColor = TextoSecundarios,
+            disabledBorderColor = BlueGray50,
+            disabledLabelColor = BlueGray50
         )
     )
 }
 
+/**
+ * Diálogo que muestra una lista de mensajes secuencialmente.
+ *
+ * @param mensajes Lista de mensajes a mostrar en el diálogo.
+ */
 @Composable
 fun LanzaAlert(
     mensajes: List<String>
@@ -420,7 +463,6 @@ fun LanzaAlert(
     if (showDialog && currentIndex < mensajes.size) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-
             text = {
                 Text(
                     mensajes[currentIndex],
@@ -437,9 +479,7 @@ fun LanzaAlert(
                             showDialog = false
                         }
                     },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = BotonesNormales
-                    )
+                    colors = ButtonDefaults.textButtonColors(contentColor = BotonesNormales)
                 ) {
                     Text(if (currentIndex < mensajes.size - 1) "Siguiente" else "Finalizar")
                 }
@@ -449,6 +489,13 @@ fun LanzaAlert(
     }
 }
 
+/**
+ * Lee los derechos desde un archivo JSON en los assets.
+ *
+ * @param context Contexto de la aplicación.
+ * @param fileName Nombre del archivo JSON a leer.
+ * @return Lista de derechos leídos o un mensaje de error en caso de fallo.
+ */
 fun LeerDerechos(context: Context, fileName: String): List<String> {
     return try {
         val inputStream: InputStream = context.assets.open(fileName)
@@ -463,11 +510,16 @@ fun LeerDerechos(context: Context, fileName: String): List<String> {
 
         mensajes.derechos
     } catch (e: Exception) {
-        // En caso de error, devuelve una lista con un mensaje de error
         listOf("Error al cargar los mensajes.")
     }
 }
 
+/**
+ * Obtiene los derechos desde un archivo JSON y los carga en un estado.
+ *
+ * @param context Contexto de la aplicación.
+ * @return Lista de derechos cargados.
+ */
 @Composable
 fun ObtenerDerechos(context: Context): List<String> {
     var mensajes by remember { mutableStateOf(listOf("Cargando mensajes...")) }
@@ -478,6 +530,13 @@ fun ObtenerDerechos(context: Context): List<String> {
     return mensajes
 }
 
+/**
+ * Lee los elementos esenciales desde un archivo JSON en los assets.
+ *
+ * @param context Contexto de la aplicación.
+ * @param fileName Nombre del archivo JSON a leer.
+ * @return Objeto [ElementosEsenciales] con los datos leídos o vacío en caso de error.
+ */
 fun leerElementosEsenciales(context: Context, fileName: String): ElementosEsenciales {
     return try {
         val inputStream: InputStream = context.assets.open(fileName)
@@ -490,7 +549,6 @@ fun leerElementosEsenciales(context: Context, fileName: String): ElementosEsenci
         val tipo = object : TypeToken<ElementosEsenciales>() {}.type
         Gson().fromJson(json, tipo)
     } catch (e: Exception) {
-        // En caso de error, devuelve un objeto vacío
         ElementosEsenciales(emptyList(), emptyList())
     }
 }

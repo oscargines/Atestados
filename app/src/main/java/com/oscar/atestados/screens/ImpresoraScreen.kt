@@ -26,8 +26,20 @@ import com.oscar.atestados.data.BluetoothDeviceDB
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 
+/**
+ * Delegate para acceder al DataStore de preferencias usado para almacenar datos de impresoras.
+ */
 val Context.dataStoreImp by preferencesDataStore(name = "IMPRESORA_PREFERENCES")
 
+/**
+ * Pantalla principal para la gestión de impresoras Bluetooth.
+ *
+ * Esta pantalla permite al usuario buscar, seleccionar y gestionar dispositivos Bluetooth,
+ * mostrando una lista de dispositivos guardados o encontrados, y un dispositivo predeterminado.
+ *
+ * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
+ * @param impresoraViewModel ViewModel que gestiona el estado y la lógica de los dispositivos Bluetooth.
+ */
 @SuppressLint("StateFlowValueCalledInComposition")
 @Composable
 fun ImpresoraScreen(
@@ -41,6 +53,7 @@ fun ImpresoraScreen(
     val selectedDevice by impresoraViewModel.selectedDevice.collectAsState()
     var selectedOption by remember { mutableStateOf("Dispositivos guardados") }
 
+    // Carga los dispositivos guardados cuando termina el escaneo
     LaunchedEffect(impresoraViewModel.uiState.value.isScanning) {
         if (!impresoraViewModel.uiState.value.isScanning) {
             impresoraViewModel.loadSavedDevicesDB()
@@ -74,10 +87,11 @@ fun ImpresoraScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Información del dispositivo predeterminado
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .padding(vertical = 8.dp),
                 shape = RoundedCornerShape(8.dp),
                 color = BlueGray100,
                 border = BorderStroke(1.dp, BlueGray300)
@@ -183,6 +197,12 @@ fun ImpresoraScreen(
     }
 }
 
+/**
+ * Menú desplegable para alternar entre dispositivos guardados y búsqueda de dispositivos.
+ *
+ * @param selectedOption Opción actualmente seleccionada ("Dispositivos guardados" o "Buscar dispositivos").
+ * @param onOptionSelected Callback que se ejecuta al seleccionar una nueva opción.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropdownMenuSelector(selectedOption: String, onOptionSelected: (String) -> Unit) {
@@ -221,6 +241,13 @@ fun DropdownMenuSelector(selectedOption: String, onOptionSelected: (String) -> U
     }
 }
 
+/**
+ * Barra superior de la pantalla de gestión de impresoras.
+ *
+ * Muestra un título centrado con el texto "Gestión de Impresoras".
+ *
+ * @param impresoraViewModel ViewModel que gestiona el estado y la lógica de los dispositivos.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ImpresoraTopBar(impresoraViewModel: ImpresoraViewModel) {
@@ -239,6 +266,15 @@ fun ImpresoraTopBar(impresoraViewModel: ImpresoraViewModel) {
     )
 }
 
+/**
+ * Barra inferior con botones para guardar y limpiar dispositivos.
+ *
+ * Incluye un botón "GUARDAR" para salvar el dispositivo seleccionado y un botón "LIMPIAR" que
+ * muestra un diálogo de confirmación para borrar todos los datos.
+ *
+ * @param impresoraViewModel ViewModel que gestiona el estado y la lógica de los dispositivos.
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomAppBarImpresora(
@@ -251,7 +287,9 @@ fun BottomAppBarImpresora(
     var showClearDialog by remember { mutableStateOf(false) }
 
     Surface(
-        modifier = Modifier.wrapContentHeight(),
+        modifier = Modifier
+            .wrapContentHeight()
+            .padding(vertical = 30.dp),
         color = Color.Transparent
     ) {
         Row(
@@ -365,6 +403,18 @@ fun BottomAppBarImpresora(
     }
 }
 
+/**
+ * Tarjeta que representa un dispositivo Bluetooth en la lista.
+ *
+ * Muestra el nombre y la dirección MAC del dispositivo, con un botón para realizar acciones
+ * como enlazar o indicar su estado (guardado/conectado).
+ *
+ * @param device Dispositivo Bluetooth a mostrar.
+ * @param isSearchMode Indica si se está en modo búsqueda o mostrando dispositivos guardados.
+ * @param savedDevices Lista de dispositivos guardados.
+ * @param impresoraViewModel ViewModel que gestiona el estado y la lógica.
+ * @param onActionClick Callback que se ejecuta al hacer clic en el botón de acción.
+ */
 @Composable
 fun DeviceCard(
     device: BluetoothDeviceDB,
@@ -433,6 +483,11 @@ fun DeviceCard(
     }
 }
 
+/**
+ * Muestra información del dispositivo seleccionado actualmente.
+ *
+ * @param impresoraViewModel ViewModel que gestiona el estado y la lógica de los dispositivos.
+ */
 @Composable
 fun SelectedDeviceInfo(impresoraViewModel: ImpresoraViewModel) {
     val selectedDevice by impresoraViewModel.selectedDevice.collectAsState()

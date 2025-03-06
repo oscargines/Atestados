@@ -17,6 +17,15 @@ import androidx.compose.ui.unit.sp
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
 
+/**
+ * Pantalla para registrar la lectura de derechos en una investigación.
+ *
+ * Esta pantalla muestra un formulario con campos para registrar información relevante sobre
+ * la investigación y un diálogo inicial con instrucciones. Permite guardar o limpiar los datos.
+ *
+ * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
+ * @param lecturaDerechosViewModel ViewModel que gestiona el estado y la lógica de los datos.
+ */
 @Composable
 fun LecturaDerechosScreen(
     navigateToScreen: (String) -> Unit,
@@ -24,7 +33,7 @@ fun LecturaDerechosScreen(
 ) {
     var showInitialDialog by remember { mutableStateOf(true) }
 
-    // Dialog inicial
+    // Diálogo inicial con instrucciones
     if (showInitialDialog) {
         AlertDialog(
             onDismissRequest = { showInitialDialog = false },
@@ -73,6 +82,11 @@ fun LecturaDerechosScreen(
     }
 }
 
+/**
+ * Barra superior de la pantalla de lectura de derechos.
+ *
+ * Muestra un título principal "Lectura de derechos" y un subtítulo con información adicional.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LecturaDerechosTopBar() {
@@ -102,6 +116,15 @@ private fun LecturaDerechosTopBar() {
     )
 }
 
+/**
+ * Contenido principal de la pantalla de lectura de derechos.
+ *
+ * Incluye opciones de radio para el momento de la lectura y campos de texto para detalles de
+ * la investigación, como lugar, hechos e indicios.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param lecturaDerechosViewModel ViewModel que gestiona el estado y la lógica de los datos.
+ */
 @Composable
 private fun LecturaDerechosContent(
     modifier: Modifier = Modifier,
@@ -182,6 +205,15 @@ private fun LecturaDerechosContent(
     }
 }
 
+/**
+ * Barra inferior con botones para guardar o limpiar los datos.
+ *
+ * Contiene un botón "GUARDAR" para salvar la información y navegar a otra pantalla, y un botón
+ * "LIMPIAR" para borrar los datos ingresados.
+ *
+ * @param viewModel ViewModel que gestiona el estado y la lógica de los datos.
+ * @param navigateToScreen Función lambda para navegar a otra pantalla.
+ */
 @Composable
 private fun LecturaDerechosBottomBar(
     viewModel: LecturaDerechosViewModel,
@@ -224,6 +256,13 @@ private fun LecturaDerechosBottomBar(
     }
 }
 
+/**
+ * Componente de opción de radio para seleccionar el momento de la lectura.
+ *
+ * @param text Texto de la opción (por ejemplo, "Tomada en el momento").
+ * @param selected Indica si la opción está seleccionada.
+ * @param onSelect Callback que se ejecuta al seleccionar la opción.
+ */
 @Composable
 private fun RadioOption(
     text: String,
@@ -250,6 +289,18 @@ private fun RadioOption(
     }
 }
 
+/**
+ * Campo de texto personalizado para la entrada de datos.
+ *
+ * Permite introducir texto con una etiqueta y personalizar el número de líneas y el tamaño.
+ *
+ * @param value Valor actual del campo de texto.
+ * @param onValueChange Callback que se ejecuta al cambiar el valor.
+ * @param label Etiqueta descriptiva del campo.
+ * @param modifier Modificador para personalizar el diseño del campo.
+ * @param singleLine Indica si el campo debe ser de una sola línea.
+ * @param maxLines Número máximo de líneas permitidas.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomTextField(

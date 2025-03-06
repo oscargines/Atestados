@@ -27,10 +27,19 @@ import com.oscar.atestados.ui.theme.AtestadosTheme
 import com.oscar.atestados.ui.theme.BlueGray700
 import kotlinx.coroutines.delay
 
+/**
+ * Pantalla de carga (splash screen) de la aplicación.
+ *
+ * Muestra un logotipo, texto descriptivo y un indicador de progreso durante un tiempo determinado
+ * antes de navegar a la siguiente pantalla.
+ *
+ * @param onSplashFinished Callback que se ejecuta cuando finaliza la duración del splash screen,
+ *                         generalmente para navegar a la pantalla principal.
+ */
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
     LaunchedEffect(key1 = true) {
-        delay(3000) // Duración del splash
+        delay(3000) // Duración del splash en milisegundos (3 segundos)
         onSplashFinished()
     }
 
@@ -78,7 +87,11 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     }
 }
 
-// Vista previa de la pantalla de carga
+/**
+ * Vista previa de la pantalla de carga para desarrollo y diseño.
+ *
+ * Muestra cómo se verá la pantalla SplashScreen en el entorno de vista previa de Android Studio.
+ */
 @Preview(showBackground = true)
 @Composable
 fun SplashScreenPreview() {

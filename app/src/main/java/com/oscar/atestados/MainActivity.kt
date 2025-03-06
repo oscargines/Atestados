@@ -45,18 +45,45 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Etiqueta utilizada para los logs de esta actividad. */
 private const val TAG = "MainActivity"
 
+/**
+ * Actividad principal de la aplicación Atestados.
+ * Gestiona la inicialización de NFC, permisos, navegación y carga de bases de datos locales.
+ */
 class MainActivity : ComponentActivity() {
+
+    /** Adaptador NFC para gestionar la lectura de tags. */
     private lateinit var nfcAdapter: NfcAdapter
+
+    /** ViewModel para gestionar datos relacionados con la entidad "Persona". */
     private lateinit var personaViewModel: PersonaViewModel
+
+    /** Lanzador de resultados para solicitar múltiples permisos. */
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+
+    /** Lista de permisos requeridos según la versión de Android. */
     private lateinit var requiredPermissions: Array<String>
+
+    /** Tag NFC pendiente de procesamiento. */
     private var pendingNfcTag by mutableStateOf<Tag?>(null)
+
+    /** Estado que indica si todos los permisos necesarios han sido concedidos. */
     private var arePermissionsGranted by mutableStateOf(false)
+
+    /** Estado que indica si las bases de datos han sido cargadas. */
     private var isDatabaseLoaded by mutableStateOf(false)
+
+    /** Estado del progreso de carga de las bases de datos. */
     private var loadingStatus by mutableStateOf("")
 
+    /**
+     * Método de creación de la actividad.
+     * Inicializa el ViewModel, el adaptador NFC y configura la interfaz de usuario.
+     *
+     * @param savedInstanceState Estado guardado de la actividad, si existe.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         personaViewModel = ViewModelProvider(this)[PersonaViewModel::class.java]
@@ -76,6 +103,9 @@ class MainActivity : ComponentActivity() {
         processNfcIntent(intent)
     }
 
+    /**
+     * Habilita la detección de NFC en primer plano cuando la actividad se reanuda.
+     */
     override fun onResume() {
         super.onResume()
         if (nfcAdapter.isEnabled) {
@@ -92,6 +122,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Deshabilita la detección de NFC en primer plano cuando la actividad se pausa.
+     */
     override fun onPause() {
         super.onPause()
         if (nfcAdapter.isEnabled) {
@@ -100,6 +133,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Maneja nuevos intents recibidos, como la detección de un tag NFC.
+     *
+     * @param intent El nuevo intent recibido.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -107,6 +145,11 @@ class MainActivity : ComponentActivity() {
         processNfcIntent(intent)
     }
 
+    /**
+     * Procesa el intent recibido para detectar y manejar tags NFC.
+     *
+     * @param intent Intent recibido que puede contener información de NFC.
+     */
     private fun processNfcIntent(intent: Intent?) {
         Log.d(TAG, "Procesando intent: $intent")
         if (intent?.action == NfcAdapter.ACTION_TECH_DISCOVERED) {
@@ -129,6 +172,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Componente que define la navegación y el contenido de la interfaz según el estado de permisos y carga de datos.
+     */
     @Composable
     private fun ContentRouter() {
         val navController = rememberNavController()
@@ -191,6 +237,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Configura el lanzador de permisos para manejar el resultado de la solicitud de permisos múltiples.
+     */
     private fun configurePermissionLauncher() {
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             arePermissionsGranted = permissions.all { it.value }
@@ -204,6 +253,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Verifica y solicita los permisos necesarios según la versión de Android.
+     */
     private fun checkAndRequestPermissions() {
         requiredPermissions = buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -240,12 +292,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Determina si se debe mostrar una explicación antes de solicitar permisos.
+     *
+     * @return `true` si alguno de los permisos requiere una explicación, `false` en caso contrario.
+     */
     private fun shouldShowRationale(): Boolean {
         return requiredPermissions.any { permission ->
             ActivityCompat.shouldShowRequestPermissionRationale(this, permission)
         }
     }
 
+    /**
+     * Muestra un diálogo explicativo antes de solicitar permisos.
+     */
     private fun showPermissionRationaleDialog() {
         AlertDialog.Builder(this)
             .setTitle("Permisos Requeridos")
@@ -255,17 +315,26 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
+    /**
+     * Abre la configuración de la aplicación en los ajustes del sistema.
+     */
     private fun openAppSettings() {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", packageName, null)
         })
     }
 
+    /**
+     * Muestra un mensaje indicando funcionalidad limitada y carga las bases de datos.
+     */
     private fun showDeniedToast() {
         Toast.makeText(this, "Funcionalidad limitada sin permisos", Toast.LENGTH_LONG).show()
         loadDatabases()
     }
 
+    /**
+     * Carga las bases de datos locales en un hilo de fondo.
+     */
     private fun loadDatabases() = lifecycleScope.launch(Dispatchers.IO) {
         try {
             listOf("paises.db", "juzgados.db", "dispositivos.db").forEach { dbName ->
@@ -284,6 +353,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * Pantalla mostrada cuando los permisos necesarios no han sido concedidos.
+ *
+ * @param onRetry Acción a realizar al intentar solicitar permisos nuevamente.
+ * @param onOpenSettings Acción para abrir la configuración de la aplicación.
+ */
 @Composable
 fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
@@ -300,6 +375,11 @@ fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
     }
 }
 
+/**
+ * Pantalla de carga mostrada mientras se inicializan las bases de datos.
+ *
+ * @param loadingStatus Mensaje de estado de la carga.
+ */
 @Composable
 fun SplashScreen(loadingStatus: String) {
     var showLoadingStatus by remember { mutableStateOf(false) }

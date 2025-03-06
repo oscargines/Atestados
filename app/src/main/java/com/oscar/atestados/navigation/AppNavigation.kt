@@ -3,6 +3,7 @@ package com.oscar.atestados.navigation
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -15,6 +16,7 @@ import com.oscar.atestados.screens.Alcoholemia02Screen
 import com.oscar.atestados.screens.CarecerScreen
 import com.oscar.atestados.screens.GuardiasScreen
 import com.oscar.atestados.screens.ImpresoraScreen
+import com.oscar.atestados.screens.InformacionScreen
 import com.oscar.atestados.screens.LecturaDerechosScreen
 import com.oscar.atestados.screens.MainScreen
 import com.oscar.atestados.screens.OtrosDocumentosScreen
@@ -30,6 +32,8 @@ import com.oscar.atestados.viewModel.VehiculoViewModel
 import com.oscar.atestados.viewModel.GuardiasViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
+import com.oscar.atestados.viewModel.OtrosDocumentosViewModel
+import com.oscar.atestados.viewModel.OtrosDocumentosViewModelFactory
 import com.oscar.atestados.viewModel.TomaDerechosViewModel
 import com.oscar.atestados.viewModel.TomaManifestacionAlcoholViewModel
 
@@ -87,11 +91,20 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable("OtrosDocumentosScreen") {
-            OtrosDocumentosScreen {
-                navController.navigate("MainScreen") {
-                    popUpTo("MainScreen") { inclusive = true }
-                }
+            val context = LocalContext.current // Obtén el contexto de la aplicación
+            val factory = remember {
+                OtrosDocumentosViewModelFactory(context = context)
             }
+            val otrosDocumentosViewModel: OtrosDocumentosViewModel = viewModel(factory = factory)
+
+            OtrosDocumentosScreen(
+                navigateToScreen = { route ->
+                    navController.navigate(route) {
+                        popUpTo("MainScreen") { inclusive = true }
+                    }
+                },
+                otrosDocumentosViewModel = otrosDocumentosViewModel
+            )
         }
 
         composable("GuardiasScreen") {
@@ -160,6 +173,13 @@ fun AppNavigation(navController: NavHostController) {
                 },
                 alcoholemiaDosViewModel = alcoholemiaDosViewModel
             )
+        }
+        composable("InformacionScreen") {
+            InformacionScreen { route ->
+                navController.navigate(route) {
+                    popUpTo("MainScreen") { inclusive = true }
+                }
+            }
         }
     }
 }

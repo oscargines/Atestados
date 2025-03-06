@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.material3.TimePicker
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -31,6 +30,13 @@ import com.oscar.atestados.R
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.AlcoholemiaUnoViewModel
 
+/**
+ * Pantalla principal para la captura de datos relacionados con una prueba de alcoholemia.
+ * Incluye un formulario para registrar información del etilómetro y tasas de alcoholemia.
+ *
+ * @param navigateToScreen Función de navegación para cambiar a otra pantalla.
+ * @param alcoholemiaUnoViewModel ViewModel que gestiona los datos de la pantalla.
+ */
 @Composable
 fun Alcoholemia01Screen(
     navigateToScreen: (String) -> Unit,
@@ -48,6 +54,10 @@ fun Alcoholemia01Screen(
     }
 }
 
+/**
+ * Barra superior de la pantalla de alcoholemia.
+ * Muestra el título y una breve descripción de la pantalla.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlcoholemiaTopBar() {
@@ -82,6 +92,13 @@ private fun AlcoholemiaTopBar() {
     )
 }
 
+/**
+ * Barra inferior de la pantalla de alcoholemia.
+ * Contiene botones para guardar los datos y limpiar el formulario.
+ *
+ * @param viewModel ViewModel que gestiona las acciones de guardar y limpiar datos.
+ * @param navigateToScreen Función de navegación para cambiar a otra pantalla tras guardar.
+ */
 @Composable
 private fun AlcoholemiaBottomBar(
     viewModel: AlcoholemiaUnoViewModel,
@@ -126,7 +143,13 @@ private fun AlcoholemiaBottomBar(
     }
 }
 
-
+/**
+ * Contenido principal de la pantalla de alcoholemia.
+ * Incluye un formulario con campos para el etilómetro, opciones de selección y tasas de alcoholemia.
+ *
+ * @param modifier Modificador para personalizar el diseño del contenido.
+ * @param alcoholemiaUnoViewModel ViewModel que proporciona y actualiza los datos del formulario.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlcoholemiaContent(
@@ -158,9 +181,7 @@ private fun AlcoholemiaContent(
                 Button(
                     onClick = {
                         alcoholemiaUnoViewModel.updatePrimeraHora(
-                            "${timePickerState1.hour}:${
-                                timePickerState1.minute.toString().padStart(2, '0')
-                            }"
+                            "${timePickerState1.hour}:${timePickerState1.minute.toString().padStart(2, '0')}"
                         )
                         showTimePicker1 = false
                     }
@@ -177,9 +198,7 @@ private fun AlcoholemiaContent(
                 Button(
                     onClick = {
                         alcoholemiaUnoViewModel.updateSegundaHora(
-                            "${timePickerState2.hour}:${
-                                timePickerState2.minute.toString().padStart(2, '0')
-                            }"
+                            "${timePickerState2.hour}:${timePickerState2.minute.toString().padStart(2, '0')}"
                         )
                         showTimePicker2 = false
                     }
@@ -194,7 +213,6 @@ private fun AlcoholemiaContent(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-
         val opcionSeleccionada by alcoholemiaUnoViewModel.opcionMotivo.observeAsState()
 
         Column {
@@ -247,7 +265,6 @@ private fun AlcoholemiaContent(
             textAlign = TextAlign.Center,
             fontSize = 20.sp
         )
-        // Para errores permitidos
         val opcionErroresSeleccionada by alcoholemiaUnoViewModel.opcionErrores.observeAsState()
 
         Row(
@@ -268,6 +285,7 @@ private fun AlcoholemiaContent(
                 )
             }
         }
+
         // Sección Pruebas
         Text(
             text = "¿Desea realizar las pruebas?",
@@ -285,7 +303,6 @@ private fun AlcoholemiaContent(
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Para deseo de realizar pruebas
             val opcionDeseoSeleccionada by alcoholemiaUnoViewModel.opcionDeseaPruebas.observeAsState()
 
             listOf(
@@ -311,7 +328,7 @@ private fun AlcoholemiaContent(
             textAlign = TextAlign.Center,
             fontSize = 20.sp
         )
-        //Primera prueba
+        // Primera prueba
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -349,9 +366,8 @@ private fun AlcoholemiaContent(
                     }
                 }
             )
-
         }
-        //Segunda prueba
+        // Segunda prueba
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -389,12 +405,17 @@ private fun AlcoholemiaContent(
                     }
                 }
             )
-
         }
-
     }
 }
 
+/**
+ * Componente que muestra una opción de selección horizontal con un botón de radio y texto.
+ *
+ * @param text Texto de la opción.
+ * @param selected Indica si la opción está seleccionada.
+ * @param onSelect Acción a realizar al seleccionar la opción.
+ */
 @Composable
 fun RadioOptionHorizontal(
     text: String,
@@ -419,9 +440,16 @@ fun RadioOptionHorizontal(
             modifier = Modifier.padding(start = 4.dp)
         )
     }
-
 }
 
+/**
+ * Diálogo que muestra un selector de tiempo para elegir una hora.
+ *
+ * @param onDismissRequest Acción a realizar al cerrar el diálogo.
+ * @param confirmButton Botón de confirmación para aceptar la hora seleccionada.
+ * @param modifier Modificador para personalizar el diseño del diálogo.
+ * @param content Contenido del diálogo, típicamente un [TimePicker].
+ */
 @Composable
 fun TimePickerDialog(
     onDismissRequest: () -> Unit,
@@ -469,9 +497,17 @@ fun TimePickerDialog(
             }
         }
     }
-
 }
 
+/**
+ * Campo de texto personalizado con un estilo uniforme para el formulario.
+ *
+ * @param value Valor actual del campo.
+ * @param onValueChange Acción a realizar cuando el valor cambia.
+ * @param label Etiqueta del campo.
+ * @param modifier Modificador para personalizar el diseño.
+ * @param enabled Indica si el campo está habilitado para edición.
+ */
 @Composable
 private fun CustomTextField(
     value: String,
@@ -499,6 +535,13 @@ private fun CustomTextField(
     )
 }
 
+/**
+ * Componente que muestra una opción de selección vertical con un botón de radio y texto.
+ *
+ * @param text Texto de la opción.
+ * @param selected Indica si la opción está seleccionada.
+ * @param onSelect Acción a realizar al seleccionar la opción.
+ */
 @Composable
 private fun RadioOption(
     text: String,
@@ -516,7 +559,6 @@ private fun RadioOption(
                 selectedColor = BotonesNormales,
                 unselectedColor = TextoSecundarios
             )
-
         )
         Text(
             text = text,
