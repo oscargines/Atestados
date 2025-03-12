@@ -19,6 +19,9 @@
       <SelectionState runConfigName="PersonaScreenPreview">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
+      <SelectionState runConfigName="AndroidStudioProjects.Atestados.app">
+        <option name="selectionMode" value="DROPDOWN" />
+      </SelectionState>
     </selectionStates>
   </component>
 </project>

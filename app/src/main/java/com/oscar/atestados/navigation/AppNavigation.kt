@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import com.oscar.atestados.screens.Alcoholemia01Screen
 import com.oscar.atestados.screens.Alcoholemia02Screen
 import com.oscar.atestados.screens.CarecerScreen
+import com.oscar.atestados.screens.CitacionScreen
 import com.oscar.atestados.screens.GuardiasScreen
 import com.oscar.atestados.screens.ImpresoraScreen
 import com.oscar.atestados.screens.InformacionScreen
@@ -27,6 +28,7 @@ import com.oscar.atestados.screens.VehiculoScreen
 import com.oscar.atestados.viewModel.AlcoholemiaDosViewModel
 import com.oscar.atestados.viewModel.AlcoholemiaUnoViewModel
 import com.oscar.atestados.viewModel.BluetoothViewModel
+import com.oscar.atestados.viewModel.CitacionViewModel
 import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.viewModel.VehiculoViewModel
 import com.oscar.atestados.viewModel.GuardiasViewModel
@@ -180,6 +182,15 @@ fun AppNavigation(navController: NavHostController) {
                     popUpTo("MainScreen") { inclusive = true }
                 }
             }
+        }
+        composable("CitacionScreen") {
+            val citacionViewModel: CitacionViewModel = viewModel()
+            CitacionScreen(
+                navigateToScreen = { route ->
+                    navController.navigate(route)
+                },
+                citacionViewModel = citacionViewModel
+            )
         }
     }
 }

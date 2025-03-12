@@ -118,7 +118,7 @@ private fun Alcoholemia02Content(
 
     // TimePicker para primera hora
     if (showTimePicker) {
-        TimePickerDialog(
+        TimePickerDialogAlcoholemia(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 Button(

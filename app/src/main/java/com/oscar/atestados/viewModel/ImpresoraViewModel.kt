@@ -1,6 +1,6 @@
 package com.oscar.atestados.viewModel
 
-import ZebraPrinterHelper
+import com.oscar.atestados.utils.ZebraPrinterHelper
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.Context

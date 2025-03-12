@@ -1,6 +1,6 @@
 [versions]
 # Android Gradle Plugin y Kotlin
-agp = "8.8.2"                   # Última versión estable
+agp = "8.9.0"                   # Última versión estable
 kotlin = "2.0.0"                # Última versión de Kotlin
 
 # AndroidX Core y Lifecycle

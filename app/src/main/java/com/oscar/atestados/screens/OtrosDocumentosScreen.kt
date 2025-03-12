@@ -1,6 +1,6 @@
 package com.oscar.atestados.screens
 
-import ZebraPrinterHelper
+import com.oscar.atestados.utils.ZebraPrinterHelper
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -36,33 +36,59 @@ fun OtrosDocumentosScreen(
 ) {
     val context = LocalContext.current
     val printerHelper = remember { ZebraPrinterHelper(context) }
-    var isPrinting by remember { mutableStateOf(false) }
-    var printResult by remember { mutableStateOf<Result<String>?>(null) }
-    var triggerPrint by remember { mutableStateOf(false) }
+    var isPrintingTest by remember { mutableStateOf(false) } // Para "PRUEBA IMPRESIÓN"
+    var isPrintingAssistance by remember { mutableStateOf(false) } // Para "INFOR. ASISTENCIA LETRADA"
+    var printResultTest by remember { mutableStateOf<Result<String>?>(null) } // Resultado de prueba
+    var printResultAssistance by remember { mutableStateOf<Result<String>?>(null) } // Resultado de asistencia
+    var triggerPrintTest by remember { mutableStateOf(false) } // Trigger para prueba
+    var triggerPrintAssistance by remember { mutableStateOf(false) } // Trigger para asistencia
     val viewModel: OtrosDocumentosViewModel = viewModel(factory = OtrosDocumentosViewModelFactory(context))
 
-    // Ejecutar la impresión cuando triggerPrint cambia a true
-    LaunchedEffect(triggerPrint) {
-        if (triggerPrint) {
-            isPrinting = true
-            // Mover la impresión a un hilo de fondo
+    // Ejecutar la impresión de "prueba.prn" cuando triggerPrintTest cambia a true
+    LaunchedEffect(triggerPrintTest) {
+        if (triggerPrintTest) {
+            isPrintingTest = true
             withContext(Dispatchers.IO) {
-                printResult = printerHelper.printFromAsset("pruebaRW420.prn")
+                printResultTest = printerHelper.printFromAsset("prueba.prn")
             }
-            isPrinting = false
-            triggerPrint = false
+            isPrintingTest = false
+            triggerPrintTest = false
         }
     }
 
-    // Mostrar resultado de la impresión
-    printResult?.let { result ->
+    // Ejecutar la impresión de "info_asistencia_jurica.prn" cuando triggerPrintAssistance cambia a true
+    LaunchedEffect(triggerPrintAssistance) {
+        if (triggerPrintAssistance) {
+            isPrintingAssistance = true
+            withContext(Dispatchers.IO) {
+                printResultAssistance = printerHelper.printFromAsset("info_asistencia_juridica.prn")
+            }
+            isPrintingAssistance = false
+            triggerPrintAssistance = false
+        }
+    }
+
+    // Mostrar resultado de la impresión de "prueba.prn"
+    printResultTest?.let { result ->
         LaunchedEffect(result) {
             result.onSuccess { status ->
-                Toast.makeText(context, "Impresión exitosa: $status", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Impresión exitosa (prueba): $status", Toast.LENGTH_SHORT).show()
             }.onFailure { exception ->
-                Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Error (prueba): ${exception.message}", Toast.LENGTH_LONG).show()
             }
-            printResult = null // Resetear el resultado después de procesarlo
+            printResultTest = null
+        }
+    }
+
+    // Mostrar resultado de la impresión de "info_asistencia_jurica.prn"
+    printResultAssistance?.let { result ->
+        LaunchedEffect(result) {
+            result.onSuccess { status ->
+                Toast.makeText(context, "Impresión exitosa (asistencia): $status", Toast.LENGTH_SHORT).show()
+            }.onFailure { exception ->
+                Toast.makeText(context, "Error (asistencia): ${exception.message}", Toast.LENGTH_LONG).show()
+            }
+            printResultAssistance = null
         }
     }
 
@@ -86,7 +112,7 @@ fun OtrosDocumentosScreen(
             )
             Spacer(modifier = Modifier.height(20.dp))
             CreaBotonOtrosDoc(
-                onClick = { navigateToScreen("InformacionScreen") },
+                onClick = { navigateToScreen("CitacionScreen") },
                 text = "CITACIÓN JUDICIAL",
                 mensaje = "Pulse aquí para generar una citación judicial"
             )
@@ -97,25 +123,36 @@ fun OtrosDocumentosScreen(
                 mensaje = "Pulse aquí para generar un documento de derechos"
             )
             Spacer(modifier = Modifier.height(20.dp))
-
             CreaBotonOtrosDoc(
                 onClick = {
-                    if (!isPrinting) {
-                        isPrinting = true
-                        triggerPrint = true
+                    if (!isPrintingAssistance) {
+                        isPrintingAssistance = true
+                        triggerPrintAssistance = true
                     }
                 },
-                text = if (isPrinting) "IMPRIMIENDO..." else "PRUEBA IMPRESIÓN",
+                text = if (isPrintingAssistance) "IMPRIMIENDO..." else "INFOR. ASISTENCIA LETRADA",
+                mensaje = "Pulse aquí para imprimir información de asistencia letrada",
+                enabled = !isPrintingAssistance
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            CreaBotonOtrosDoc(
+                onClick = {
+                    if (!isPrintingTest) {
+                        isPrintingTest = true
+                        triggerPrintTest = true
+                    }
+                },
+                text = if (isPrintingTest) "IMPRIMIENDO..." else "PRUEBA IMPRESIÓN",
                 mensaje = "Pulse aquí para imprimir una etiqueta de prueba",
-                enabled = !isPrinting
+                enabled = !isPrintingTest
             )
         }
-        // Mostrar CircularProgressIndicator mientras se imprime
-        if (isPrinting) {
+        // Mostrar CircularProgressIndicator mientras se imprime cualquiera de las etiquetas
+        if (isPrintingTest || isPrintingAssistance) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White.copy(alpha = 0.7f)) // Fondo gris semitransparente
+                    .background(Color.White.copy(alpha = 0.7f))
                     .wrapContentSize(Alignment.Center)
             ) {
                 CircularProgressIndicator(

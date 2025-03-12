@@ -175,7 +175,7 @@ private fun AlcoholemiaContent(
 
     // TimePicker para primera hora
     if (showTimePicker1) {
-        TimePickerDialog(
+        TimePickerDialogAlcoholemia(
             onDismissRequest = { showTimePicker1 = false },
             confirmButton = {
                 Button(
@@ -192,7 +192,7 @@ private fun AlcoholemiaContent(
 
     // TimePicker para segunda hora
     if (showTimePicker2) {
-        TimePickerDialog(
+        TimePickerDialogAlcoholemia(
             onDismissRequest = { showTimePicker2 = false },
             confirmButton = {
                 Button(
@@ -451,7 +451,7 @@ fun RadioOptionHorizontal(
  * @param content Contenido del diálogo, típicamente un [TimePicker].
  */
 @Composable
-fun TimePickerDialog(
+fun TimePickerDialogAlcoholemia(
     onDismissRequest: () -> Unit,
     confirmButton: @Composable (() -> Unit),
     modifier: Modifier = Modifier,
