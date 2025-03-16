@@ -1,5 +1,6 @@
 package com.oscar.atestados.screens
 
+import android.app.Application
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -22,12 +23,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.utils.ZebraPrinterHelper
 import com.oscar.atestados.ui.theme.*
+import com.oscar.atestados.viewModel.BluetoothViewModelFactory
 import com.oscar.atestados.viewModel.CitacionViewModel
+import com.oscar.atestados.viewModel.ImpresoraViewModel
+import com.oscar.atestados.viewModel.ImpresoraViewModelFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
@@ -46,37 +52,19 @@ import java.util.*
 @Composable
 fun CitacionScreen(
     navigateToScreen: (String) -> Unit,
-    citacionViewModel: CitacionViewModel
+    citacionViewModel: CitacionViewModel,
+    impresoraViewModel: ImpresoraViewModel = viewModel(
+        factory = ImpresoraViewModelFactory(
+            bluetoothViewModel = viewModel(
+                factory = BluetoothViewModelFactory(LocalContext.current.applicationContext as Application)
+            ),
+            context = LocalContext.current
+        )
+    )
 ) {
     val context = LocalContext.current
-    val printerHelper = remember { ZebraPrinterHelper(context) }
     var isPrinting by remember { mutableStateOf(false) }
-    var printResult by remember { mutableStateOf<Result<String>?>(null) }
-    var triggerPrint by remember { mutableStateOf(false) }
-
-    // Ejecutar la impresión cuando triggerPrint cambia a true
-    LaunchedEffect(triggerPrint) {
-        if (triggerPrint) {
-            isPrinting = true
-            withContext(Dispatchers.IO) {
-                printResult = printerHelper.printFromAsset("ActaCitacion.prn")
-            }
-            isPrinting = false
-            triggerPrint = false
-        }
-    }
-
-    // Mostrar resultado de la impresión
-    printResult?.let { result ->
-        LaunchedEffect(result) {
-            result.onSuccess { status ->
-                Toast.makeText(context, "Impresión exitosa: $status", Toast.LENGTH_SHORT).show()
-            }.onFailure { exception ->
-                Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
-            }
-            printResult = null // Resetear el resultado después de procesarlo
-        }
-    }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         modifier = Modifier.fillMaxSize().padding(top = 16.dp),
@@ -87,12 +75,19 @@ fun CitacionScreen(
             modifier = Modifier.padding(paddingValues),
             citacionViewModel = citacionViewModel,
             navigateToScreen = navigateToScreen,
-            onPrintTrigger = { triggerPrint = true },
+            onPrintTrigger = {
+                if (!isPrinting) {
+                    isPrinting = true
+                    scope.launch {
+                        impresoraViewModel.printZplFile("ActaCitacion.prn")
+                        isPrinting = false
+                    }
+                }
+            },
             isPrinting = isPrinting
         )
     }
 
-    // Mostrar CircularProgressIndicator mientras se imprime
     if (isPrinting) {
         Box(
             modifier = Modifier
@@ -365,7 +360,7 @@ private fun CitacionContent(
                     text = juzgadoInfo!!["nombre"] ?: "N/A",
                     color = TextoSecundarios,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 4.dp),
+                    modifier = Modifier.padding(vertical = 4.dp),
                     textAlign = TextAlign.Center
                 )
                 Text(
@@ -406,10 +401,8 @@ private fun CitacionContent(
 
         Button(
             onClick = {
-                if (!isPrinting) {
-                    citacionViewModel.guardarDatos()
-                    onPrintTrigger()
-                }
+                citacionViewModel.guardarDatos()
+                onPrintTrigger()
             },
             enabled = !isPrinting,
             colors = ButtonDefaults.buttonColors(

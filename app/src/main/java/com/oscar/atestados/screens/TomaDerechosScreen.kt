@@ -161,7 +161,7 @@ private fun TomaDerechosContent(
 
     // Cargar los elementos esenciales desde el JSON
     LaunchedEffect(Unit) {
-        elementosEsenciales = leerElementosEsenciales(context, "elementos_esenciales.json")
+        elementosEsenciales = leerElementosEsenciales(context, "documents/elementos_esenciales.json")
     }
 
     // Texto que se mostrará en el CustomTextField
@@ -525,7 +525,7 @@ fun ObtenerDerechos(context: Context): List<String> {
     var mensajes by remember { mutableStateOf(listOf("Cargando mensajes...")) }
 
     LaunchedEffect(Unit) {
-        mensajes = LeerDerechos(context, "derechos.json")
+        mensajes = LeerDerechos(context, "documents/derechos.json")
     }
     return mensajes
 }

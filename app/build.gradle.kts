@@ -126,6 +126,11 @@ dependencies {
     // Zebra
     implementation(files("libs/ZSDK_ANDROID_API.jar"))
 
+    // PDF
+    implementation(libs.itext.core)
+    implementation(libs.layout)
+    implementation(libs.commonmark)  // Parsear Markdown
+
     // Pruebas
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

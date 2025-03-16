@@ -55,6 +55,10 @@ junit = "4.13.2"                # Última versión estable
 androidxJunit = "1.2.1"         # Última versión estable
 espressoCore = "3.6.1"          # Última versión estable
 
+# PDF y Marckdown
+commonmark = "0.18.2"
+itextCore = "9.1.0"
+
 [libraries]
 # AndroidX Core y Lifecycle
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -118,6 +122,11 @@ zsdk-api = { group = "com.zebra", name = "zsdk-api", version.ref = "zsdkApi" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+
+# PDF y Marckdown
+commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
+itext-core = { module = "com.itextpdf:itext-core", version.ref = "itextCore" }
+layout = { module = "com.itextpdf:layout", version.ref = "itextCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,6 +1,9 @@
 package com.oscar.atestados.screens
 
-import com.oscar.atestados.utils.ZebraPrinterHelper
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,86 +18,52 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oscar.atestados.ui.theme.*
+import com.oscar.atestados.utils.PDFCreaterHelper
+import com.oscar.atestados.viewModel.BluetoothViewModel
+import com.oscar.atestados.viewModel.BluetoothViewModelFactory
+import com.oscar.atestados.viewModel.ImpresoraViewModel
+import com.oscar.atestados.viewModel.ImpresoraViewModelFactory
 import com.oscar.atestados.viewModel.OtrosDocumentosViewModel
 import com.oscar.atestados.viewModel.OtrosDocumentosViewModelFactory
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Pantalla que muestra opciones para generar e imprimir documentos varios.
  * Incluye botones para generar actas, citaciones, derechos y una prueba de impresión.
  *
  * @param navigateToScreen Función de navegación para cambiar a otra pantalla.
+ * @param impresoraViewModel ViewModel para gestionar la impresora.
  * @param otrosDocumentosViewModel ViewModel que gestiona el estado de la pantalla.
  */
 @Composable
 fun OtrosDocumentosScreen(
     navigateToScreen: (String) -> Unit,
-    otrosDocumentosViewModel: OtrosDocumentosViewModel
+    impresoraViewModel: ImpresoraViewModel = viewModel(
+        factory = ImpresoraViewModelFactory(
+            bluetoothViewModel = viewModel(
+                factory = BluetoothViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            ),
+            context = LocalContext.current
+        )
+    ),
+    otrosDocumentosViewModel: OtrosDocumentosViewModel = viewModel(
+        factory = OtrosDocumentosViewModelFactory(LocalContext.current)
+    )
 ) {
     val context = LocalContext.current
-    val printerHelper = remember { ZebraPrinterHelper(context) }
-    var isPrintingTest by remember { mutableStateOf(false) } // Para "PRUEBA IMPRESIÓN"
-    var isPrintingAssistance by remember { mutableStateOf(false) } // Para "INFOR. ASISTENCIA LETRADA"
-    var printResultTest by remember { mutableStateOf<Result<String>?>(null) } // Resultado de prueba
-    var printResultAssistance by remember { mutableStateOf<Result<String>?>(null) } // Resultado de asistencia
-    var triggerPrintTest by remember { mutableStateOf(false) } // Trigger para prueba
-    var triggerPrintAssistance by remember { mutableStateOf(false) } // Trigger para asistencia
-    val viewModel: OtrosDocumentosViewModel = viewModel(factory = OtrosDocumentosViewModelFactory(context))
-
-    // Ejecutar la impresión de "prueba.prn" cuando triggerPrintTest cambia a true
-    LaunchedEffect(triggerPrintTest) {
-        if (triggerPrintTest) {
-            isPrintingTest = true
-            withContext(Dispatchers.IO) {
-                printResultTest = printerHelper.printFromAsset("prueba.prn")
-            }
-            isPrintingTest = false
-            triggerPrintTest = false
-        }
-    }
-
-    // Ejecutar la impresión de "info_asistencia_jurica.prn" cuando triggerPrintAssistance cambia a true
-    LaunchedEffect(triggerPrintAssistance) {
-        if (triggerPrintAssistance) {
-            isPrintingAssistance = true
-            withContext(Dispatchers.IO) {
-                printResultAssistance = printerHelper.printFromAsset("info_asistencia_juridica.prn")
-            }
-            isPrintingAssistance = false
-            triggerPrintAssistance = false
-        }
-    }
-
-    // Mostrar resultado de la impresión de "prueba.prn"
-    printResultTest?.let { result ->
-        LaunchedEffect(result) {
-            result.onSuccess { status ->
-                Toast.makeText(context, "Impresión exitosa (prueba): $status", Toast.LENGTH_SHORT).show()
-            }.onFailure { exception ->
-                Toast.makeText(context, "Error (prueba): ${exception.message}", Toast.LENGTH_LONG).show()
-            }
-            printResultTest = null
-        }
-    }
-
-    // Mostrar resultado de la impresión de "info_asistencia_jurica.prn"
-    printResultAssistance?.let { result ->
-        LaunchedEffect(result) {
-            result.onSuccess { status ->
-                Toast.makeText(context, "Impresión exitosa (asistencia): $status", Toast.LENGTH_SHORT).show()
-            }.onFailure { exception ->
-                Toast.makeText(context, "Error (asistencia): ${exception.message}", Toast.LENGTH_LONG).show()
-            }
-            printResultAssistance = null
-        }
-    }
+    var isPrintingTest by remember { mutableStateOf(false) }
+    var isPrintingAssistance by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = Modifier.fillMaxSize(),
-        topBar = { OtrosDocumentosTopBar(viewModel) },
+        topBar = { OtrosDocumentosTopBar(otrosDocumentosViewModel) },
         bottomBar = { OtrosDocumentosBottomBar(navigateToScreen) }
     ) { paddingValues ->
         Column(
@@ -127,19 +96,41 @@ fun OtrosDocumentosScreen(
                 onClick = {
                     if (!isPrintingAssistance) {
                         isPrintingAssistance = true
-                        triggerPrintAssistance = true
+                        scope.launch {
+                            try {
+                                // Imprimir el archivo ZPL
+                                Log.d("OtrosDocumentosScreen", "Iniciando impresión de info_asistencia_juridica.prn")
+                                impresoraViewModel.printZplFile("info_asistencia_juridica.prn")
+
+                                // Generar y abrir el PDF
+                                val markdownContent = context.assets.open("documents/asistencia_juridica_gratuita.md")
+                                    .bufferedReader().use { it.readText() }
+                                val pdfHelper = PDFCreaterHelper()
+                                val pdfFile = pdfHelper.convertMarkdownToPdf(context, markdownContent, "asistencia_juridica_gratuita")
+                                openPdf(context, pdfFile)
+                            } catch (e: Exception) {
+                                Log.e("OtrosDocumentosScreen", "Error al generar o abrir el PDF: ${e.message}")
+                                Toast.makeText(context, "Error al generar el PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                            } finally {
+                                isPrintingAssistance = false
+                            }
+                        }
                     }
                 },
                 text = if (isPrintingAssistance) "IMPRIMIENDO..." else "INFOR. ASISTENCIA LETRADA",
-                mensaje = "Pulse aquí para imprimir información de asistencia letrada",
+                mensaje = "Pulse aquí para imprimir y visualizar información de asistencia letrada",
                 enabled = !isPrintingAssistance
             )
             Spacer(modifier = Modifier.height(20.dp))
             CreaBotonOtrosDoc(
                 onClick = {
                     if (!isPrintingTest) {
+                        Log.d("OtrosDocumentosScreen", "Iniciando impresión de prueba.prn")
                         isPrintingTest = true
-                        triggerPrintTest = true
+                        scope.launch {
+                            impresoraViewModel.printZplFile("prueba.prn")
+                            isPrintingTest = false
+                        }
                     }
                 },
                 text = if (isPrintingTest) "IMPRIMIENDO..." else "PRUEBA IMPRESIÓN",
@@ -147,7 +138,6 @@ fun OtrosDocumentosScreen(
                 enabled = !isPrintingTest
             )
         }
-        // Mostrar CircularProgressIndicator mientras se imprime cualquiera de las etiquetas
         if (isPrintingTest || isPrintingAssistance) {
             Box(
                 modifier = Modifier
@@ -164,6 +154,24 @@ fun OtrosDocumentosScreen(
     }
 }
 
+/**
+ * Abre un archivo PDF utilizando una intención en Android.
+ *
+ * @param context Contexto de la aplicación.
+ * @param pdfFile Archivo PDF a abrir.
+ */
+private fun openPdf(context: Context, pdfFile: File) {
+    val uri: Uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        pdfFile
+    )
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "application/pdf")
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Abrir PDF con"))
+}
 
 /**
  * Barra superior de la pantalla OtrosDocumentosScreen.

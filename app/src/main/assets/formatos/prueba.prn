@@ -1,11 +1,11 @@
-! 0 200 200 2222 1
-PW 783
-TONE 0
-SPEED 3
-ON-FEED IGNORE
-NO-PACE
-BAR-SENSE
-PCX 286 168 
-T 5 2 325 57 PRUEBA
-T 0 0 116 370 Escanee este código para tener toda la información completa
-PRINT
+N
+Q2217,24
+B1,1
+I8,1
+A10,50,0,1,1,1,N,"Fuente 1: Hola ninos (solo ASCII)"
+A10,100,0,2,1,1,N,"Fuente 2: Hola ninos (solo ASCII)"
+A10,150,0,3,1,1,N,"Fuente 3: Hola ninos (solo ASCII)"
+A10,200,0,4,1,1,N,"Fuente 4: Hola ninos (solo ASCII)"
+A10,250,0,5,1,1,N,"Fuente 5: Hola niños cómo están"
+P1
+
