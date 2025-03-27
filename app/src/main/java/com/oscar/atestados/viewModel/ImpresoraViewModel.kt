@@ -6,6 +6,12 @@ import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
@@ -18,9 +24,12 @@ import com.oscar.atestados.utils.ZebraPrinterHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,24 +40,30 @@ class ImpresoraViewModel(
 ) : ViewModel() {
 
     private val printerHelper = ZebraPrinterHelper(context)
-
-    /** Instancia de la base de datos para almacenar dispositivos Bluetooth. */
     private val database = AccesoBaseDatos(context, "dispositivos.db", 1)
-
-    /** Flujo de estado que contiene la lista de dispositivos Bluetooth guardados en la base de datos. */
     private val _savedDevices = MutableStateFlow<List<BluetoothDeviceDB>>(emptyList())
     val savedDevices: StateFlow<List<BluetoothDeviceDB>> = _savedDevices.asStateFlow()
-
-    /** Flujo de estado que contiene la lista de dispositivos Bluetooth encontrados durante el escaneo. */
     private val _foundDevices = MutableStateFlow<List<BluetoothDeviceDB>>(emptyList())
     val foundDevices: StateFlow<List<BluetoothDeviceDB>> = _foundDevices.asStateFlow()
-
-    /** Flujo de estado que contiene el estado de la interfaz de usuario (escaneo, errores, etc.). */
     private val _uiState = MutableStateFlow(ImpresoraUiState())
     val uiState: StateFlow<ImpresoraUiState> = _uiState.asStateFlow()
-
-    /** Adaptador Bluetooth para obtener dispositivos reales. */
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+
+    val defaultDevice: StateFlow<BluetoothDeviceDB?> = context.dataStoreImp.data
+        .map { preferences ->
+            val name = preferences[stringPreferencesKey("DEFAULT_PRINTER_NAME")]
+            val mac = preferences[stringPreferencesKey("DEFAULT_PRINTER_MAC")]
+            if (name != null && mac != null) BluetoothDeviceDB(name, mac) else null
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    // Nuevo: Estado para controlar el diálogo de borrado
+    private val _showDeleteDialog = MutableStateFlow<BluetoothDeviceDB?>(null)
+    val showDeleteDialog: StateFlow<BluetoothDeviceDB?> = _showDeleteDialog.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -65,17 +80,20 @@ class ImpresoraViewModel(
         setupBluetoothObservers()
     }
 
-    /** Selecciona un dispositivo Bluetooth como el dispositivo activo. */
+    /** Selecciona un dispositivo Bluetooth como el dispositivo activo (temporal). */
     fun selectDevice(device: BluetoothDeviceDB) {
         viewModelScope.launch {
-            val btDevice = bluetoothViewModel.devices.value.find { it.address == device.mac }
+            var btDevice = bluetoothViewModel.devices.value.find { it.address == device.mac }
+            if (btDevice == null) {
+                btDevice = bluetoothAdapter?.getRemoteDevice(device.mac)
+            }
             if (btDevice != null) {
                 Log.d("ImpresoraViewModel", "Seleccionando dispositivo: ${device.nombre} (${device.mac})")
                 bluetoothViewModel.selectDevice(btDevice)
-                saveSelectedDevice()
             } else {
-                Log.w("ImpresoraViewModel", "Dispositivo no encontrado en la lista: ${device.mac}")
-                _uiState.update { it.copy(errorMessage = "Dispositivo no encontrado: ${device.mac}") }
+                Log.w("ImpresoraViewModel", "Dispositivo no disponible: ${device.mac}")
+                _uiState.update { it.copy(errorMessage = "Dispositivo no disponible: ${device.mac}") }
+                Toast.makeText(context, "Dispositivo no disponible", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -104,6 +122,67 @@ class ImpresoraViewModel(
             Log.d("ImpresoraViewModel", "Dispositivo guardado en DataStore: ${deviceDB.nombre}")
 
             loadSavedDevicesDB()
+        }
+    }
+
+    /** Muestra el diálogo para confirmar el borrado de un dispositivo. */
+    fun showDeleteDialog(device: BluetoothDeviceDB, context: Context) {
+        _showDeleteDialog.value = device
+    }
+
+    /** Borra un dispositivo de la base de datos. */
+    fun deleteDevice(device: BluetoothDeviceDB) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                database.execSQL("DELETE FROM dispositivos WHERE mac = ?", arrayOf(device.mac))
+                Log.d("ImpresoraViewModel", "Dispositivo borrado: ${device.nombre} (${device.mac})")
+
+                // Si el dispositivo borrado era el predeterminado, limpiamos DataStore
+                val currentDefault = defaultDevice.value
+                if (currentDefault?.mac == device.mac) {
+                    context.dataStoreImp.edit { preferences ->
+                        preferences.remove(stringPreferencesKey("DEFAULT_PRINTER_NAME"))
+                        preferences.remove(stringPreferencesKey("DEFAULT_PRINTER_MAC"))
+                    }
+                    bluetoothViewModel.selectDevice(null)
+                }
+
+                loadSavedDevicesDB()
+                launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Dispositivo borrado: ${device.nombre}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("ImpresoraViewModel", "Error borrando dispositivo: ${e.message}", e)
+                _uiState.update { it.copy(errorMessage = "Error borrando dispositivo: ${e.message}") }
+                launch(Dispatchers.Main) {
+                    Toast.makeText(context, "Error al borrar: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                _showDeleteDialog.value = null // Cerramos el diálogo
+            }
+        }
+    }
+
+    /** Composable para mostrar el diálogo de borrado. */
+    @Composable
+    fun DeleteDeviceDialog() {
+        val deviceToDelete by showDeleteDialog.collectAsState()
+        deviceToDelete?.let { device ->
+            AlertDialog(
+                onDismissRequest = { _showDeleteDialog.value = null },
+                title = { Text("Borrar dispositivo") },
+                text = { Text("¿Estás seguro de que quieres borrar ${device.nombre} (${device.mac})?") },
+                confirmButton = {
+                    TextButton(onClick = { deleteDevice(device) }) {
+                        Text("Borrar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { _showDeleteDialog.value = null }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
         }
     }
 
@@ -256,8 +335,8 @@ class ImpresoraViewModel(
         }
     }
 
-    /** Imprime un archivo ZPL usando la impresora seleccionada. */
-    fun printZplFile(fileName: String) {
+    /** Imprime un archivo usando la impresora seleccionada. */
+    fun printFile(fileName: String) {
         viewModelScope.launch {
             val selectedDevice = bluetoothViewModel.selectedDevice.value
             if (selectedDevice == null) {
@@ -269,7 +348,6 @@ class ImpresoraViewModel(
 
             Log.d("ImpresoraViewModel", "Iniciando impresión de $fileName en ${selectedDevice.name}")
             val result = printerHelper.printFromAsset(fileName, selectedDevice.address) { status ->
-                // Ya estamos en el hilo principal porque printFromAsset usa Dispatchers.Main internamente
                 Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
                 Log.i("ImpresoraViewModel", "Estado de impresión: $status")
             }
@@ -283,6 +361,17 @@ class ImpresoraViewModel(
                 Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
                 _uiState.update { it.copy(errorMessage = errorMsg) }
             }
+        }
+    }
+
+    /** Devuelve la dirección MAC de la impresora seleccionada. */
+    fun getSelectedPrinterMac(): String? {
+        val selectedDevice = bluetoothViewModel.selectedDevice.value
+        return selectedDevice?.address.also {
+            Log.d("ImpresoraViewModel", "Obteniendo MAC de impresora seleccionada: $it")
+        } ?: run {
+            Log.w("ImpresoraViewModel", "No hay impresora seleccionada para obtener MAC")
+            null
         }
     }
 

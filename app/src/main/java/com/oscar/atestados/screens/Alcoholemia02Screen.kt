@@ -1,5 +1,8 @@
 package com.oscar.atestados.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Geocoder
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -7,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -23,29 +27,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.oscar.atestados.R
-import com.oscar.atestados.ui.theme.BotonesFirmaAjena
-import com.oscar.atestados.ui.theme.BotonesNormales
-import com.oscar.atestados.ui.theme.BotonesSecundarios
-import com.oscar.atestados.ui.theme.TextoBotonesNormales
-import com.oscar.atestados.ui.theme.TextoNormales
-import com.oscar.atestados.ui.theme.TextoSecundarios
-import com.oscar.atestados.ui.theme.TextoTerciarios
+import com.oscar.atestados.data.AccesoBaseDatos
+import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.AlcoholemiaDosViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
-/**
- * Pantalla para la gestión de los datos iniciales de diligencias de alcoholemia.
- *
- * Esta pantalla permite al usuario introducir información relacionada con el inicio de diligencias
- * de alcoholemia, incluyendo fecha y hora, lugar de la investigación, opciones de firma y
- * datos sobre la inmovilización del vehículo y segundo conductor.
- *
- * @param navigateToScreen Función lambda que permite la navegación entre pantallas de la aplicación.
- * @param alcoholemiaDosViewModel ViewModel que gestiona los estados y datos relacionados con esta pantalla.
- */
 @Composable
 fun Alcoholemia02Screen(
     navigateToScreen: (String) -> Unit,
@@ -57,7 +50,6 @@ fun Alcoholemia02Screen(
         topBar = { AlcoholemiaTopBar() },
         bottomBar = { AlcoholemiaBottomBar(alcoholemiaDosViewModel, navigateToScreen) }
     ) { paddingValues ->
-
         Alcoholemia02Content(
             modifier = Modifier.padding(paddingValues),
             alcoholemiaDosViewModel = alcoholemiaDosViewModel,
@@ -65,32 +57,17 @@ fun Alcoholemia02Screen(
             showDatePickerFechaDiligencias = showDatePickerFechaDiligencias
         )
         if (showDatePickerFechaDiligencias) {
-            getDateDialogVeh(
+            getDateDialogDiligencias(
                 onDateSelected = { fechaSeleccionada ->
-                    alcoholemiaDosViewModel.updateFechaInicio(fechaSeleccionada) // Actualiza el ViewModel con la fecha seleccionada
-                    showDatePickerFechaDiligencias = false // Cierra el DatePicker
+                    alcoholemiaDosViewModel.updateFechaInicio(fechaSeleccionada)
+                    showDatePickerFechaDiligencias = false
                 },
-                onDismiss = { showDatePickerFechaDiligencias = false } // Cierra el DatePicker si se cancela
+                onDismiss = { showDatePickerFechaDiligencias = false }
             )
         }
     }
 }
 
-/**
- * Contenido principal de la pantalla de alcoholemia.
- *
- * Muestra todos los campos para introducir la información relacionada con
- * el inicio de diligencias de alcoholemia, organizados en secciones:
- * - Fecha y hora de inicio
- * - Lugar de la investigación
- * - Opciones adicionales (firma, inmovilización, segundo conductor)
- * - Botones para captura de firmas
- *
- * @param modifier Modificador para ajustar la apariencia y comportamiento del componente.
- * @param alcoholemiaDosViewModel ViewModel que gestiona los estados y datos relacionados con esta pantalla.
- * @param onDatePickerFechaDiligenciasClicked Función lambda que se ejecuta al hacer clic para seleccionar la fecha.
- * @param showDatePickerFechaDiligencias Estado booleano que controla la visibilidad del selector de fecha.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Alcoholemia02Content(
@@ -102,6 +79,13 @@ private fun Alcoholemia02Content(
     val context = LocalContext.current
     var showTimePicker by remember { mutableStateOf(false) }
     val timePickerState = rememberTimePickerState()
+
+    // Inicializar cliente de ubicación
+    val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
+    // Estado para la ubicación actual
+    var locationText by remember { mutableStateOf("") }
+    // Instancia de la base de datos
+    val db = remember { AccesoBaseDatos(context, "juzgados.db", 1) }
 
     // Estados del ViewModel
     val fechaInicio by alcoholemiaDosViewModel.fechaInicio.observeAsState("")
@@ -115,6 +99,58 @@ private fun Alcoholemia02Content(
 
     var showSignatureDialog by remember { mutableStateOf(false) }
     var signatureType by remember { mutableStateOf("") } // Para identificar qué firma se está capturando
+
+    // Función para obtener la ubicación
+    fun getLocationData(onSuccess: (String) -> Unit) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let {
+                    val geocoder = Geocoder(context, Locale.getDefault())
+                    try {
+                        val addresses = geocoder.getFromLocation(it.latitude, it.longitude, 1)
+                        if (addresses?.isNotEmpty() == true) {
+                            val address = addresses[0]
+                            val thoroughfare = address.thoroughfare ?: "Carretera desconocida"
+                            val featureName = address.featureName ?: ""
+                            val pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
+                            val locality = address.locality ?: "Localidad desconocida"
+                            val postalCode = address.getPostalCode()
+                            val adminArea = address.adminArea ?: "Provincia desconocida"
+
+                            val provinciaFromDB = postalCode?.let { code ->
+                                val idProvincia = code.take(2)
+                                db.query("SELECT Provincia FROM PROVINCIAS WHERE idProvincia = ?", arrayOf(idProvincia))
+                                    .firstOrNull()?.get("Provincia") as? String
+                            } ?: adminArea
+
+                            val locationDetails = "$thoroughfare, $pk, $locality, $provinciaFromDB"
+                            onSuccess(locationDetails)
+                        } else {
+                            onSuccess("No se pudo obtener la información de la ubicación")
+                        }
+                    } catch (e: Exception) {
+                        onSuccess("Error al obtener la ubicación: ${e.message}")
+                    }
+                } ?: run {
+                    onSuccess("Ubicación no disponible")
+                }
+            }.addOnFailureListener { e ->
+                onSuccess("Error al obtener la ubicación: ${e.message}")
+            }
+        } else {
+            onSuccess("Permisos de ubicación no concedidos")
+        }
+    }
+
+    // Actualizar ubicación automáticamente si lugarCoincide es true
+    LaunchedEffect(lugarCoincide) {
+        if (lugarCoincide) {
+            getLocationData { locationDetails ->
+                locationText = locationDetails
+                alcoholemiaDosViewModel.updateLugarDiligencias(locationDetails)
+            }
+        }
+    }
 
     // TimePicker para primera hora
     if (showTimePicker) {
@@ -211,14 +247,63 @@ private fun Alcoholemia02Content(
             onCheckedChange = { alcoholemiaDosViewModel.updateLugarCoincide(it) }
         )
 
-        // Mostrar el CustomTextField solo si "Lugar coincide" es false
-        if (!lugarCoincide) {
+        if (lugarCoincide) {
+            Text(
+                text = locationText.ifEmpty { "Ubicación no obtenida aún" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Black,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                textAlign = TextAlign.Center
+            )
+
+            Button(
+                onClick = {
+                    getLocationData { locationDetails ->
+                        locationText = locationDetails
+                        alcoholemiaDosViewModel.updateLugarDiligencias(locationDetails)
+                    }
+                },
+                enabled = false, // Deshabilitado cuando lugarCoincide es true
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BotonesNormales,
+                    contentColor = TextoBotonesNormales,
+                    disabledContainerColor = Color.Gray,
+                    disabledContentColor = Color.White
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                Text("Obtener Ubicación Actual")
+            }
+        } else {
             CustomTextField(
                 value = lugarDiligencias,
                 onValueChange = { alcoholemiaDosViewModel.updateLugarDiligencias(it) },
                 label = "Lugar donde se realiza diligencias",
-                enabled = !lugarCoincide // Deshabilitar si "Lugar coincide" es true
+                enabled = true
             )
+            Button(
+                onClick = {
+                    getLocationData { locationDetails ->
+                        alcoholemiaDosViewModel.updateLugarDiligencias(locationDetails)
+                    }
+                },
+                enabled = true, // Habilitado cuando lugarCoincide es false
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BotonesNormales,
+                    contentColor = TextoBotonesNormales
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                Text("Obtener Ubicación Actual")
+            }
         }
 
         // Sección Opciones de firma y vehículo
@@ -283,7 +368,6 @@ private fun Alcoholemia02Content(
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Mostrar el botón de FIRMA DEL INVESTIGADO solo si "¿Desea firmar?" es true
             if (deseaFirmar) {
                 Button(
                     onClick = {
@@ -299,18 +383,16 @@ private fun Alcoholemia02Content(
                 ) {
                     Text(
                         text = "FIRMA DEL INVESTIGADO",
-                        textAlign = TextAlign.Center, // Centrar el texto dentro del botón
-                        modifier = Modifier.fillMaxWidth() // Ocupar todo el ancho del botón
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             } else {
-                // Espacio vacío si el botón no se muestra
                 Spacer(modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Mostrar el botón de FIRMA SEGUNDO CONDUCTOR solo si "¿Hay segundo conductor?" es true
             if (haySegundoConductor) {
                 Button(
                     onClick = {
@@ -326,12 +408,11 @@ private fun Alcoholemia02Content(
                 ) {
                     Text(
                         text = "FIRMA SEGUNDO CONDUCTOR",
-                        textAlign = TextAlign.Center, // Centrar el texto dentro del botón
-                        modifier = Modifier.fillMaxWidth() // Ocupar todo el ancho del botón
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             } else {
-                // Espacio vacío si el botón no se muestra
                 Spacer(modifier = Modifier.weight(1f))
             }
         }
@@ -356,8 +437,8 @@ private fun Alcoholemia02Content(
             ) {
                 Text(
                     text = "FIRMA DEL INSTRUCTOR",
-                    textAlign = TextAlign.Center, // Centrar el texto dentro del botón
-                    modifier = Modifier.fillMaxWidth() // Ocupar todo el ancho del botón
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
@@ -377,20 +458,14 @@ private fun Alcoholemia02Content(
             ) {
                 Text(
                     text = "FIRMA DEL SECRETARIO",
-                    textAlign = TextAlign.Center, // Centrar el texto dentro del botón
-                    modifier = Modifier.fillMaxWidth() // Ocupar todo el ancho del botón
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
     }
 }
 
-/**
- * Componente que muestra la barra superior de la pantalla de alcoholemia.
- *
- * Contiene el título principal "Alcoholemia" y el subtítulo "Datos inicio diligencias"
- * centrados en la parte superior de la pantalla.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlcoholemiaTopBar() {
@@ -426,16 +501,6 @@ private fun AlcoholemiaTopBar() {
     )
 }
 
-/**
- * Componente que muestra la barra inferior de la pantalla de alcoholemia.
- *
- * Contiene los botones de "GUARDAR" y "LIMPIAR" para gestionar los datos del formulario.
- * El botón "GUARDAR" almacena los datos en el sistema y navega a la pantalla principal.
- * El botón "LIMPIAR" restaura todos los campos a sus valores por defecto.
- *
- * @param viewModel ViewModel que contiene los métodos para guardar y limpiar los datos.
- * @param navigateToScreen Función lambda que permite la navegación entre pantallas de la aplicación.
- */
 @Composable
 private fun AlcoholemiaBottomBar(
     viewModel: AlcoholemiaDosViewModel,
@@ -480,18 +545,6 @@ private fun AlcoholemiaBottomBar(
     }
 }
 
-/**
- * Campo de texto personalizado para introducir datos en el formulario.
- *
- * Proporciona un TextField estilizado con etiqueta y placeholder para
- * facilitar la entrada de datos en el formulario.
- *
- * @param value Valor actual del campo de texto.
- * @param onValueChange Función lambda que se ejecuta cuando cambia el valor del campo.
- * @param label Etiqueta descriptiva que se muestra sobre el campo.
- * @param modifier Modificador opcional para ajustar la apariencia del componente.
- * @param enabled Estado que determina si el campo está habilitado o no.
- */
 @Composable
 private fun CustomTextField(
     value: String,
@@ -519,20 +572,6 @@ private fun CustomTextField(
     )
 }
 
-/**
- * Campo de texto personalizado específico para la pantalla de alcoholemia.
- *
- * Proporciona un TextField estilizado con soporte para iconos, etiquetas y
- * configuración de teclado específica para los campos de la pantalla de alcoholemia.
- *
- * @param value Valor actual del campo de texto.
- * @param onValueChange Función lambda que se ejecuta cuando cambia el valor del campo.
- * @param label Etiqueta descriptiva que se muestra sobre el campo.
- * @param placeholder Texto sugerido que se muestra cuando el campo está vacío.
- * @param keyboardType Tipo de teclado que se mostrará al editar el campo.
- * @param modifier Modificador opcional para ajustar la apariencia del componente.
- * @param leadingIcon Icono opcional que se muestra al inicio del campo.
- */
 @Composable
 private fun CustomOutlinedTextFieldAlcohol(
     value: String,
@@ -562,16 +601,6 @@ private fun CustomOutlinedTextFieldAlcohol(
     )
 }
 
-/**
- * Componente que muestra una opción de casilla de verificación con texto.
- *
- * Crea una fila con una casilla de verificación (checkbox) y un texto descriptivo
- * que permite seleccionar opciones binarias en el formulario.
- *
- * @param text Texto descriptivo que se muestra junto a la casilla.
- * @param checked Estado actual de la casilla (marcada o desmarcada).
- * @param onCheckedChange Función lambda que se ejecuta cuando cambia el estado de la casilla.
- */
 @Composable
 private fun CheckboxOption(
     text: String,
@@ -600,15 +629,6 @@ private fun CheckboxOption(
     }
 }
 
-/**
- * Diálogo para seleccionar una fecha para las diligencias.
- *
- * Muestra un selector de fecha en formato calendario que permite al usuario
- * elegir una fecha para las diligencias de alcoholemia.
- *
- * @param onDateSelected Función lambda que recibe la fecha seleccionada formateada.
- * @param onDismiss Función lambda que se ejecuta cuando se cierra el diálogo sin seleccionar fecha.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun getDateDialogDiligencias(
@@ -624,9 +644,8 @@ fun getDateDialogDiligencias(
                     val localDate = Instant.ofEpochMilli(it)
                         .atZone(ZoneId.systemDefault())
                         .toLocalDate()
-                    // Formatear la fecha en español
                     val formatter = DateTimeFormatter
-                        .ofPattern("d 'de' MMMM 'de' yyyy", java.util.Locale("es", "ES"))
+                        .ofPattern("d 'de' MMMM 'de' yyyy", Locale("es", "ES"))
                     localDate.format(formatter)
                 } ?: ""
                 onDateSelected(selectedDate)

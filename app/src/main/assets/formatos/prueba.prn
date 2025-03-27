@@ -1,11 +1,16 @@
 N
-Q2217,24
-B1,1
-I8,1
-A10,50,0,1,1,1,N,"Fuente 1: Hola ninos (solo ASCII)"
-A10,100,0,2,1,1,N,"Fuente 2: Hola ninos (solo ASCII)"
-A10,150,0,3,1,1,N,"Fuente 3: Hola ninos (solo ASCII)"
-A10,200,0,4,1,1,N,"Fuente 4: Hola ninos (solo ASCII)"
-A10,250,0,5,1,1,N,"Fuente 5: Hola niños cómo están"
+q2217
+Q200,24
+A50,10,0,1,1,1,N,"Fuente 0: Hola ni\xF1os (solo ASCII)"
+A150,10,0,1,1,1,N,"Fuente 1: Hola ni\xF1os (solo ASCII)"
+A300,10,0,4,1,1,N,"Fuente 4: Hola ni\xF1os (solo ASCII)"
+A350,10,0,5,1,1,N,"Fuente 5: Hola ni\xF1os c\xF3mo est\xE1n"
+A450,10,0,7,1,1,N,"Fuente 7: Hola ni\xF1os c\xF3mo est\xE1n"
+A500,10,0,8,1,1,N,"Fuente 8: Hola ni\xF1os c\xF3mo est\xE1n"
+A550,10,0,9,1,1,N,"Fuente 9: Hola ni\xF1os c\xF3mo est\xE1n"
+A650,10,0,11,1,1,N,"Fuente 11: Hola ni\xF1os c\xF3mo est\xE1n"
+A700,10,0,12,1,1,N,"Fuente VER04BPT.CPF: Hola ni\xF1os c\xF3mo est\xE1n"
+A700,10,0,13,1,1,N,"Fuente ARI04PT.CPF: Hola ni\xF1os c\xF3mo est\xE1n"
+A750,10,0,7,1,1,N,"Fuente 7: !\"·$%&/()=?¿*^ç¨´Ç`+{}][|@#~¬"
 P1
 

@@ -22,7 +22,8 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.utils.PDFCreaterHelper
-import com.oscar.atestados.viewModel.BluetoothViewModel
+import com.oscar.atestados.utils.PDFCreaterHelperZebra
+import com.oscar.atestados.utils.ZebraPrinterHelper
 import com.oscar.atestados.viewModel.BluetoothViewModelFactory
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModelFactory
@@ -33,7 +34,7 @@ import java.io.File
 
 /**
  * Pantalla que muestra opciones para generar e imprimir documentos varios.
- * Incluye botones para generar actas, citaciones, derechos y una prueba de impresión.
+ * Incluye botones para generar actas, citaciones, derechos y asistencia letrada.
  *
  * @param navigateToScreen Función de navegación para cambiar a otra pantalla.
  * @param impresoraViewModel ViewModel para gestionar la impresora.
@@ -55,10 +56,16 @@ fun OtrosDocumentosScreen(
     )
 ) {
     val context = LocalContext.current
-    var isPrintingTest by remember { mutableStateOf(false) }
     var isPrintingAssistance by remember { mutableStateOf(false) }
+    var isPrintingTest by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val pdfCreaterHelper = remember { PDFCreaterHelper() }
+    val pdfCreaterHelperZebra = remember { PDFCreaterHelperZebra() }
+    val zebraPrinterHelper = remember { ZebraPrinterHelper(context) }
+
+    // Ubicación fija para el PDF A4
+    val fixedA4File = File(context.getExternalFilesDir(null), "Documento_Otros.pdf")
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -98,19 +105,57 @@ fun OtrosDocumentosScreen(
                         isPrintingAssistance = true
                         scope.launch {
                             try {
-                                // Imprimir el archivo ZPL
-                                Log.d("OtrosDocumentosScreen", "Iniciando impresión de info_asistencia_juridica.prn")
-                                impresoraViewModel.printZplFile("info_asistencia_juridica.prn")
+                                // Cargar el archivo HTML desde assets/documents
+                                val htmlAssetPath = "documents/asistencia_juridica_gratuita.html"
+                                val htmlInputStream = context.assets.open(htmlAssetPath)
+                                val htmlContent = htmlInputStream.readBytes().toString(Charsets.UTF_8)
+                                htmlInputStream.close()
+                                val htmlFile = File(context.cacheDir, "asistencia_juridica_gratuita_temp.html").apply {
+                                    writeText(htmlContent)
+                                }
 
-                                // Generar y abrir el PDF
-                                val markdownContent = context.assets.open("documents/asistencia_juridica_gratuita.md")
-                                    .bufferedReader().use { it.readText() }
-                                val pdfHelper = PDFCreaterHelper()
-                                val pdfFile = pdfHelper.convertMarkdownToPdf(context, markdownContent, "asistencia_juridica_gratuita")
-                                openPdf(context, pdfFile)
+                                // Mapa de reemplazos (puedes ajustarlo según el contenido del HTML)
+                                val replacements = mapOf<String, String>()
+
+                                // Generar y sobrescribir PDF A4
+                                if (fixedA4File.exists()) fixedA4File.delete()
+                                val a4File = pdfCreaterHelper.convertHtmlToPdf(context, htmlFile, replacements, "Asistencia_Juridica_Gratuita")
+                                a4File.copyTo(fixedA4File, overwrite = true)
+
+                                // Abrir el PDF A4
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", fixedA4File)
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "application/pdf")
+                                    flags = Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Abrir PDF con"))
+
+                                // Generar Bitmap para Zebra
+                                val zebraBitmap = pdfCreaterHelperZebra.convertHtmlToImage(context, htmlFile, replacements)
+                                if (zebraBitmap != null) {
+                                    val macAddress = impresoraViewModel.getSelectedPrinterMac()
+                                    if (!macAddress.isNullOrEmpty()) {
+                                        val printResult = zebraPrinterHelper.printBitmap(macAddress, zebraBitmap)
+                                        printResult.onSuccess {
+                                            Toast.makeText(context, "Impresión enviada correctamente", Toast.LENGTH_SHORT).show()
+                                            Log.d("OtrosDocumentosScreen", "Impresión Zebra exitosa")
+                                        }.onFailure { e ->
+                                            Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
+                                            Log.e("OtrosDocumentosScreen", "Error al imprimir en Zebra: ${e.message}")
+                                        }
+                                    } else {
+                                        Log.w("OtrosDocumentosScreen", "No hay impresora seleccionada")
+                                        Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    throw Exception("No se pudo generar el Bitmap para Zebra")
+                                }
+
+                                // Limpiar archivo temporal
+                                htmlFile.delete()
                             } catch (e: Exception) {
-                                Log.e("OtrosDocumentosScreen", "Error al generar o abrir el PDF: ${e.message}")
-                                Toast.makeText(context, "Error al generar el PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                                Log.e("OtrosDocumentosScreen", "Error general: ${e.message}", e)
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                             } finally {
                                 isPrintingAssistance = false
                             }
@@ -125,10 +170,10 @@ fun OtrosDocumentosScreen(
             CreaBotonOtrosDoc(
                 onClick = {
                     if (!isPrintingTest) {
-                        Log.d("OtrosDocumentosScreen", "Iniciando impresión de prueba.prn")
+                        Log.d("OtrosDocumentosScreen", "Iniciando impresión de prueba")
                         isPrintingTest = true
                         scope.launch {
-                            impresoraViewModel.printZplFile("prueba.prn")
+                            impresoraViewModel.printFile("ActaCitacion.txt")
                             isPrintingTest = false
                         }
                     }
@@ -142,13 +187,27 @@ fun OtrosDocumentosScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White.copy(alpha = 0.7f))
-                    .wrapContentSize(Alignment.Center)
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(50.dp),
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .padding(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(50.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Procesando...",
+                        color = Color.Black,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -161,16 +220,23 @@ fun OtrosDocumentosScreen(
  * @param pdfFile Archivo PDF a abrir.
  */
 private fun openPdf(context: Context, pdfFile: File) {
-    val uri: Uri = FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        pdfFile
-    )
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, "application/pdf")
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    try {
+        val uri: Uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            pdfFile
+        )
+        Log.d("OtrosDocumentosScreen", "Intentando abrir PDF con URI: $uri")
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Abrir PDF con"))
+        Log.d("OtrosDocumentosScreen", "Intento de apertura de PDF enviado")
+    } catch (e: Exception) {
+        Log.e("OtrosDocumentosScreen", "Error al abrir PDF: ${e.message}", e)
+        Toast.makeText(context, "Error al abrir el PDF: ${e.message}", Toast.LENGTH_LONG).show()
     }
-    context.startActivity(Intent.createChooser(intent, "Abrir PDF con"))
 }
 
 /**

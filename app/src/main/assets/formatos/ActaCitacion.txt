@@ -1,61 +1,60 @@
 ! 0 200 200 2190 1
+! U1 COUNTRY CP850
 PW 799
 TONE 0
 SPEED 3
 ON-FEED IGNORE
 NO-PACE
 BAR-SENSE
-BOX 16 268 771 325 2
-! U1 COUNTRY SPAIN
+PCX 46 34
+BOX 16 268 771 325 3
 T 0 2 28 287 @[[NOMBRE]]
-T 0 2 16 242 INVESTIGADO
+T 0 2 341 255 INVESTIGADO
 T 0 5 188 19 DILIGENCIA CITACÓN PARA
 T 0 5 188 71 JUICIO RÁPIDO POR DELITO
-BOX 16 353 771 410 2
+BOX 16 353 771 410 3
 T 0 2 28 372 @[[LUGAR_FECHA_HORA]]
-T 0 2 16 325 LUGAR
+T 0 2 363 339 LUGAR
 T 0 2 16 451 Por parte de los Guardias Civiles actuantes, se informa a la persona investigada de 
 T 0 2 16 477 la obligación de personarse en el juzgado que se indica a continuación:
-BOX 16 156 771 213 2
+BOX 16 156 771 213 3
 T 0 2 28 175 @[[DILIGENCIAS]]
-T 0 2 19 130 NÚMERO DE DILIGENCIAS
+T 0 2 298 146 NÚMERO DE DILIGENCIAS
 L 16 228 768 228 2
-BOX 16 555 771 857 2
-T 0 2 28 574 @[[DATOS_JUZGADO]]
-T 0 2 16 519 Juzgado
-T 0 2 16 868 en el que se celebraró Juicio Rápido por Delito, con fecha:
-BOX 16 930 771 987 2
+BOX 16 530 771 857 3
+T 0 2 28 550 @[[DATOS_JUZGADO]]
+T 0 2 356 517 Juzgado
+T 0 2 16 868 en el que se celebrará Juicio Rápido por Delito, con fecha:
+BOX 16 930 771 987 3
 T 7 0 28 949 @[[LUGAR_FECHA_HORA_JUICIO]]
-T 0 2 16 898 FECHA Y HORA
+T 0 2 341 917 FECHA Y HORA
 T 0 2 16 1002 SE LE INFORMA DE QUE:
 T 0 2 16 1054 DERECHOS:
 T 0 2 16 1080 Se le informa de su derecho de comparecer en dicho Juzgado asistido de Abogado.
-BOX 16 1145 771 1202 2
-T 7 0 28 1164 @[[LETRADO]]
-T 0 2 16 1115 LETRADO
+BOX 16 1132 771 1189 3
+T 7 0 28 1152 @[[LETRADO]]
+T 0 2 356 1114 LETRADO
 T 0 2 16 1210 Se le comunica que tiene derecho a instar el nombramiento de Abogado de Oficio (cuyos
-T 0 2 16 1236 honorarios ser�n de su cargo salvo que le sea reconocido el derecho de asistencia ju-
-T 0 2 16 1262 rídica gratuita seg�n la Ley 1/1996, de 10 de enero, de Asistencia Jurídica Gratuita
+T 0 2 16 1236 honorarios serán de su cargo salvo que le sea reconocido el derecho de asistencia ju-
+T 0 2 16 1262 rídica gratuita según la Ley 1/1996, de 10 de enero, de Asistencia Jurídica Gratuita
 T 0 2 16 1288 y el Real Decreto 141/2021, 9 de marzo, por el que se aprueba el Regla-
 T 0 2 16 1314 mento de Asistencia Jurídica Gratuita).
 T 0 2 16 1350 APERCIBIMIENTO:
 T 0 2 16 1402 -Denunciado. Se le informa que en caso de incomparecencia en el Juzgado en el día y
 T 0 2 16 1428 hora señalados, la orden de comparecencia podrá convertirse en orden de detención
 T 0 2 16 1454 (art. 487 de la Ley de Enjuiciamiento Criminal); de la misma forma se le recuerda la 
-T 0 2 16 1480 obligaci�n de presentar en dicha comparecencia su Permiso de Conducción; así como el
+T 0 2 16 1480 obligación de presentar en dicha comparecencia su Permiso de Conducción; así como el
 T 0 2 16 1506 Permiso de Circulación, Tarjeta de Inspección Técnica y Póliza Seguro obligatorio del
 T 0 2 16 1532 vehículo implicado en los hechos
 T 0 2 16 1679           Y para que conste, se extiende la presente diligencia que es firmada por el 
 T 0 2 16 1705 Instructor y el Secretario, y se entrega una copia de la misma al citado.
 BOX 188 1776 591 1962 2
 T 7 0 305 1929 @[[DNI_INVES]]
-T 0 2 343 1745 INVESTIGADO
-BOX 19 2002 392 2167 2
+T 0 2 350 1767 INVESTIGADO
+BOX 19 1980 392 2166 2
 T 7 0 130 2134 @[[TIP_INST]]
 T 0 2 163 1971 INSTRUCTOR
-BOX 411 2002 784 2167 2
+BOX 411 1980 784 2166 2
 T 7 0 531 2134 @[[TIP_SEC]]
 T 0 2 555 1971 SECRETARIO
-T 0 5 16 67 Texto1
-T 0 5 670 67 Texto2
 PRINT

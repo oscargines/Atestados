@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -38,7 +39,7 @@ fun ImpresoraScreen(
     val uiState by impresoraViewModel.uiState.collectAsState()
     val savedDevices by impresoraViewModel.savedDevices.collectAsState(emptyList())
     val foundDevices by impresoraViewModel.foundDevices.collectAsState(emptyList())
-    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState() // Cambiado a bluetoothViewModel
+    val defaultDevice by impresoraViewModel.defaultDevice.collectAsState()
     var selectedOption by remember { mutableStateOf("Dispositivos guardados") }
 
     LaunchedEffect(impresoraViewModel.uiState.value.isScanning) {
@@ -105,11 +106,11 @@ fun ImpresoraScreen(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = selectedDevice?.let { "${it.name ?: "Desconocido"} (${it.address})" }
+                            text = defaultDevice?.let { "${it.nombre} (${it.mac})" }
                                 ?: "Ningún dispositivo seleccionado",
                             fontSize = 16.sp,
-                            color = if (selectedDevice != null) TextoNormales else TextoTerciarios,
-                            fontWeight = if (selectedDevice != null) FontWeight.Bold else FontWeight.Normal
+                            color = if (defaultDevice != null) TextoNormales else TextoTerciarios,
+                            fontWeight = if (defaultDevice != null) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }
@@ -137,12 +138,16 @@ fun ImpresoraScreen(
                         impresoraViewModel = impresoraViewModel,
                         onActionClick = {
                             impresoraViewModel.selectDevice(device)
-                            impresoraViewModel.saveSelectedDevice()
                             Toast.makeText(
                                 context,
-                                "Dispositivo seleccionado y guardado: ${device.nombre}",
+                                "Dispositivo seleccionado: ${device.nombre}",
                                 Toast.LENGTH_SHORT
                             ).show()
+                        },
+                        onLongPress = {
+                            if (selectedOption == "Dispositivos guardados") {
+                                impresoraViewModel.showDeleteDialog(device, context)
+                            }
                         }
                     )
                 }
@@ -180,6 +185,7 @@ fun ImpresoraScreen(
                 }
             }
         }
+        impresoraViewModel.DeleteDeviceDialog() // Añadido aquí para mostrar el diálogo
     }
 }
 
@@ -246,7 +252,7 @@ fun BottomAppBarImpresora(
     navigateToScreen: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState() // Cambiado a bluetoothViewModel
+    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState()
     val plainTooltipState = rememberTooltipState()
     var showClearDialog by remember { mutableStateOf(false) }
 
@@ -373,27 +379,30 @@ fun DeviceCard(
     isSearchMode: Boolean,
     savedDevices: List<BluetoothDeviceDB>,
     impresoraViewModel: ImpresoraViewModel,
-    onActionClick: () -> Unit
+    onActionClick: () -> Unit,
+    onLongPress: () -> Unit
 ) {
-    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState() // Cambiado a bluetoothViewModel
+    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState()
     val isSaved = savedDevices.any { it.mac == device.mac }
-    val isConnected = selectedDevice?.address == device.mac
+    val isSelected = selectedDevice?.address == device.mac
     val buttonText = when {
         isSearchMode && isSaved -> "Guardado"
-        !isSearchMode && isConnected -> "Conectado"
+        !isSearchMode && isSelected -> "Pulse Guardar"
         !isSearchMode -> "Enlazado"
         else -> "Enlazar"
     }
-    val cardColor = if (!isSearchMode && isConnected) ItemSelected else Color.White
-    val buttonColor = if (isSaved || isConnected) Color.Gray else BotonesNormales
+    val cardColor = if (isSelected) ItemSelected else Color.White
+    val buttonColor = if (isSaved || isSelected) Color.Gray else BotonesNormales
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable {
-                impresoraViewModel.selectDevice(device)
-                impresoraViewModel.saveSelectedDevice()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { impresoraViewModel.selectDevice(device) },
+                    onLongPress = { onLongPress() }
+                )
             },
         colors = CardDefaults.cardColors(containerColor = cardColor),
         border = BorderStroke(1.dp, Color.LightGray)
@@ -437,7 +446,7 @@ fun DeviceCard(
 
 @Composable
 fun SelectedDeviceInfo(impresoraViewModel: ImpresoraViewModel) {
-    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState() // Cambiado a bluetoothViewModel
+    val selectedDevice by impresoraViewModel.bluetoothViewModel.selectedDevice.collectAsState()
 
     selectedDevice?.let { device ->
         Column(

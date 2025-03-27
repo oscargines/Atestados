@@ -1,6 +1,8 @@
 package com.oscar.atestados.screens
 
-import android.app.Application
+import android.content.Intent
+import android.graphics.Bitmap
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -23,22 +25,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.content.FileProvider
+import com.itextpdf.io.source.ByteArrayOutputStream
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
-import com.oscar.atestados.utils.ZebraPrinterHelper
+import com.oscar.atestados.utils.PDFCreaterHelper
+import com.oscar.atestados.utils.PDFCreaterHelperZebra
 import com.oscar.atestados.ui.theme.*
-import com.oscar.atestados.viewModel.BluetoothViewModelFactory
 import com.oscar.atestados.viewModel.CitacionViewModel
-import com.oscar.atestados.viewModel.ImpresoraViewModel
-import com.oscar.atestados.viewModel.ImpresoraViewModelFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
+
+private const val TAG = "CitacionScreen"
 
 /**
  * Pantalla para registrar una citación judicial.
@@ -52,19 +56,108 @@ import java.util.*
 @Composable
 fun CitacionScreen(
     navigateToScreen: (String) -> Unit,
-    citacionViewModel: CitacionViewModel,
-    impresoraViewModel: ImpresoraViewModel = viewModel(
-        factory = ImpresoraViewModelFactory(
-            bluetoothViewModel = viewModel(
-                factory = BluetoothViewModelFactory(LocalContext.current.applicationContext as Application)
-            ),
-            context = LocalContext.current
-        )
-    )
+    citacionViewModel: CitacionViewModel
 ) {
     val context = LocalContext.current
-    var isPrinting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var isGenerating by remember { mutableStateOf(false) }
+    var generateResult by remember { mutableStateOf<Result<String>?>(null) }
+    var triggerGenerate by remember { mutableStateOf(false) }
+
+    Log.v(TAG, "CitacionScreen iniciada")
+
+    LaunchedEffect(triggerGenerate) {
+        if (triggerGenerate) {
+            Log.i(TAG, "Iniciando generación de PDFs")
+            isGenerating = true
+            withContext(Dispatchers.IO) {
+                try {
+                    Log.d(TAG, "Cargando archivo HTML desde assets/documents/acta_citacion.html")
+                    val htmlFile = File(context.cacheDir, "acta_citacion.html").apply {
+                        context.assets.open("documents/acta_citacion.html").use { input ->
+                            outputStream().use { output -> input.copyTo(output) }
+                        }
+                    }
+                    Log.d(TAG, "Archivo HTML copiado a caché: ${htmlFile.absolutePath}")
+
+                    val replacements = mapOf(
+                        "lugar" to "Desconocido",
+                        "termino_municipal" to (citacionViewModel.localidad.value ?: ""),
+                        "partido_judicial" to (citacionViewModel.localidad.value ?: ""),
+                        "hora_diligencia" to (citacionViewModel.hora.value ?: ""),
+                        "fecha_diligencia" to (citacionViewModel.fechaInicio.value ?: ""),
+                        "abogado" to "",
+                        "num_colegiado" to "",
+                        "colegio_abogados" to "",
+                        "telefonema" to "",
+                        "tip_instructor" to "",
+                        "tip_secretario" to ""
+                    )
+                    Log.d(TAG, "Reemplazos preparados: $replacements")
+
+                    Log.i(TAG, "Generando PDF A4")
+                    val pdfA4Helper = PDFCreaterHelper()
+                    val pdfA4File = pdfA4Helper.convertHtmlToPdf(context, htmlFile, replacements, "citacion_a4")
+                    Log.i(TAG, "PDF A4 generado en: ${pdfA4File.absolutePath}")
+
+                    Log.i(TAG, "Generando PDF para Zebra")
+                    val pdfZebraHelper = PDFCreaterHelperZebra()
+                    val zebraBitmap = pdfZebraHelper.convertHtmlToImage(context, htmlFile, replacements)
+                    val zebraFile = zebraBitmap?.let { bitmap ->
+                        Log.d(TAG, "Bitmap generado para Zebra, dimensiones: ${bitmap.width}x${bitmap.height}")
+                        val byteArrayOutputStream = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+                        val bitmapByteArray = byteArrayOutputStream.toByteArray()
+                        Log.d(TAG, "Bitmap convertido a ByteArray, tamaño: ${bitmapByteArray.size} bytes")
+
+                        val file = File(context.getExternalFilesDir(null), "citacion_zebra.pdf")
+                        val writer = com.itextpdf.kernel.pdf.PdfWriter(file)
+                        val pdf = com.itextpdf.kernel.pdf.PdfDocument(writer)
+                        val document = com.itextpdf.layout.Document(pdf)
+                        val imageData = com.itextpdf.io.image.ImageDataFactory.create(bitmapByteArray)
+                        val image = com.itextpdf.layout.element.Image(imageData)
+                        document.add(image)
+                        document.close()
+                        Log.i(TAG, "PDF Zebra generado en: ${file.absolutePath}")
+                        file
+                    } ?: run {
+                        Log.w(TAG, "No se pudo generar el Bitmap para Zebra")
+                        null
+                    }
+
+                    generateResult = Result.success("PDFs generados con éxito")
+
+                    // Abrir los PDFs generados
+                    withContext(Dispatchers.Main) {
+                        openPdf(context, pdfA4File)
+                        zebraFile?.let { openPdf(context, it) }
+                    }
+
+                    Log.i(TAG, "Generación de PDFs completada con éxito")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error durante la generación de PDFs: ${e.message}", e)
+                    generateResult = Result.failure(e)
+                }
+            }
+            isGenerating = false
+            triggerGenerate = false
+            Log.d(TAG, "Proceso de generación finalizado, isGenerating: $isGenerating")
+        }
+    }
+
+    generateResult?.let { result ->
+        LaunchedEffect(result) {
+            result.onSuccess { status ->
+                Log.i(TAG, "Resultado de generación exitoso: $status")
+                Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
+            }.onFailure { exception ->
+                Log.e(TAG, "Error en generación: ${exception.message}", exception)
+                Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
+            }
+            generateResult = null
+            Log.d(TAG, "Resultado procesado y reseteado")
+        }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize().padding(top = 16.dp),
@@ -75,20 +168,16 @@ fun CitacionScreen(
             modifier = Modifier.padding(paddingValues),
             citacionViewModel = citacionViewModel,
             navigateToScreen = navigateToScreen,
-            onPrintTrigger = {
-                if (!isPrinting) {
-                    isPrinting = true
-                    scope.launch {
-                        impresoraViewModel.printZplFile("ActaCitacion.prn")
-                        isPrinting = false
-                    }
-                }
+            onGenerateTrigger = {
+                Log.i(TAG, "Botón IMPRIMIR pulsado, iniciando generación")
+                triggerGenerate = true
             },
-            isPrinting = isPrinting
+            isGenerating = isGenerating
         )
     }
 
-    if (isPrinting) {
+    if (isGenerating) {
+        Log.d(TAG, "Mostrando CircularProgressIndicator")
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -100,9 +189,10 @@ fun CitacionScreen(
                 color = MaterialTheme.colorScheme.primary
             )
         }
+    } else {
+        Log.v(TAG, "CircularProgressIndicator oculto")
     }
 }
-
 /**
  * Barra superior de la pantalla de citación.
  */
@@ -158,8 +248,8 @@ private fun CitacionContent(
     modifier: Modifier = Modifier,
     citacionViewModel: CitacionViewModel,
     navigateToScreen: (String) -> Unit,
-    onPrintTrigger: () -> Unit,
-    isPrinting: Boolean
+    onGenerateTrigger: () -> Unit,
+    isGenerating: Boolean
 ) {
     val context = LocalContext.current
 
@@ -401,10 +491,12 @@ private fun CitacionContent(
 
         Button(
             onClick = {
-                citacionViewModel.guardarDatos()
-                onPrintTrigger()
+                if (!isGenerating) {
+                    citacionViewModel.guardarDatos()
+                    onGenerateTrigger()
+                }
             },
-            enabled = !isPrinting,
+            enabled = !isGenerating,
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,
                 contentColor = TextoBotonesNormales
@@ -414,7 +506,7 @@ private fun CitacionContent(
                 .padding(horizontal = 8.dp),
             shape = RoundedCornerShape(0.dp)
         ) {
-            Text(if (isPrinting) "IMPRIMIENDO..." else "IMPRIMIR")
+            Text(if (isGenerating) "GENERANDO..." else "IMPRIMIR")
         }
     }
 }
@@ -635,4 +727,24 @@ private fun getJuzgadoInfo(db: AccesoBaseDatos, nombreJuzgado: String): Map<Stri
     val query = "SELECT * FROM SEDES WHERE nombre = '$nombreJuzgado'"
     val result = db.query(query)
     return if (result.isNotEmpty()) result[0] as Map<String, String> else null
+}
+// Función para abrir un PDF
+private fun openPdf(context: android.content.Context, file: File) {
+    try {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/pdf")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+        Log.i(TAG, "Intent lanzado para abrir PDF: ${file.absolutePath}")
+    } catch (e: Exception) {
+        Log.e(TAG, "Error al abrir PDF: ${e.message}", e)
+        Toast.makeText(context, "No se pudo abrir el PDF: ${e.message}", Toast.LENGTH_LONG).show()
+    }
 }

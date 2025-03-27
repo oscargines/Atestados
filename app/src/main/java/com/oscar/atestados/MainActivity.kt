@@ -45,52 +45,42 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Etiqueta utilizada para los logs de esta actividad. */
+/**
+ * Constante para el tag de logging utilizado en toda la actividad.
+ */
 private const val TAG = "MainActivity"
 
 /**
- * Actividad principal de la aplicación Atestados.
- * Gestiona la inicialización de NFC, permisos, navegación y carga de bases de datos locales.
+ * Actividad principal de la aplicación que gestiona NFC, permisos y navegación.
+ * Solicita permisos necesarios, incluyendo GPS, y carga bases de datos iniciales.
  */
 class MainActivity : ComponentActivity() {
 
-    /** Adaptador NFC para gestionar la lectura de tags. */
-    private lateinit var nfcAdapter: NfcAdapter
-
-    /** ViewModel para gestionar datos relacionados con la entidad "Persona". */
-    private lateinit var personaViewModel: PersonaViewModel
-
-    /** Lanzador de resultados para solicitar múltiples permisos. */
-    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
-
-    /** Lista de permisos requeridos según la versión de Android. */
-    private lateinit var requiredPermissions: Array<String>
-
-    /** Tag NFC pendiente de procesamiento. */
-    private var pendingNfcTag by mutableStateOf<Tag?>(null)
-
-    /** Estado que indica si todos los permisos necesarios han sido concedidos. */
-    private var arePermissionsGranted by mutableStateOf(false)
-
-    /** Estado que indica si las bases de datos han sido cargadas. */
-    private var isDatabaseLoaded by mutableStateOf(false)
-
-    /** Estado del progreso de carga de las bases de datos. */
-    private var loadingStatus by mutableStateOf("")
+    private var nfcAdapter: NfcAdapter? = null // Adaptador NFC, nullable para manejar dispositivos sin soporte
+    private lateinit var personaViewModel: PersonaViewModel // ViewModel para gestionar datos de personas
+    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>> // Lanzador para solicitud de permisos
+    private lateinit var requiredPermissions: Array<String> // Lista de permisos requeridos
+    private var pendingNfcTag by mutableStateOf<Tag?>(null) // Tag NFC pendiente de procesamiento
+    private var arePermissionsGranted by mutableStateOf(false) // Estado de permisos concedidos
+    private var isDatabaseLoaded by mutableStateOf(false) // Estado de carga de bases de datos
+    private var loadingStatus by mutableStateOf("") // Estado de carga para mostrar en pantalla
 
     /**
-     * Método de creación de la actividad.
-     * Inicializa el ViewModel, el adaptador NFC y configura la interfaz de usuario.
+     * Método llamado al crear la actividad. Inicializa el ViewModel, NFC y permisos.
      *
      * @param savedInstanceState Estado guardado de la actividad, si existe.
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         personaViewModel = ViewModelProvider(this)[PersonaViewModel::class.java]
-        nfcAdapter = NfcAdapter.getDefaultAdapter(this) ?: run {
+
+        // Inicializar NFC de manera segura
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+        if (nfcAdapter == null) {
             Toast.makeText(this, "Este dispositivo no soporta NFC", Toast.LENGTH_LONG).show()
-            return
+            Log.w(TAG, "NFC no soportado en este dispositivo")
         }
+
         configurePermissionLauncher()
         checkAndRequestPermissions()
 
@@ -104,39 +94,43 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Habilita la detección de NFC en primer plano cuando la actividad se reanuda.
+     * Habilita el despacho de NFC en primer plano cuando la actividad se reanuda.
      */
     override fun onResume() {
         super.onResume()
-        if (nfcAdapter.isEnabled) {
-            val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            val pendingIntent = android.app.PendingIntent.getActivity(
-                this, 0, intent,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
-            )
-            val techList = arrayOf(arrayOf("android.nfc.tech.IsoDep"), arrayOf("android.nfc.tech.NfcB"))
-            nfcAdapter.enableForegroundDispatch(this, pendingIntent, null, techList)
-            Log.d(TAG, "Foreground dispatch habilitado para NFC")
-        } else {
-            Toast.makeText(this, "Por favor, active el NFC", Toast.LENGTH_SHORT).show()
-        }
+        nfcAdapter?.let { adapter ->
+            if (adapter.isEnabled) {
+                val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                val pendingIntent = android.app.PendingIntent.getActivity(
+                    this, 0, intent,
+                    android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_MUTABLE
+                )
+                val techList = arrayOf(arrayOf("android.nfc.tech.IsoDep"), arrayOf("android.nfc.tech.NfcB"))
+                adapter.enableForegroundDispatch(this, pendingIntent, null, techList)
+                Log.d(TAG, "Foreground dispatch habilitado para NFC")
+            } else {
+                Toast.makeText(this, "Por favor, active el NFC", Toast.LENGTH_SHORT).show()
+            }
+        } ?: Log.d(TAG, "NFC no disponible, omitiendo enableForegroundDispatch")
     }
 
     /**
-     * Deshabilita la detección de NFC en primer plano cuando la actividad se pausa.
+     * Deshabilita el despacho de NFC en primer plano cuando la actividad se pausa.
      */
     override fun onPause() {
         super.onPause()
-        if (nfcAdapter.isEnabled) {
-            nfcAdapter.disableForegroundDispatch(this)
-            Log.d(TAG, "Foreground dispatch deshabilitado")
+        nfcAdapter?.let { adapter ->
+            if (adapter.isEnabled) {
+                adapter.disableForegroundDispatch(this)
+                Log.d(TAG, "Foreground dispatch deshabilitado")
+            }
         }
     }
 
     /**
-     * Maneja nuevos intents recibidos, como la detección de un tag NFC.
+     * Maneja nuevos intents recibidos, como la detección de tags NFC.
      *
-     * @param intent El nuevo intent recibido.
+     * @param intent El intent recibido.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -146,9 +140,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Procesa el intent recibido para detectar y manejar tags NFC.
+     * Procesa un intent para detectar tags NFC y almacenarlos como pendientes.
      *
-     * @param intent Intent recibido que puede contener información de NFC.
+     * @param intent El intent a procesar, puede contener información de NFC.
      */
     private fun processNfcIntent(intent: Intent?) {
         Log.d(TAG, "Procesando intent: $intent")
@@ -173,26 +167,26 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Componente que define la navegación y el contenido de la interfaz según el estado de permisos y carga de datos.
+     * Componente Composable que define el enrutamiento de la interfaz según permisos y estado.
      */
     @Composable
     private fun ContentRouter() {
         val navController = rememberNavController()
         val context = LocalContext.current
-        val nfcAdapter = NfcAdapter.getDefaultAdapter(context)
+        val localNfcAdapter = NfcAdapter.getDefaultAdapter(context)
         var shouldNavigateToPersona by remember { mutableStateOf(false) }
 
         LaunchedEffect(isDatabaseLoaded, pendingNfcTag) {
-            if (isDatabaseLoaded && pendingNfcTag != null && nfcAdapter?.isEnabled == true) {
+            if (isDatabaseLoaded && pendingNfcTag != null && localNfcAdapter?.isEnabled == true) {
                 Log.d(
                     TAG,
-                    "Condiciones cumplidas: isDatabaseLoaded=$isDatabaseLoaded, pendingNfcTag=$pendingNfcTag, NFC habilitado=${nfcAdapter.isEnabled}"
+                    "Condiciones cumplidas: isDatabaseLoaded=$isDatabaseLoaded, pendingNfcTag=$pendingNfcTag, NFC habilitado=${localNfcAdapter.isEnabled}"
                 )
                 shouldNavigateToPersona = true
             } else {
                 Log.d(
                     TAG,
-                    "Condiciones no cumplidas: isDatabaseLoaded=$isDatabaseLoaded, pendingNfcTag=$pendingNfcTag, NFC habilitado=${nfcAdapter?.isEnabled}"
+                    "Condiciones no cumplidas: isDatabaseLoaded=$isDatabaseLoaded, pendingNfcTag=$pendingNfcTag, NFC habilitado=${localNfcAdapter?.isEnabled}"
                 )
             }
         }
@@ -238,7 +232,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Configura el lanzador de permisos para manejar el resultado de la solicitud de permisos múltiples.
+     * Configura el lanzador de permisos para manejar múltiples solicitudes.
      */
     private fun configurePermissionLauncher() {
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -254,7 +248,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Verifica y solicita los permisos necesarios según la versión de Android.
+     * Verifica y solicita los permisos necesarios, incluyendo GPS para ubicación.
      */
     private fun checkAndRequestPermissions() {
         requiredPermissions = buildList {
@@ -264,7 +258,7 @@ class MainActivity : ComponentActivity() {
             } else {
                 add(Manifest.permission.BLUETOOTH)
                 add(Manifest.permission.BLUETOOTH_ADMIN)
-                add(Manifest.permission.ACCESS_FINE_LOCATION)
+                add(Manifest.permission.ACCESS_FINE_LOCATION) // Necesario para GPS en versiones antiguas
             }
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -272,6 +266,9 @@ class MainActivity : ComponentActivity() {
             }
             add(Manifest.permission.CAMERA)
             add(Manifest.permission.NFC)
+            // Permisos de ubicación para GPS
+            add(Manifest.permission.ACCESS_FINE_LOCATION) // Precisión fina para GPS
+            add(Manifest.permission.ACCESS_COARSE_LOCATION) // Precisión aproximada como respaldo
         }.toTypedArray()
 
         arePermissionsGranted = requiredPermissions.all { permission ->
@@ -293,9 +290,9 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Determina si se debe mostrar una explicación antes de solicitar permisos.
+     * Determina si se debe mostrar un diálogo explicativo para los permisos.
      *
-     * @return `true` si alguno de los permisos requiere una explicación, `false` en caso contrario.
+     * @return Verdadero si algún permiso requiere una explicación, falso en caso contrario.
      */
     private fun shouldShowRationale(): Boolean {
         return requiredPermissions.any { permission ->
@@ -304,19 +301,19 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Muestra un diálogo explicativo antes de solicitar permisos.
+     * Muestra un diálogo explicativo antes de solicitar permisos si es necesario.
      */
     private fun showPermissionRationaleDialog() {
         AlertDialog.Builder(this)
             .setTitle("Permisos Requeridos")
-            .setMessage("La aplicación necesita acceder a estos recursos para funcionar correctamente.")
+            .setMessage("La aplicación necesita acceder a estos recursos, incluyendo la ubicación GPS, para funcionar correctamente.")
             .setPositiveButton("Conceder") { _, _ -> permissionLauncher.launch(requiredPermissions) }
             .setNegativeButton("Configuración") { _, _ -> openAppSettings() }
             .show()
     }
 
     /**
-     * Abre la configuración de la aplicación en los ajustes del sistema.
+     * Abre la configuración de la aplicación para que el usuario gestione los permisos manualmente.
      */
     private fun openAppSettings() {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -325,15 +322,15 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Muestra un mensaje indicando funcionalidad limitada y carga las bases de datos.
+     * Muestra un mensaje toast cuando algunos permisos son denegados.
      */
     private fun showDeniedToast() {
-        Toast.makeText(this, "Funcionalidad limitada sin permisos", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Funcionalidad limitada sin permisos, incluyendo ubicación GPS", Toast.LENGTH_LONG).show()
         loadDatabases()
     }
 
     /**
-     * Carga las bases de datos locales en un hilo de fondo.
+     * Carga las bases de datos necesarias en un hilo de IO.
      */
     private fun loadDatabases() = lifecycleScope.launch(Dispatchers.IO) {
         try {
@@ -354,9 +351,9 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Pantalla mostrada cuando los permisos necesarios no han sido concedidos.
+ * Pantalla mostrada cuando los permisos necesarios no están concedidos.
  *
- * @param onRetry Acción a realizar al intentar solicitar permisos nuevamente.
+ * @param onRetry Acción al intentar solicitar permisos nuevamente.
  * @param onOpenSettings Acción para abrir la configuración de la aplicación.
  */
 @Composable
@@ -364,7 +361,7 @@ fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Se requieren permisos para el funcionamiento completo de la aplicación",
+                text = "Se requieren permisos, incluyendo ubicación GPS, para el funcionamiento completo de la aplicación",
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(24.dp))
@@ -378,7 +375,7 @@ fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
 /**
  * Pantalla de carga mostrada mientras se inicializan las bases de datos.
  *
- * @param loadingStatus Mensaje de estado de la carga.
+ * @param loadingStatus Mensaje de estado actual de la carga.
  */
 @Composable
 fun SplashScreen(loadingStatus: String) {

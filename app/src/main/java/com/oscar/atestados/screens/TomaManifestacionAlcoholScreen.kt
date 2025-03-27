@@ -120,7 +120,6 @@ private fun TomaManifestacionAlcoholContent(
             checked = deseaDeclarar,
             onCheckedChange = {
                 viewModel.setDeseaDeclarar(it)
-                if (it) viewModel.setRenunciaExpresaLletrado(false)
             }
         )
 
@@ -130,7 +129,6 @@ private fun TomaManifestacionAlcoholContent(
             checked = renunciaExpresaLletrado,
             onCheckedChange = {
                 viewModel.setRenunciaExpresaLletrado(it)
-                if (it) viewModel.setDeseaDeclarar(false)
             }
         )
         Text(

@@ -1,5 +1,8 @@
 package com.oscar.atestados.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Geocoder
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,30 +13,32 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.oscar.atestados.R
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.*
 
-/**
- * Pantalla para registrar la lectura de derechos en una investigación.
- *
- * Esta pantalla muestra un formulario con campos para registrar información relevante sobre
- * la investigación y un diálogo inicial con instrucciones. Permite guardar o limpiar los datos.
- *
- * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
- * @param lecturaDerechosViewModel ViewModel que gestiona el estado y la lógica de los datos.
- */
 @Composable
 fun LecturaDerechosScreen(
     navigateToScreen: (String) -> Unit,
     lecturaDerechosViewModel: LecturaDerechosViewModel
 ) {
     var showInitialDialog by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
 
-    // Diálogo inicial con instrucciones
     if (showInitialDialog) {
         AlertDialog(
             onDismissRequest = { showInitialDialog = false },
@@ -59,9 +64,7 @@ fun LecturaDerechosScreen(
             confirmButton = {
                 TextButton(
                     onClick = { showInitialDialog = false },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = BotonesNormales
-                    )
+                    colors = ButtonDefaults.textButtonColors(contentColor = BotonesNormales)
                 ) {
                     Text("ENTENDIDO")
                 }
@@ -69,24 +72,20 @@ fun LecturaDerechosScreen(
             containerColor = MaterialTheme.colorScheme.surface
         )
     }
+
     Scaffold(
-        modifier = Modifier.fillMaxSize()
-            .padding(top = 16.dp),
+        modifier = Modifier.fillMaxSize().padding(top = 16.dp),
         topBar = { LecturaDerechosTopBar() },
         bottomBar = { LecturaDerechosBottomBar(lecturaDerechosViewModel, navigateToScreen) }
     ) { paddingValues ->
         LecturaDerechosContent(
             modifier = Modifier.padding(paddingValues),
-            lecturaDerechosViewModel = lecturaDerechosViewModel
+            lecturaDerechosViewModel = lecturaDerechosViewModel,
+            fusedLocationClient = fusedLocationClient
         )
     }
 }
 
-/**
- * Barra superior de la pantalla de lectura de derechos.
- *
- * Muestra un título principal "Lectura de derechos" y un subtítulo con información adicional.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LecturaDerechosTopBar() {
@@ -110,25 +109,15 @@ private fun LecturaDerechosTopBar() {
                 )
             }
         },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color.Transparent
-        )
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
     )
 }
 
-/**
- * Contenido principal de la pantalla de lectura de derechos.
- *
- * Incluye opciones de radio para el momento de la lectura y campos de texto para detalles de
- * la investigación, como lugar, hechos e indicios.
- *
- * @param modifier Modificador para personalizar el diseño del contenido.
- * @param lecturaDerechosViewModel ViewModel que gestiona el estado y la lógica de los datos.
- */
 @Composable
 private fun LecturaDerechosContent(
     modifier: Modifier = Modifier,
-    lecturaDerechosViewModel: LecturaDerechosViewModel
+    lecturaDerechosViewModel: LecturaDerechosViewModel,
+    fusedLocationClient: FusedLocationProviderClient
 ) {
     val momentoLectura by lecturaDerechosViewModel.momentoLectura.observeAsState("Tomada en el momento")
     val lugarInvestigacion by lecturaDerechosViewModel.lugarInvestigacion.observeAsState("")
@@ -136,6 +125,7 @@ private fun LecturaDerechosContent(
     val resumenHechos by lecturaDerechosViewModel.resumenHechos.observeAsState("")
     val calificacionHechos by lecturaDerechosViewModel.calificacionHechos.observeAsState("")
     val relacionIndicios by lecturaDerechosViewModel.relacionIndicios.observeAsState("")
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -143,7 +133,6 @@ private fun LecturaDerechosContent(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // Radio buttons para el momento de la lectura
         Column {
             listOf(
                 "Tomada en el momento",
@@ -159,13 +148,60 @@ private fun LecturaDerechosContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Campos de texto
         CustomTextField(
             value = lugarInvestigacion,
             onValueChange = { lecturaDerechosViewModel.updateLugarInvestigacion(it) },
             label = "Lugar, hora y fecha de la investigación",
             singleLine = false,
-            maxLines = 1
+            maxLines = 1,
+            leadingIcon = {
+                IconButton(
+                    onClick = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                location?.let {
+                                    val geocoder = Geocoder(context, Locale.getDefault())
+                                    try {
+                                        val addresses = geocoder.getFromLocation(it.latitude, it.longitude, 1)
+                                        if (addresses?.isNotEmpty() == true) {
+                                            val address = addresses[0]
+                                            val thoroughfare = address.thoroughfare ?: "Carretera desconocida"
+                                            val featureName = address.featureName ?: ""
+                                            val pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
+                                            val currentDateTime = Instant.now()
+                                                .atZone(ZoneId.systemDefault())
+                                                .toLocalDateTime()
+                                            val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "ES"))
+                                            val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("es", "ES"))
+                                            val formattedTime = currentDateTime.format(timeFormatter)
+                                            val formattedDate = currentDateTime.format(dateFormatter)
+                                            val locationDetails = "$thoroughfare, $pk, $formattedTime, $formattedDate"
+
+                                            // Rellenar ambos campos
+                                            lecturaDerechosViewModel.updateLugarInvestigacion(locationDetails)
+                                            lecturaDerechosViewModel.updateLugarDelito(locationDetails)
+                                        }
+                                    } catch (e: Exception) {
+                                        lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}")
+                                    }
+                                } ?: run {
+                                    lecturaDerechosViewModel.updateLugarInvestigacion("Ubicación no disponible")
+                                }
+                            }.addOnFailureListener { e ->
+                                lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}")
+                            }
+                        } else {
+                            lecturaDerechosViewModel.updateLugarInvestigacion("Permisos de ubicación no concedidos")
+                        }
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.share_location_24),
+                        contentDescription = "Obtener ubicación GPS",
+                        tint = BotonesNormales
+                    )
+                }
+            }
         )
 
         CustomTextField(
@@ -205,15 +241,6 @@ private fun LecturaDerechosContent(
     }
 }
 
-/**
- * Barra inferior con botones para guardar o limpiar los datos.
- *
- * Contiene un botón "GUARDAR" para salvar la información y navegar a otra pantalla, y un botón
- * "LIMPIAR" para borrar los datos ingresados.
- *
- * @param viewModel ViewModel que gestiona el estado y la lógica de los datos.
- * @param navigateToScreen Función lambda para navegar a otra pantalla.
- */
 @Composable
 private fun LecturaDerechosBottomBar(
     viewModel: LecturaDerechosViewModel,
@@ -256,13 +283,6 @@ private fun LecturaDerechosBottomBar(
     }
 }
 
-/**
- * Componente de opción de radio para seleccionar el momento de la lectura.
- *
- * @param text Texto de la opción (por ejemplo, "Tomada en el momento").
- * @param selected Indica si la opción está seleccionada.
- * @param onSelect Callback que se ejecuta al seleccionar la opción.
- */
 @Composable
 private fun RadioOption(
     text: String,
@@ -289,18 +309,6 @@ private fun RadioOption(
     }
 }
 
-/**
- * Campo de texto personalizado para la entrada de datos.
- *
- * Permite introducir texto con una etiqueta y personalizar el número de líneas y el tamaño.
- *
- * @param value Valor actual del campo de texto.
- * @param onValueChange Callback que se ejecuta al cambiar el valor.
- * @param label Etiqueta descriptiva del campo.
- * @param modifier Modificador para personalizar el diseño del campo.
- * @param singleLine Indica si el campo debe ser de una sola línea.
- * @param maxLines Número máximo de líneas permitidas.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomTextField(
@@ -309,7 +317,8 @@ private fun CustomTextField(
     label: String,
     modifier: Modifier = Modifier,
     singleLine: Boolean = true,
-    maxLines: Int = 1
+    maxLines: Int = 1,
+    leadingIcon: @Composable (() -> Unit)? = null
 ) {
     OutlinedTextField(
         value = value,
@@ -320,6 +329,7 @@ private fun CustomTextField(
             .padding(vertical = 8.dp),
         singleLine = singleLine,
         maxLines = maxLines,
+        leadingIcon = leadingIcon,
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedBorderColor = TextoSecundarios,
             focusedBorderColor = BotonesNormales

@@ -6,9 +6,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
@@ -20,19 +20,21 @@ import java.io.ByteArrayOutputStream
 
 /**
  * Configuración de DataStore para almacenar preferencias relacionadas con la pantalla de alcoholemia dos.
+ * Define un DataStore con el nombre "alcoholemia_dos_settings" accesible desde el contexto de la aplicación.
  */
 val Context.dataStoreAlcoholemiaDos: DataStore<Preferences> by preferencesDataStore(name = "alcoholemia_dos_settings")
 
 /**
  * ViewModel para gestionar los datos relacionados con la pantalla de alcoholemia dos.
- * Utiliza LiveData para observar cambios en los datos y DataStore para persistirlos.
+ * Utiliza LiveData para observar cambios en los datos y DataStore para persistirlos de manera asíncrona.
  *
- * @property application Aplicación Android necesaria para inicializar el ViewModel y acceder al contexto.
+ * @param application Aplicación Android necesaria para inicializar el ViewModel y acceder al contexto.
  */
 class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Objeto interno que define las claves utilizadas para almacenar datos en DataStore.
+     * Contiene claves para cada campo del formulario de alcoholemia.
      */
     private object PreferencesKeys {
         /** Clave para la fecha de inicio de las diligencias. */
@@ -41,7 +43,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
         val HORA_INICIO = stringPreferencesKey("hora_inicio")
         /** Clave para indicar si el lugar coincide con otro evento. */
         val LUGAR_COINCIDE = booleanPreferencesKey("lugar_coincide")
-        /** Clave para el lugar donde se realizan las diligencias. */
+        /** Clave para el lugar donde se realizan las diligencias, incluyendo localidad y provincia. */
         val LUGAR_DILIGENCIAS = stringPreferencesKey("lugar_diligencias")
         /** Clave para indicar si el investigado desea firmar. */
         val DESEA_FIRMAR = booleanPreferencesKey("desea_firmar")
@@ -54,23 +56,23 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     }
 
     // Fecha y hora de inicio
-    /** LiveData privado para la fecha de inicio. */
+    /** LiveData privado para la fecha de inicio de las diligencias. */
     private val _fechaInicio = MutableLiveData<String>("")
-    /** LiveData público para observar la fecha de inicio. */
+    /** LiveData público para observar la fecha de inicio de las diligencias. */
     val fechaInicio: LiveData<String> = _fechaInicio
 
-    /** LiveData privado para la hora de inicio. */
+    /** LiveData privado para la hora de inicio de las diligencias. */
     private val _horaInicio = MutableLiveData<String>("")
-    /** LiveData público para observar la hora de inicio. */
+    /** LiveData público para observar la hora de inicio de las diligencias. */
     val horaInicio: LiveData<String> = _horaInicio
 
     // Lugar de la investigación
-    /** LiveData privado para indicar si el lugar coincide. */
+    /** LiveData privado para indicar si el lugar de investigación coincide con el de instrucción. */
     private val _lugarCoincide = MutableLiveData<Boolean>(false)
     /** LiveData público para observar si el lugar coincide. */
     val lugarCoincide: LiveData<Boolean> = _lugarCoincide
 
-    /** LiveData privado para el lugar de las diligencias. */
+    /** LiveData privado para el lugar donde se realizan las diligencias, incluyendo localidad y provincia. */
     private val _lugarDiligencias = MutableLiveData<String>("")
     /** LiveData público para observar el lugar de las diligencias. */
     val lugarDiligencias: LiveData<String> = _lugarDiligencias
@@ -97,26 +99,29 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     val nombreSegundoConductor: LiveData<String> = _nombreSegundoConductor
 
     // Firmas de intervinientes
-    /** LiveData privado para la firma del investigado. */
+    /** LiveData privado para la firma del investigado en formato Bitmap. */
     private val _firmaInvestigado = MutableLiveData<Bitmap?>()
     /** LiveData público para observar la firma del investigado. */
     val firmaInvestigado: LiveData<Bitmap?> = _firmaInvestigado
 
-    /** LiveData privado para la firma del segundo conductor. */
+    /** LiveData privado para la firma del segundo conductor en formato Bitmap. */
     private val _firmaSegundoConductor = MutableLiveData<Bitmap?>()
     /** LiveData público para observar la firma del segundo conductor. */
     val firmaSegundoConductor: LiveData<Bitmap?> = _firmaSegundoConductor
 
-    /** LiveData privado para la firma del instructor. */
+    /** LiveData privado para la firma del instructor en formato Bitmap. */
     private val _firmaInstructor = MutableLiveData<Bitmap?>()
     /** LiveData público para observar la firma del instructor. */
     val firmaInstructor: LiveData<Bitmap?> = _firmaInstructor
 
-    /** LiveData privado para la firma del secretario. */
+    /** LiveData privado para la firma del secretario en formato Bitmap. */
     private val _firmaSecretario = MutableLiveData<Bitmap?>()
     /** LiveData público para observar la firma del secretario. */
     val firmaSecretario: LiveData<Bitmap?> = _firmaSecretario
 
+    /**
+     * Inicializa el ViewModel cargando los datos y firmas guardados previamente.
+     */
     init {
         loadSavedData()
         loadSavedFirmas()
@@ -124,9 +129,9 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
 
     // Funciones para actualizar datos
     /**
-     * Actualiza la fecha de inicio si el valor no está vacío.
+     * Actualiza la fecha de inicio si el valor proporcionado no está vacío.
      *
-     * @param value Nueva fecha de inicio.
+     * @param value Nueva fecha de inicio en formato de cadena.
      */
     fun updateFechaInicio(value: String) {
         if (value.isNotEmpty()) {
@@ -135,9 +140,9 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
-     * Actualiza la hora de inicio si el valor no está vacío.
+     * Actualiza la hora de inicio si el valor proporcionado no está vacío.
      *
-     * @param value Nueva hora de inicio.
+     * @param value Nueva hora de inicio en formato de cadena (ej. "HH:mm").
      */
     fun updateHoraInicio(value: String) {
         if (value.isNotEmpty()) {
@@ -146,18 +151,19 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
-     * Actualiza si el lugar coincide con otro evento.
+     * Actualiza el estado de coincidencia del lugar de investigación.
      *
-     * @param value Indicador de coincidencia de lugar.
+     * @param value Indicador booleano de si el lugar coincide con el de instrucción.
      */
     fun updateLugarCoincide(value: Boolean) {
         _lugarCoincide.value = value
     }
 
     /**
-     * Actualiza el lugar de las diligencias si el valor no está vacío.
+     * Actualiza el lugar donde se realizan las diligencias si el valor no está vacío.
+     * Puede incluir localidad y provincia obtenidas del GPS (ej. "Madrid, Madrid").
      *
-     * @param value Nuevo lugar de las diligencias.
+     * @param value Nuevo lugar de las diligencias en formato de cadena.
      */
     fun updateLugarDiligencias(value: String) {
         if (value.isNotEmpty()) {
@@ -166,27 +172,27 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
-     * Actualiza si el investigado desea firmar.
+     * Actualiza si el investigado desea firmar el documento.
      *
-     * @param value Indicador de deseo de firmar.
+     * @param value Indicador booleano de si el investigado desea firmar.
      */
     fun updateDeseaFirmar(value: Boolean) {
         _deseaFirmar.value = value
     }
 
     /**
-     * Actualiza si el vehículo se inmoviliza.
+     * Actualiza si el vehículo se inmoviliza durante las diligencias.
      *
-     * @param value Indicador de inmovilización del vehículo.
+     * @param value Indicador booleano de si el vehículo se inmoviliza.
      */
     fun updateInmovilizaVehiculo(value: Boolean) {
         _inmovilizaVehiculo.value = value
     }
 
     /**
-     * Actualiza si hay un segundo conductor.
+     * Actualiza si existe un segundo conductor involucrado.
      *
-     * @param value Indicador de existencia de segundo conductor.
+     * @param value Indicador booleano de si hay un segundo conductor.
      */
     fun updateHaySegundoConductor(value: Boolean) {
         _haySegundoConductor.value = value
@@ -195,7 +201,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Actualiza el nombre del segundo conductor si el valor no está vacío.
      *
-     * @param value Nombre del segundo conductor.
+     * @param value Nombre completo del segundo conductor en formato de cadena.
      */
     fun updateNombreSegundoConductor(value: String) {
         if (value.isNotEmpty()) {
@@ -206,7 +212,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Actualiza la firma del investigado.
      *
-     * @param bitmap Firma en formato Bitmap.
+     * @param bitmap Imagen de la firma en formato Bitmap.
      */
     fun updateFirmaInvestigado(bitmap: Bitmap) {
         _firmaInvestigado.value = bitmap
@@ -215,7 +221,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Actualiza la firma del segundo conductor.
      *
-     * @param bitmap Firma en formato Bitmap.
+     * @param bitmap Imagen de la firma en formato Bitmap.
      */
     fun updateFirmaSegundoConductor(bitmap: Bitmap) {
         _firmaSegundoConductor.value = bitmap
@@ -224,7 +230,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Actualiza la firma del instructor.
      *
-     * @param bitmap Firma en formato Bitmap.
+     * @param bitmap Imagen de la firma en formato Bitmap.
      */
     fun updateFirmaInstructor(bitmap: Bitmap) {
         _firmaInstructor.value = bitmap
@@ -233,7 +239,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Actualiza la firma del secretario.
      *
-     * @param bitmap Firma en formato Bitmap.
+     * @param bitmap Imagen de la firma en formato Bitmap.
      */
     fun updateFirmaSecretario(bitmap: Bitmap) {
         _firmaSecretario.value = bitmap
@@ -241,7 +247,8 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
 
     // Guardar y limpiar datos
     /**
-     * Guarda los datos actuales en DataStore de manera asíncrona.
+     * Guarda todos los datos actuales del formulario en DataStore de manera asíncrona.
+     * Incluye la ubicación (localidad y provincia) en el campo `lugarDiligencias` si está disponible.
      *
      * @param context Contexto necesario para acceder a DataStore.
      */
@@ -257,11 +264,13 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
                 _haySegundoConductor.value?.let { preferences[PreferencesKeys.HAY_SEGUNDO_CONDUCTOR] = it }
                 _nombreSegundoConductor.value?.let { preferences[PreferencesKeys.NOMBRE_SEGUNDO_CONDUCTOR] = it }
             }
+            // Guardar también las firmas al guardar los datos
+            guardarFirmas(context)
         }
     }
 
     /**
-     * Limpia todos los datos almacenados en DataStore y restablece los valores en el ViewModel.
+     * Limpia todos los datos almacenados en DataStore y restablece los valores del ViewModel a sus estados iniciales.
      */
     fun limpiarDatos() {
         viewModelScope.launch {
@@ -277,11 +286,16 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
             _inmovilizaVehiculo.value = false
             _haySegundoConductor.value = false
             _nombreSegundoConductor.value = ""
+            _firmaInvestigado.value = null
+            _firmaSegundoConductor.value = null
+            _firmaInstructor.value = null
+            _firmaSecretario.value = null
         }
     }
 
     /**
-     * Carga los datos guardados en DataStore al inicializar el ViewModel.
+     * Carga los datos guardados previamente en DataStore al inicializar el ViewModel.
+     * Incluye la ubicación (localidad y provincia) almacenada en `lugarDiligencias`.
      */
     private fun loadSavedData() {
         viewModelScope.launch {
@@ -308,7 +322,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     private val FIRMA_SECRETARIO = stringPreferencesKey("firma_secretario")
 
     /**
-     * Guarda las firmas en DataStore convirtiéndolas a cadenas de bytes.
+     * Guarda las firmas de los intervinientes en DataStore convirtiéndolas a cadenas de bytes.
      *
      * @param context Contexto necesario para acceder a DataStore.
      */
@@ -340,7 +354,7 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
-     * Carga las firmas guardadas en DataStore y las convierte de nuevo a Bitmap.
+     * Carga las firmas guardadas en DataStore y las convierte de nuevo a objetos Bitmap.
      */
     private fun loadSavedFirmas() {
         viewModelScope.launch {

@@ -1,0 +1,9 @@
+! 0 200 200 2230 1
+;! U1 getvar "device.languages"
+;! U1 getvar "country"
+;TEXT 4 0 10 40 CODIGO ASCII: Ma CHR 164 ana ser CHR 160 un d CHR 161 a c CHR 160 lido
+! U1 COUNTRY SPAIN
+TEXT 0 0 10 80 PRUEBA CON COUNTRY: niño, á, í, é
+
+
+PRINT

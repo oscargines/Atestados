@@ -90,6 +90,10 @@ dependencies {
 
     // Serialización
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.jsoup)
+
+    // Localización
+    implementation (libs.play.services.location)
 
     // Splashscreen
     implementation(libs.androidx.core.splashscreen)
@@ -130,6 +134,9 @@ dependencies {
     implementation(libs.itext.core)
     implementation(libs.layout)
     implementation(libs.commonmark)  // Parsear Markdown
+    implementation(libs.html2pdf)
+    implementation (libs.slf4j.simple)
+    implementation(libs.androidx.room.ktx) // Proveedor de logging para SLF4J
 
     // Pruebas
     testImplementation(libs.junit)
