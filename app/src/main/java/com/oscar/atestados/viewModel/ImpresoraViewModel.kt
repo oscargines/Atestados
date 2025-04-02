@@ -352,14 +352,17 @@ class ImpresoraViewModel(
                 Log.i("ImpresoraViewModel", "Estado de impresión: $status")
             }
 
-            result.onSuccess { successMsg ->
-                Log.i("ImpresoraViewModel", "Impresión exitosa: $successMsg")
-                _uiState.update { it.copy(errorMessage = null) }
-            }.onFailure { e ->
-                Log.e("ImpresoraViewModel", "Fallo al imprimir: ${e.message}", e)
-                val errorMsg = "Error al imprimir: ${e.message}"
-                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
-                _uiState.update { it.copy(errorMessage = errorMsg) }
+            when (result) {
+                is ZebraPrinterHelper.PrintResult.Success -> {
+                    Log.i("ImpresoraViewModel", "Impresión exitosa: ${result.details}")
+                    _uiState.update { it.copy(errorMessage = null) }
+                }
+                is ZebraPrinterHelper.PrintResult.Error -> {
+                    Log.e("ImpresoraViewModel", "Fallo al imprimir: ${result.message}")
+                    val errorMsg = "Error al imprimir: ${result.message}"
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                    _uiState.update { it.copy(errorMessage = errorMsg) }
+                }
             }
         }
     }

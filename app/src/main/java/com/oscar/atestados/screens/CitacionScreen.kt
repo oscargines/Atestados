@@ -1,7 +1,6 @@
 package com.oscar.atestados.screens
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -26,17 +25,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
-import com.itextpdf.io.source.ByteArrayOutputStream
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
-import com.oscar.atestados.utils.PDFCreaterHelper
-import com.oscar.atestados.utils.PDFCreaterHelperZebra
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.CitacionViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -44,15 +39,6 @@ import java.util.*
 
 private const val TAG = "CitacionScreen"
 
-/**
- * Pantalla para registrar una citación judicial.
- *
- * Esta pantalla muestra un formulario con campos para registrar información relevante sobre
- * la citación, como provincia, localidad, juzgado, fecha y hora, y permite imprimir una etiqueta.
- *
- * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
- * @param citacionViewModel ViewModel que gestiona el estado y la lógica de los datos.
- */
 @Composable
 fun CitacionScreen(
     navigateToScreen: (String) -> Unit,
@@ -68,94 +54,32 @@ fun CitacionScreen(
 
     LaunchedEffect(triggerGenerate) {
         if (triggerGenerate) {
-            Log.i(TAG, "Iniciando generación de PDFs")
             isGenerating = true
             withContext(Dispatchers.IO) {
                 try {
-                    Log.d(TAG, "Cargando archivo HTML desde assets/documents/acta_citacion.html")
-                    val htmlFile = File(context.cacheDir, "acta_citacion.html").apply {
-                        context.assets.open("documents/acta_citacion.html").use { input ->
-                            outputStream().use { output -> input.copyTo(output) }
-                        }
-                    }
-                    Log.d(TAG, "Archivo HTML copiado a caché: ${htmlFile.absolutePath}")
-
-                    val replacements = mapOf(
-                        "lugar" to "Desconocido",
-                        "termino_municipal" to (citacionViewModel.localidad.value ?: ""),
-                        "partido_judicial" to (citacionViewModel.localidad.value ?: ""),
-                        "hora_diligencia" to (citacionViewModel.hora.value ?: ""),
-                        "fecha_diligencia" to (citacionViewModel.fechaInicio.value ?: ""),
-                        "abogado" to "",
-                        "num_colegiado" to "",
-                        "colegio_abogados" to "",
-                        "telefonema" to "",
-                        "tip_instructor" to "",
-                        "tip_secretario" to ""
-                    )
-                    Log.d(TAG, "Reemplazos preparados: $replacements")
-
-                    Log.i(TAG, "Generando PDF A4")
-                    val pdfA4Helper = PDFCreaterHelper()
-                    val pdfA4File = pdfA4Helper.convertHtmlToPdf(context, htmlFile, replacements, "citacion_a4")
-                    Log.i(TAG, "PDF A4 generado en: ${pdfA4File.absolutePath}")
-
-                    Log.i(TAG, "Generando PDF para Zebra")
-                    val pdfZebraHelper = PDFCreaterHelperZebra()
-                    val zebraBitmap = pdfZebraHelper.convertHtmlToImage(context, htmlFile, replacements)
-                    val zebraFile = zebraBitmap?.let { bitmap ->
-                        Log.d(TAG, "Bitmap generado para Zebra, dimensiones: ${bitmap.width}x${bitmap.height}")
-                        val byteArrayOutputStream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-                        val bitmapByteArray = byteArrayOutputStream.toByteArray()
-                        Log.d(TAG, "Bitmap convertido a ByteArray, tamaño: ${bitmapByteArray.size} bytes")
-
-                        val file = File(context.getExternalFilesDir(null), "citacion_zebra.pdf")
-                        val writer = com.itextpdf.kernel.pdf.PdfWriter(file)
-                        val pdf = com.itextpdf.kernel.pdf.PdfDocument(writer)
-                        val document = com.itextpdf.layout.Document(pdf)
-                        val imageData = com.itextpdf.io.image.ImageDataFactory.create(bitmapByteArray)
-                        val image = com.itextpdf.layout.element.Image(imageData)
-                        document.add(image)
-                        document.close()
-                        Log.i(TAG, "PDF Zebra generado en: ${file.absolutePath}")
-                        file
-                    } ?: run {
-                        Log.w(TAG, "No se pudo generar el Bitmap para Zebra")
-                        null
-                    }
-
-                    generateResult = Result.success("PDFs generados con éxito")
-
-                    // Abrir los PDFs generados
-                    withContext(Dispatchers.Main) {
-                        openPdf(context, pdfA4File)
-                        zebraFile?.let { openPdf(context, it) }
-                    }
-
-                    Log.i(TAG, "Generación de PDFs completada con éxito")
+                    // Removed PDF generation code since helper classes are no longer available
+                    generateResult = Result.success("Datos guardados correctamente")
+                    Log.i(TAG, "Datos guardados sin generación de PDF")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error durante la generación de PDFs: ${e.message}", e)
+                    Log.e(TAG, "Error al guardar datos: ${e.message}", e)
                     generateResult = Result.failure(e)
                 }
             }
             isGenerating = false
             triggerGenerate = false
-            Log.d(TAG, "Proceso de generación finalizado, isGenerating: $isGenerating")
         }
     }
 
     generateResult?.let { result ->
         LaunchedEffect(result) {
             result.onSuccess { status ->
-                Log.i(TAG, "Resultado de generación exitoso: $status")
+                Log.i(TAG, "Operación exitosa: $status")
                 Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
             }.onFailure { exception ->
-                Log.e(TAG, "Error en generación: ${exception.message}", exception)
+                Log.e(TAG, "Error: ${exception.message}", exception)
                 Toast.makeText(context, "Error: ${exception.message}", Toast.LENGTH_LONG).show()
             }
             generateResult = null
-            Log.d(TAG, "Resultado procesado y reseteado")
         }
     }
 
@@ -169,7 +93,7 @@ fun CitacionScreen(
             citacionViewModel = citacionViewModel,
             navigateToScreen = navigateToScreen,
             onGenerateTrigger = {
-                Log.i(TAG, "Botón IMPRIMIR pulsado, iniciando generación")
+                Log.i(TAG, "Botón IMPRIMIR pulsado, guardando datos")
                 triggerGenerate = true
             },
             isGenerating = isGenerating
@@ -177,25 +101,10 @@ fun CitacionScreen(
     }
 
     if (isGenerating) {
-        Log.d(TAG, "Mostrando CircularProgressIndicator")
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White.copy(alpha = 0.7f))
-                .wrapContentSize(Alignment.Center)
-        ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(50.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    } else {
-        Log.v(TAG, "CircularProgressIndicator oculto")
+        FullScreenProgressIndicator(text = "Guardando datos...")
     }
 }
-/**
- * Barra superior de la pantalla de citación.
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CitacionTopBar() {
@@ -230,18 +139,6 @@ private fun CitacionTopBar() {
     )
 }
 
-/**
- * Contenido principal de la pantalla de citación.
- *
- * Incluye campos para provincia, localidad, juzgado, fecha y hora de la citación.
- * Muestra información adicional del juzgado seleccionado en "Datos del juzgado".
- *
- * @param modifier Modificador para personalizar el diseño del contenido.
- * @param citacionViewModel ViewModel que gestiona el estado y la lógica de los datos.
- * @param navigateToScreen Función para manejar la navegación.
- * @param onPrintTrigger Función para activar la impresión.
- * @param isPrinting Indica si la impresión está en curso.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CitacionContent(
@@ -506,14 +403,11 @@ private fun CitacionContent(
                 .padding(horizontal = 8.dp),
             shape = RoundedCornerShape(0.dp)
         ) {
-            Text(if (isGenerating) "GENERANDO..." else "IMPRIMIR")
+            Text(if (isGenerating) "GUARDANDO..." else "GUARDAR")
         }
     }
 }
 
-/**
- * Barra inferior con botones para guardar o limpiar los datos.
- */
 @Composable
 private fun CitacionBottomBar(
     viewModel: CitacionViewModel,
@@ -556,9 +450,6 @@ private fun CitacionBottomBar(
     }
 }
 
-/**
- * Campo desplegable personalizado para seleccionar opciones.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DropdownFieldCitacion(
@@ -614,9 +505,6 @@ private fun DropdownFieldCitacion(
     }
 }
 
-/**
- * Diálogo que muestra un selector de tiempo para elegir una hora.
- */
 @Composable
 fun TimePickerDialogCitacion(
     onDismissRequest: () -> Unit,
@@ -666,14 +554,6 @@ fun TimePickerDialogCitacion(
     }
 }
 
-/**
- * Campo de texto personalizado para entrada de datos.
- *
- * @param value Valor actual del campo.
- * @param onValueChange Función que se ejecuta cuando cambia el valor.
- * @param label Etiqueta del campo.
- * @param modifier Modificador para personalizar el diseño.
- */
 @Composable
 fun CustomEditText(
     value: String,
@@ -694,57 +574,25 @@ fun CustomEditText(
     )
 }
 
-/**
- * Obtiene la lista de provincias desde la base de datos.
- */
 private fun getProvincias(db: AccesoBaseDatos): List<String> {
     return db.query("SELECT Provincia FROM PROVINCIAS").map { it["Provincia"] as String }
 }
 
-/**
- * Obtiene la lista de municipios filtrados por provincia desde la base de datos.
- */
 private fun getMunicipios(db: AccesoBaseDatos, provincia: String): List<String> {
     if (provincia.isEmpty()) return emptyList()
     val query = "SELECT M.Municipio FROM MUNICIPIOS M JOIN PROVINCIAS P ON M.idProvincia = P.idProvincia JOIN SEDES S ON M.Municipio = S.municipio WHERE P.Provincia = '$provincia' GROUP by M.municipio;"
     return db.query(query).map { it["Municipio"] as String }
 }
 
-/**
- * Obtiene la lista de sedes (juzgados) filtradas por municipio desde la base de datos.
- */
 private fun getSedes(db: AccesoBaseDatos, municipio: String): List<String> {
     if (municipio.isEmpty()) return emptyList()
     val query = "SELECT nombre FROM SEDES WHERE municipio = '$municipio'"
     return db.query(query).map { it["nombre"] as String }
 }
 
-/**
- * Obtiene la información completa de un juzgado seleccionado desde la base de datos.
- */
 private fun getJuzgadoInfo(db: AccesoBaseDatos, nombreJuzgado: String): Map<String, String>? {
     if (nombreJuzgado.isEmpty()) return null
     val query = "SELECT * FROM SEDES WHERE nombre = '$nombreJuzgado'"
     val result = db.query(query)
     return if (result.isNotEmpty()) result[0] as Map<String, String> else null
-}
-// Función para abrir un PDF
-private fun openPdf(context: android.content.Context, file: File) {
-    try {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
-        Log.i(TAG, "Intent lanzado para abrir PDF: ${file.absolutePath}")
-    } catch (e: Exception) {
-        Log.e(TAG, "Error al abrir PDF: ${e.message}", e)
-        Toast.makeText(context, "No se pudo abrir el PDF: ${e.message}", Toast.LENGTH_LONG).show()
-    }
 }

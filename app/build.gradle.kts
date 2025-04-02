@@ -103,6 +103,9 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.camera2)
+    implementation(libs.core) // ZXing lector qr
+    implementation (libs.barcode.scanning)
+    implementation (libs.barcode.scanning.v1720)
 
     // ML Kit y visión
     implementation(libs.vision.common)
@@ -136,7 +139,8 @@ dependencies {
     implementation(libs.commonmark)  // Parsear Markdown
     implementation(libs.html2pdf)
     implementation (libs.slf4j.simple)
-    implementation(libs.androidx.room.ktx) // Proveedor de logging para SLF4J
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.play.services.mlkit.barcode.scanning) // Proveedor de logging para SLF4J
 
     // Pruebas
     testImplementation(libs.junit)

@@ -40,6 +40,7 @@ import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.utils.NfcReader
 import com.oscar.atestados.utils.DniData
+import com.oscar.atestados.utils.QrScanner
 import com.oscar.atestados.ui.theme.BotonesNormales
 import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
@@ -85,7 +86,7 @@ fun PersonaScreen(
     onCameraButtonClicked: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    var showCamera by remember { mutableStateOf(false) }
+    var showQrScanner by remember { mutableStateOf(false) }
     var showCanDialog by remember { mutableStateOf(false) }
     var showSuccessAlert by remember { mutableStateOf(false) }
     var showErrorAlert by remember { mutableStateOf(false) }
@@ -185,25 +186,40 @@ fun PersonaScreen(
             Toast.makeText(context, "Por favor, active el NFC", Toast.LENGTH_SHORT).show()
         }
     }
+    val onCameraButtonClickedNew: () -> Unit = {
+        showQrScanner = true // Abrimos el escáner de QR
+        Log.d(TAG, "Botón de cámara pulsado, abriendo escáner QR")
+    }
 
     if (showReadingNfcDialog) {
         ReadingNfcDialog()
     }
-    if (showCamera) {
-        CameraPreview(
-            onImageCaptured = { bitmap ->
-                showCamera = false
-                processImage(bitmap,
-                    { text -> personaViewModel.updateNombre(text) },
-                    { error ->
-                        Toast.makeText(context, "Error al procesar la imagen", Toast.LENGTH_SHORT).show()
-                        Log.e(TAG, "Error procesando imagen: ${error.message}", error)
-                    })
+    if (showQrScanner) {
+        QrScanner(
+            onQrCodeScanned = { qrContent ->
+                coroutineScope.launch {
+                    showQrScanner = false
+                    try {
+                        // Procesar contenido QR
+                        val qrData = qrContent.split(",").associate {
+                            val (key, value) = it.split(":")
+                            key.trim() to value.trim()
+                        }
+                        personaViewModel.updateNombre(qrData["Nombre"] ?: "")
+                        personaViewModel.updateApellidos(qrData["Apellidos"] ?: "")
+                        showSuccessAlert = true
+                    } catch (e: Exception) {
+                        errorMessage = "Error al procesar QR: ${e.message}"
+                        showErrorAlert = true
+                    }
+                }
             },
-            onDismiss = { showCamera = false }
+            onDismiss = {
+                showQrScanner = false
+                Log.d(TAG, "Escáner QR cerrado")
+            }
         )
     }
-
     if (showCanDialog) {
         CanDialog(
             onConfirm = { code ->
@@ -253,7 +269,7 @@ fun PersonaScreen(
     PersonaScreenContent(
         navigateToScreen = navigateToScreen,
         personaViewModel = personaViewModel,
-        onCameraButtonClicked = onCameraButtonClicked,
+        onCameraButtonClicked = onCameraButtonClickedNew,
         onNfcButtonClicked = onNfcButtonClicked,
         onTextFieldChanged = { text -> personaViewModel.updateNombre(text) }
     )
@@ -497,8 +513,8 @@ fun ToolbarPersona(
             ) {
                 IconButton(onClick = onCameraButtonClicked) {
                     Icon(
-                        painter = painterResource(id = R.drawable.camera_50),
-                        contentDescription = "Botón para capturar información mediante el uso de la cámara",
+                        painter = painterResource(id = R.drawable.qr_scanner_50),
+                        contentDescription = "Botón para escanear un código QR",
                         tint = BotonesNormales
                     )
                 }

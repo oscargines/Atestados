@@ -1,38 +1,59 @@
 package com.oscar.atestados.utils
 
-import android.util.Log
-import java.io.File
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 object HtmlUtils {
-    /**
-     * Utilidad para trabajar con archivos HTML y sustituir contenido mediante identificadores.
-     */
-    object HtmlUtils {
-        private const val TAG = "HtmlUtils"
+    data class HtmlElement(
+        val tag: String,
+        val content: String,
+        val attributes: Map<String, String> = emptyMap(),
+        val children: List<HtmlElement> = emptyList()
+    )
 
-        /**
-         * Sustituye los valores de los identificadores en un archivo HTML con los datos proporcionados.
-         *
-         * @param htmlFile Archivo HTML base.
-         * @param replacements Mapa de identificadores y sus valores de reemplazo.
-         * @param tempFile Archivo temporal donde se guardará el HTML modificado.
-         * @return Archivo temporal con el HTML sustituido.
-         */
-        fun replaceHtmlIds(htmlFile: File, replacements: Map<String, String>, tempFile: File): File {
-            Log.i(TAG, "Sustituyendo identificadores en ${htmlFile.absolutePath}")
-            val htmlContent = htmlFile.readText()
+    fun extractHtmlElements(html: String): List<HtmlElement> {
+        val doc = Jsoup.parse(html)
+        val body = doc.body()
+        val elements = mutableListOf<HtmlElement>()
 
-            var updatedContent = htmlContent
-            replacements.forEach { (id, value) ->
-                val regex = """<span class="underline" id="$id">[^<]*</span>""".toRegex()
-                val replacement = """<span class="underline" id="$id">$value</span>"""
-                updatedContent = updatedContent.replace(regex, replacement)
-                Log.d(TAG, "Sustituido id='$id' con valor='$value'")
+        fun processElement(element: Element, parentTag: String? = null): HtmlElement? {
+            return when (element.tagName()) {
+                "h1", "h2", "h3", "p" -> {
+                    HtmlElement(
+                        tag = element.tagName(),
+                        content = element.text().trim(),
+                        attributes = element.attributes().associate { it.key to it.value }
+                    )
+                }
+                "ul" -> {
+                    val children = element.children().mapNotNull { child ->
+                        if (child.tagName() == "li") processElement(child, "ul") else null
+                    }
+                    HtmlElement(
+                        tag = "ul",
+                        content = "",
+                        attributes = element.attributes().associate { it.key to it.value },
+                        children = children
+                    )
+                }
+                "li" -> {
+                    val subChildren = element.children().mapNotNull { child ->
+                        if (child.tagName() == "ul") processElement(child) else null
+                    }
+                    HtmlElement(
+                        tag = "li",
+                        content = element.ownText().trim(),
+                        children = subChildren
+                    )
+                }
+                else -> null // Ignorar otros tags como script
             }
-
-            tempFile.writeText(updatedContent)
-            Log.i(TAG, "HTML modificado guardado en ${tempFile.absolutePath}")
-            return tempFile
         }
+
+        body.children().forEach { element ->
+            processElement(element)?.let { elements.add(it) }
+        }
+
+        return elements.ifEmpty { listOf(HtmlElement("p", "SIN CONTENIDO")) }
     }
 }

@@ -28,6 +28,7 @@
     <!-- Características del hardware -->
     <uses-feature android:name="android.hardware.bluetooth" android:required="true" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
     <!-- Configuración de la aplicación -->
@@ -42,7 +43,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Atestados"
-        tools:replace="android:theme">
+        tools:replace="android:theme"
+        tools:targetApi="33">
 
         <!-- Actividades -->
         <activity
