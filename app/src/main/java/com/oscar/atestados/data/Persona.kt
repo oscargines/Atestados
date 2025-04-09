@@ -14,5 +14,9 @@ data class Persona(
     val domicilio: String = "",
     val codigoPostal: String = "",
     val telefono: String = "",
-    val email: String = ""
+    val email: String = "",
+    val photo: ByteArray? = null,
+    val signature: ByteArray? = null,
+    val uid: String? = null,
+    val can: String? = null
 )

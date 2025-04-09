@@ -38,7 +38,13 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
+/**
+ * Pantalla principal para el segundo paso del proceso de alcoholemia.
+ * Muestra y gestiona los datos de inicio de diligencias.
+ *
+ * @param navigateToScreen Función para navegar a otras pantallas.
+ * @param alcoholemiaDosViewModel ViewModel que contiene la lógica y estado de la pantalla.
+ */
 @Composable
 fun Alcoholemia02Screen(
     navigateToScreen: (String) -> Unit,
@@ -67,7 +73,14 @@ fun Alcoholemia02Screen(
         }
     }
 }
-
+/**
+ * Contenido principal de la pantalla de alcoholemia (paso 2).
+ *
+ * @param modifier Modificador para ajustar el diseño.
+ * @param alcoholemiaDosViewModel ViewModel que maneja el estado de la pantalla.
+ * @param onDatePickerFechaDiligenciasClicked Callback cuando se hace clic en el selector de fecha.
+ * @param showDatePickerFechaDiligencias Estado que controla si se muestra el selector de fecha.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Alcoholemia02Content(
@@ -100,7 +113,11 @@ private fun Alcoholemia02Content(
     var showSignatureDialog by remember { mutableStateOf(false) }
     var signatureType by remember { mutableStateOf("") } // Para identificar qué firma se está capturando
 
-    // Función para obtener la ubicación
+    /**
+     * Obtiene los datos de ubicación actual y ejecuta un callback con el resultado.
+     *
+     * @param onSuccess Callback que recibe la descripción de la ubicación.
+     */
     fun getLocationData(onSuccess: (String) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
@@ -465,7 +482,9 @@ private fun Alcoholemia02Content(
         }
     }
 }
-
+/**
+ * Barra superior de la pantalla de alcoholemia.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AlcoholemiaTopBar() {
@@ -500,7 +519,12 @@ private fun AlcoholemiaTopBar() {
         )
     )
 }
-
+/**
+ * Barra inferior de la pantalla de alcoholemia con botones de acción.
+ *
+ * @param viewModel ViewModel para manejar las acciones.
+ * @param navigateToScreen Función para navegar a otras pantallas.
+ */
 @Composable
 private fun AlcoholemiaBottomBar(
     viewModel: AlcoholemiaDosViewModel,
@@ -544,7 +568,15 @@ private fun AlcoholemiaBottomBar(
         }
     }
 }
-
+/**
+ * Campo de texto personalizado con estilo específico para la pantalla de alcoholemia.
+ *
+ * @param value Valor actual del campo.
+ * @param onValueChange Callback cuando cambia el valor.
+ * @param label Texto de la etiqueta.
+ * @param modifier Modificador para ajustar el diseño.
+ * @param enabled Estado de habilitación del campo.
+ */
 @Composable
 private fun CustomTextField(
     value: String,
@@ -571,7 +603,17 @@ private fun CustomTextField(
         }
     )
 }
-
+/**
+ * Campo de texto personalizado con icono principal para la pantalla de alcoholemia.
+ *
+ * @param value Valor actual del campo.
+ * @param onValueChange Callback cuando cambia el valor.
+ * @param label Texto de la etiqueta.
+ * @param placeholder Texto del marcador de posición.
+ * @param keyboardType Tipo de teclado a mostrar.
+ * @param modifier Modificador para ajustar el diseño.
+ * @param leadingIcon Icono principal del campo.
+ */
 @Composable
 private fun CustomOutlinedTextFieldAlcohol(
     value: String,
@@ -600,7 +642,13 @@ private fun CustomOutlinedTextFieldAlcohol(
         leadingIcon = leadingIcon
     )
 }
-
+/**
+ * Opción de checkbox con estilo personalizado.
+ *
+ * @param text Texto descriptivo de la opción.
+ * @param checked Estado actual del checkbox.
+ * @param onCheckedChange Callback cuando cambia el estado.
+ */
 @Composable
 private fun CheckboxOption(
     text: String,
@@ -628,7 +676,12 @@ private fun CheckboxOption(
         )
     }
 }
-
+/**
+ * Diálogo para seleccionar fecha con formato específico.
+ *
+ * @param onDateSelected Callback cuando se selecciona una fecha.
+ * @param onDismiss Callback cuando se cancela el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun getDateDialogDiligencias(

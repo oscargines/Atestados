@@ -10,6 +10,13 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 
+/**
+ * Clase helper para manejar operaciones con bases de datos SQLite.
+ *
+ * @property context Contexto de la aplicación.
+ * @property nombreBaseDatos Nombre del archivo de la base de datos.
+ * @property version Versión de la base de datos.
+ */
 class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
     SQLiteOpenHelper(context, nombreBaseDatos, null, version) {
 
@@ -26,6 +33,11 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
+    /**
+     * Crea una nueva base de datos copiándola desde los assets.
+     *
+     * @throws IOException Si ocurre un error al copiar la base de datos.
+     */
     @Throws(IOException::class)
     fun createDatabase() {
         val dbExist = checkDatabase()
@@ -40,6 +52,11 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
+    /**
+     * Verifica si la base de datos existe en la ruta especificada.
+     *
+     * @return true si la base de datos existe, false en caso contrario.
+     */
     private fun checkDatabase(): Boolean {
         var db: SQLiteDatabase? = null
         return try {
@@ -54,6 +71,11 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
+    /**
+     * Copia la base de datos desde los assets al directorio de la aplicación.
+     *
+     * @throws IOException Si ocurre un error durante la copia.
+     */
     @Throws(IOException::class)
     private fun copyDatabase() {
         val dbFile = File(DB_PATH)
@@ -79,8 +101,20 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
+    /**
+     * Método llamado cuando se crea la base de datos por primera vez.
+     *
+     * @param db La base de datos.
+     */
     override fun onCreate(db: SQLiteDatabase?) {}
 
+    /**
+     * Método llamado cuando la base de datos necesita ser actualizada.
+     *
+     * @param db La base de datos.
+     * @param oldVersion La versión antigua de la base de datos.
+     * @param newVersion La nueva versión de la base de datos.
+     */
     override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {}
 
     /**
@@ -108,6 +142,11 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
+    /**
+     * Copia la base de datos desde los assets y verifica si se copió correctamente.
+     *
+     * @return true si la copia fue exitosa, false en caso contrario.
+     */
     fun copiaBD(): Boolean {
         try {
             copyDatabase()
@@ -118,6 +157,10 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
+    /**
+     * Asegura que la tabla 'dispositivos' exista en la base de datos con las columnas requeridas.
+     * Si la tabla no existe, la crea con las columnas id, nombre y mac (única).
+     */
     fun ensureTableExists() {
         val db = this.writableDatabase
         db.execSQL("""
@@ -130,6 +173,12 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         Log.d("AccesoBaseDatos", "Tabla 'dispositivos' asegurada con UNIQUE en mac")
     }
 
+    /**
+     * Ejecuta una sentencia SQL en la base de datos.
+     *
+     * @param query Sentencia SQL a ejecutar.
+     * @param args Argumentos para la sentencia SQL (opcional).
+     */
     fun execSQL(query: String, args: Array<Any?> = emptyArray()) {
         writableDatabase.execSQL(query, args)
     }

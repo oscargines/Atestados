@@ -31,6 +31,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     packaging {
@@ -104,6 +105,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.core) // ZXing lector qr
+    implementation (libs.zxing.android.embedded)
     implementation (libs.barcode.scanning)
     implementation (libs.barcode.scanning.v1720)
 
@@ -120,8 +122,8 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.74")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.74")
     implementation("org.bouncycastle:bcutil-jdk18on:1.74")
-    implementation(libs.jmrtd)
-    implementation(libs.scuba.smartcards)
+    /*implementation(libs.jmrtd)
+    implementation(libs.scuba.smartcards)*/
 
     // Gson
     implementation(libs.gson)

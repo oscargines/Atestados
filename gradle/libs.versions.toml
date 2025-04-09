@@ -66,6 +66,7 @@ commonmark = "0.18.2"
 itextCore = "9.1.0"
 roomKtx = "2.6.1"
 playServicesMlkitBarcodeScanning = "18.3.1"
+zxingAndroidEmbedded = "4.3.0"
 
 [libraries]
 # AndroidX Core y Lifecycle
@@ -144,6 +145,7 @@ itext-core = { module = "com.itextpdf:itext-core", version.ref = "itextCore" }
 layout = { module = "com.itextpdf:layout", version.ref = "itextCore" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 play-services-mlkit-barcode-scanning = { group = "com.google.android.gms", name = "play-services-mlkit-barcode-scanning", version.ref = "playServicesMlkitBarcodeScanning" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxingAndroidEmbedded" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
