@@ -1,8 +1,8 @@
 package com.oscar.atestados.screens
 
+import com.oscar.atestados.utils.QrScannerDialog
 import android.content.Context
 import android.nfc.NfcAdapter
-import android.nfc.Tag
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -34,7 +34,6 @@ import com.oscar.atestados.ui.theme.TextoTerciarios
 import com.oscar.atestados.data.DniData
 import com.oscar.atestados.utils.NfcReader
 import com.oscar.atestados.utils.NfcDataParser
-import com.oscar.atestados.utils.QrScannerDialog
 import com.oscar.atestados.viewModel.NfcViewModel
 import com.oscar.atestados.viewModel.PersonaViewModel
 import kotlinx.coroutines.Dispatchers
@@ -53,9 +52,9 @@ private const val TAG = "PersonaScreen"
 fun PersonaScreen(
     navigateToScreen: (String) -> Unit,
     personaViewModel: PersonaViewModel,
-    nfcViewModel: NfcViewModel, // Usar NfcViewModel en lugar de nfcTag
+    nfcViewModel: NfcViewModel,
     onTagProcessed: () -> Unit = {},
-    onCameraButtonClicked: () -> Unit = {}
+
 ) {
     val context = LocalContext.current
     val nfcTag by nfcViewModel.nfcTag.collectAsState() // Observar el tag desde el ViewModel
@@ -63,6 +62,8 @@ fun PersonaScreen(
     var showWaitingForNfcDialog by remember { mutableStateOf(false) }
     var showSuccessAlert by remember { mutableStateOf(false) }
     var showErrorAlert by remember { mutableStateOf(false) }
+    var showQrScannerDialog by remember { mutableStateOf(false) }
+    var qrResult by remember { mutableStateOf<DniData?>(null) }
     var errorMessage by remember { mutableStateOf("") }
     var dniData by remember { mutableStateOf<DniData?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -251,13 +252,71 @@ fun PersonaScreen(
             }
         )
     }
+    if (showQrScannerDialog) {
+        QrScannerDialog(
+            onQrCodeScanned = { scannedDniData: DniData ->
+                Log.d(TAG, "DniData del QR: $scannedDniData")
+                qrResult = scannedDniData
+                showQrScannerDialog = false
+                Log.d(TAG, "qrResult establecido, debería mostrarse AlertDialog")
+            },
+            onDismiss = {
+                showQrScannerDialog = false
+                Log.d(TAG, "QrScannerDialog descartado")
+            }
+        )
+    }
+
+    qrResult?.let { result ->
+        if (result.error != null) {
+            AlertDialog(
+                onDismissRequest = { qrResult = null },
+                title = { Text("Error") },
+                text = { Text(result.error!!) },
+                confirmButton = {
+                    Button(onClick = { qrResult = null }) {
+                        Text("Aceptar")
+                    }
+                }
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { qrResult = null },
+                title = { Text("QR Escaneado") },
+                text = {
+                    Column {
+                        result.numeroDocumento?.let { Text("DNI: $it") }
+                        result.nombre?.let { Text("Nombre: $it") }
+                        result.apellidos?.let { Text("Apellidos: $it") }
+                        result.fechaNacimiento?.let { Text("Fecha de Nacimiento: $it") }
+                        result.domicilio?.let { Text("Domicilio: $it") }
+                        result.nacionalidad?.let { Text("Nacionalidad: $it") }
+                        result.genero?.let { Text("Género: $it") }
+                        if (result.numeroDocumento == null && result.nombre == null) {
+                            Text("No se encontraron datos válidos en el QR")
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { qrResult = null }) {
+                        Text("Aceptar")
+                    }
+                }
+            )
+        }
+    }
 
     PersonaScreenContent(
         navigateToScreen = navigateToScreen,
         personaViewModel = personaViewModel,
-        onCameraButtonClicked = onCameraButtonClicked,
+        onCameraButtonClicked = {
+            Log.d(TAG, "Botón QR pulsado")
+            showQrScannerDialog = true
+        },
         onNfcButtonClicked = onNfcButtonClicked,
-        onTextFieldChanged = { text -> personaViewModel.updateNombre(text) }
+        onTextFieldChanged = {
+            text -> personaViewModel.updateNombre(text)
+        }
     )
 }
 @Composable
