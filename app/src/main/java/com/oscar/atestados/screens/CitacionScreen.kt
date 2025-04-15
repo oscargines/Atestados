@@ -1,6 +1,7 @@
 package com.oscar.atestados.screens
 
 import android.content.Intent
+import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -28,10 +29,16 @@ import androidx.core.content.FileProvider
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.*
+import com.oscar.atestados.utils.HtmlParser
+import com.oscar.atestados.utils.PDFLabelPrinterZebra
+import com.oscar.atestados.utils.PDFToBitmapPrinter
+import com.oscar.atestados.utils.PdfToBitmapConverter
 import com.oscar.atestados.viewModel.CitacionViewModel
+import com.oscar.atestados.viewModel.ImpresoraViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -42,31 +49,122 @@ private const val TAG = "CitacionScreen"
 @Composable
 fun CitacionScreen(
     navigateToScreen: (String) -> Unit,
-    citacionViewModel: CitacionViewModel
+    citacionViewModel: CitacionViewModel,
+    impresoraViewModel: ImpresoraViewModel
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isGenerating by remember { mutableStateOf(false) }
     var generateResult by remember { mutableStateOf<Result<String>?>(null) }
     var triggerGenerate by remember { mutableStateOf(false) }
+    var isPrintingActa by remember { mutableStateOf(false) }
+    var showPreviewDialog by remember { mutableStateOf(false) } // Nuevo estado para el diálogo
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) } // Bitmap para previsualización
+    var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
+    val htmlParser = remember { HtmlParser(context) }
+    val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
 
     Log.v(TAG, "CitacionScreen iniciada")
 
-    LaunchedEffect(triggerGenerate) {
-        if (triggerGenerate) {
-            isGenerating = true
-            withContext(Dispatchers.IO) {
-                try {
-                    // Removed PDF generation code since helper classes are no longer available
-                    generateResult = Result.success("Datos guardados correctamente")
-                    Log.i(TAG, "Datos guardados sin generación de PDF")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error al guardar datos: ${e.message}", e)
-                    generateResult = Result.failure(e)
+    // ... (mantén el resto del código hasta el LaunchedEffect para isPrintingActa)
+
+    LaunchedEffect(isPrintingActa) {
+        if (isPrintingActa) {
+            try {
+                val macAddress = impresoraViewModel.getSelectedPrinterMac()
+                if (!macAddress.isNullOrEmpty()) {
+                    currentPrintStatus = "Preparando documento..."
+
+                    // Generar el archivo HTML temporal con HtmlParser
+                    val tempHtmlFilePath = withContext(Dispatchers.IO) {
+                        htmlParser.generateHtmlFile("documents/acta_citacion.html", citacionViewModel)
+                    }
+                    val htmlContent = withContext(Dispatchers.IO) {
+                        File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                    }
+
+                    // Generar el PDF para previsualización
+                    val outputFile = File(context.getExternalFilesDir(null), "acta_citacion_preview.pdf")
+                    if (outputFile.exists()) outputFile.delete()
+                    val pdfLabelPrinter = PDFLabelPrinterZebra(context)
+                    pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
+                    currentPrintStatus = "PDF generado para previsualización"
+
+                    // Convertir a Bitmap para previsualización
+                    val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
+                    if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
+                        previewBitmap = bitmaps[0] // Usar la primera página para previsualización
+                        showPreviewDialog = true
+                        currentPrintStatus = "Mostrando previsualización"
+                    } else {
+                        currentPrintStatus = "Error al generar previsualización"
+                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
+                        withContext(Dispatchers.IO) {
+                            File(tempHtmlFilePath).delete()
+                        }
+                        isPrintingActa = false
+                    }
+                } else {
+                    currentPrintStatus = "No hay impresora seleccionada"
+                    Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
+                    isPrintingActa = false
                 }
+            } catch (e: Exception) {
+                currentPrintStatus = "Error al generar previsualización: ${e.message}"
+                Toast.makeText(context, "Error al generar previsualización: ${e.message}", Toast.LENGTH_LONG).show()
+                Log.e(TAG, "Error en previsualización: ${e.message}", e)
+                isPrintingActa = false
             }
-            isGenerating = false
-            triggerGenerate = false
+        }
+    }
+
+    // Manejar la confirmación de impresión desde el diálogo
+    LaunchedEffect(showPreviewDialog) {
+        if (!showPreviewDialog && isPrintingActa && previewBitmap != null) {
+            try {
+                val macAddress = impresoraViewModel.getSelectedPrinterMac()
+                val tempHtmlFilePath = withContext(Dispatchers.IO) {
+                    htmlParser.generateHtmlFile("documents/acta_citacion.html", citacionViewModel)
+                }
+                val htmlContent = withContext(Dispatchers.IO) {
+                    File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                }
+
+                currentPrintStatus = "Enviando a imprimir..."
+                val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
+                    htmlAssetPath = "",
+                    macAddress = macAddress!!,
+                    outputFileName = "acta_citacion_temp.pdf",
+                    htmlContent = htmlContent,
+                    onStatusUpdate = { status ->
+                        scope.launch(Dispatchers.Main) { currentPrintStatus = status }
+                    }
+                )
+
+                when (printResult) {
+                    is PDFToBitmapPrinter.PrintResult.Success -> {
+                        currentPrintStatus = "Impresión enviada"
+                        Toast.makeText(context, "Acta de citación enviada a imprimir", Toast.LENGTH_SHORT).show()
+                    }
+                    is PDFToBitmapPrinter.PrintResult.Error -> {
+                        currentPrintStatus = "Error: ${printResult.message}"
+                        Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+
+                // Limpiar recursos
+                withContext(Dispatchers.IO) {
+                    File(tempHtmlFilePath).delete()
+                }
+            } catch (e: Exception) {
+                currentPrintStatus = "Error al imprimir: ${e.message}"
+                Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
+                Log.e(TAG, "Error en impresión: ${e.message}", e)
+            } finally {
+                previewBitmap?.recycle()
+                previewBitmap = null
+                isPrintingActa = false
+            }
         }
     }
 
@@ -93,12 +191,35 @@ fun CitacionScreen(
             citacionViewModel = citacionViewModel,
             navigateToScreen = navigateToScreen,
             onGenerateTrigger = {
-                Log.i(TAG, "Botón IMPRIMIR pulsado, guardando datos")
+                Log.i(TAG, "Botón GUARDAR pulsado, guardando datos")
                 triggerGenerate = true
             },
-            isGenerating = isGenerating
+            isGenerating = isGenerating,
+            impresoraViewModel = impresoraViewModel,
+            isPrintingActa = isPrintingActa,
+            onPrintActaTrigger = { isPrintingActa = true }
         )
     }
+
+    if (isGenerating || isPrintingActa) {
+        FullScreenProgressIndicator(text = if (isGenerating) "Guardando datos..." else "Imprimiendo acta...")
+    }
+    BitmapPreviewDialog(
+        bitmap = previewBitmap,
+        onConfirm = {
+            showPreviewDialog = false // Continúa con la impresión
+        },
+        onDismiss = {
+            showPreviewDialog = false
+            previewBitmap?.recycle()
+            previewBitmap = null
+            isPrintingActa = false
+            currentPrintStatus = "Impresión cancelada"
+            scope.launch {
+                Toast.makeText(context, "Impresión cancelada", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
 
     if (isGenerating) {
         FullScreenProgressIndicator(text = "Guardando datos...")
@@ -146,7 +267,10 @@ private fun CitacionContent(
     citacionViewModel: CitacionViewModel,
     navigateToScreen: (String) -> Unit,
     onGenerateTrigger: () -> Unit,
-    isGenerating: Boolean
+    isGenerating: Boolean,
+    impresoraViewModel: ImpresoraViewModel, // Nuevo parámetro
+    isPrintingActa: Boolean, // Nuevo parámetro
+    onPrintActaTrigger: () -> Unit // Nuevo callback para disparar la impresión
 ) {
     val context = LocalContext.current
 
@@ -404,6 +528,27 @@ private fun CitacionContent(
             shape = RoundedCornerShape(0.dp)
         ) {
             Text(if (isGenerating) "GUARDANDO..." else "GUARDAR")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp)) // Espacio entre botones
+
+        Button(
+            onClick = {
+                if (!isPrintingActa) {
+                    onPrintActaTrigger()
+                }
+            },
+            enabled = !isPrintingActa,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BotonesNormales,
+                contentColor = TextoBotonesNormales
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            shape = RoundedCornerShape(0.dp)
+        ) {
+            Text(if (isPrintingActa) "IMPRIMIENDO..." else "IMPRIMIR ACTA")
         }
     }
 }

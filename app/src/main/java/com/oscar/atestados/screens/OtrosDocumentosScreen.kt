@@ -1,9 +1,7 @@
 package com.oscar.atestados.screens
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -14,19 +12,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.oscar.atestados.ui.theme.*
+import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PDFToBitmapPrinter
 import com.oscar.atestados.utils.PdfToBitmapConverter
-import com.oscar.atestados.utils.XmlPrinterHelperZebra
 import com.oscar.atestados.viewModel.BluetoothViewModelFactory
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModelFactory
@@ -36,7 +32,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 
 @Composable
 fun OtrosDocumentosScreen(
@@ -54,95 +49,67 @@ fun OtrosDocumentosScreen(
     )
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var isPrintingAssistance by remember { mutableStateOf(false) }
     var isPrintingTest by remember { mutableStateOf(false) }
-    var showPreviewDialog by remember { mutableStateOf(false) }
+    var showPreviewDialog by remember { mutableStateOf<String?>(null) } // "assistance" o "test"
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    val scope = rememberCoroutineScope()
+    var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
     val snackbarHostState = remember { SnackbarHostState() }
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
 
-    var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
-
-    // Diálogo de previsualización
-    if (showPreviewDialog && previewBitmap != null) {
-        AlertDialog(
-            onDismissRequest = { showPreviewDialog = false },
-            title = { Text("Previsualización de la etiqueta") },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(
-                        bitmap = previewBitmap!!.asImageBitmap(),
-                        contentDescription = "Previsualización de etiqueta",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
+    // Manejar la impresión tras confirmar el diálogo
+    LaunchedEffect(showPreviewDialog, isPrintingAssistance, isPrintingTest) {
+        if (showPreviewDialog == null && (isPrintingAssistance || isPrintingTest) && previewBitmap != null) {
+            try {
+                val macAddress = impresoraViewModel.getSelectedPrinterMac()
+                if (!macAddress.isNullOrEmpty()) {
+                    val htmlAssetPath = when {
+                        isPrintingAssistance -> "documents/asistencia_juridica_gratuita_zebra.html"
+                        isPrintingTest -> "documents/test_label.html"
+                        else -> throw IllegalStateException("Estado no reconocido")
+                    }
+                    currentPrintStatus = "Enviando a imprimir..."
+                    val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
+                        htmlAssetPath = htmlAssetPath,
+                        macAddress = macAddress,
+                        onStatusUpdate = { status ->
+                            scope.launch(Dispatchers.Main) { currentPrintStatus = status }
+                        }
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("¿Deseas imprimir esta etiqueta?")
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showPreviewDialog = false
-                        scope.launch(Dispatchers.IO) {
-                            isPrintingTest = true
-                            try {
-                                val macAddress = impresoraViewModel.getSelectedPrinterMac()
-                                if (!macAddress.isNullOrEmpty()) {
-                                    withContext(Dispatchers.Main) { currentPrintStatus = "Enviando a imprimir..." }
-                                    val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
-                                        htmlAssetPath = "documents/test_label.html",
-                                        macAddress = macAddress,
-                                        onStatusUpdate = { status ->
-                                            scope.launch(Dispatchers.Main) { currentPrintStatus = status }
-                                        }
-                                    )
-                                    withContext(Dispatchers.Main) {
-                                        when (printResult) {
-                                            is PDFToBitmapPrinter.PrintResult.Success -> {
-                                                currentPrintStatus = "Impresión exitosa: ${printResult.details}"
-                                                Toast.makeText(context, "Etiqueta impresa correctamente", Toast.LENGTH_SHORT).show()
-                                            }
-                                            is PDFToBitmapPrinter.PrintResult.Error -> {
-                                                currentPrintStatus = "Error: ${printResult.message}"
-                                                Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        currentPrintStatus = "No hay impresora seleccionada"
-                                        Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    currentPrintStatus = "Error al imprimir: ${e.message}"
-                                    Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
-                                }
-                            } finally {
-                                withContext(Dispatchers.Main) { isPrintingTest = false }
+                    withContext(Dispatchers.Main) {
+                        when (printResult) {
+                            is PDFToBitmapPrinter.PrintResult.Success -> {
+                                currentPrintStatus = "Impresión exitosa: ${printResult.details}"
+                                Toast.makeText(context, "Documento impreso correctamente", Toast.LENGTH_SHORT).show()
+                            }
+                            is PDFToBitmapPrinter.PrintResult.Error -> {
+                                currentPrintStatus = "Error: ${printResult.message}"
+                                Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_LONG).show()
                             }
                         }
                     }
-                ) {
-                    Text("Imprimir")
+                } else {
+                    withContext(Dispatchers.Main) {
+                        currentPrintStatus = "No hay impresora seleccionada"
+                        Toast.makeText(context, "Por favor, seleccione una impresora", Toast.LENGTH_LONG).show()
+                    }
                 }
-            },
-            dismissButton = {
-                Button(
-                    onClick = { showPreviewDialog = false },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    )
-                ) {
-                    Text("Cancelar")
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    currentPrintStatus = "Error al imprimir: ${e.message}"
+                    Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
+                    Log.e("OtrosDocumentosScreen", "Error en impresión: ${e.message}", e)
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    previewBitmap?.recycle()
+                    previewBitmap = null
+                    if (isPrintingAssistance) isPrintingAssistance = false
+                    if (isPrintingTest) isPrintingTest = false
                 }
             }
-        )
+        }
     }
 
     Scaffold(
@@ -154,7 +121,7 @@ fun OtrosDocumentosScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues) // Corregido: padingValues -> paddingValues
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -181,49 +148,44 @@ fun OtrosDocumentosScreen(
                 onClick = {
                     if (!isPrintingAssistance) {
                         isPrintingAssistance = true
-                        currentPrintStatus = "Generando documento..."
-                        scope.launch {
+                        currentPrintStatus = "Generando previsualización..."
+                        scope.launch(Dispatchers.IO) {
                             try {
-                                val macAddress = impresoraViewModel.getSelectedPrinterMac()
-                                if (!macAddress.isNullOrEmpty()) {
-                                    val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
-                                        htmlAssetPath = "documents/asistencia_juridica_gratuita_zebra.html",
-                                        macAddress = macAddress,
-                                        onStatusUpdate = { status ->
-                                            scope.launch(Dispatchers.Main) { currentPrintStatus = status }
-                                        }
-                                    )
-                                    withContext(Dispatchers.Main) {
-                                        when (printResult) {
-                                            is PDFToBitmapPrinter.PrintResult.Success -> {
-                                                currentPrintStatus = "Impresión exitosa: ${printResult.details}"
-                                                Toast.makeText(context, "Documento impreso correctamente", Toast.LENGTH_SHORT).show()
-                                            }
-                                            is PDFToBitmapPrinter.PrintResult.Error -> {
-                                                currentPrintStatus = "Error: ${printResult.message}"
-                                                Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
+                                val htmlContent = context.assets.open("documents/asistencia_juridica_gratuita_zebra.html")
+                                    .use { it.readBytes().toString(Charsets.UTF_8) }
+                                val outputFile = File(context.getExternalFilesDir(null), "asistencia_preview.pdf")
+                                if (outputFile.exists()) outputFile.delete()
+                                val pdfLabelPrinter = PDFLabelPrinterZebra(context)
+                                pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
+                                currentPrintStatus = "PDF generado para previsualización"
+
+                                val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
+                                if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
+                                    previewBitmap = bitmaps[0]
+                                    showPreviewDialog = "assistance"
+                                    currentPrintStatus = "Mostrando previsualización"
                                 } else {
                                     withContext(Dispatchers.Main) {
-                                        currentPrintStatus = "No hay impresora seleccionada"
-                                        Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
+                                        currentPrintStatus = "Error al generar previsualización"
+                                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
+                                        isPrintingAssistance = false
                                     }
                                 }
+                                // Limpiar archivo temporal
+                                outputFile.delete()
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
                                     currentPrintStatus = "Error: ${e.message}"
-                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Error al generar previsualización: ${e.message}", Toast.LENGTH_LONG).show()
+                                    isPrintingAssistance = false
+                                    Log.e("OtrosDocumentosScreen", "Error en previsualización: ${e.message}", e)
                                 }
-                            } finally {
-                                withContext(Dispatchers.Main) { isPrintingAssistance = false }
                             }
                         }
                     }
                 },
-                text = if (isPrintingAssistance) "IMPRIMIENDO..." else "INFOR. ASISTENCIA LETRADA",
-                mensaje = "Pulse aquí para generar e imprimir información de asistencia letrada",
+                text = if (isPrintingAssistance) "GENERANDO..." else "INFOR. ASISTENCIA LETRADA",
+                mensaje = "Pulse aquí para previsualizar e imprimir información de asistencia letrada",
                 enabled = !isPrintingAssistance
             )
             Spacer(modifier = Modifier.height(20.dp))
@@ -232,60 +194,108 @@ fun OtrosDocumentosScreen(
                     if (!isPrintingTest) {
                         isPrintingTest = true
                         currentPrintStatus = "Generando previsualización..."
-                        scope.launch {
+                        scope.launch(Dispatchers.IO) {
                             try {
-                                // 1. Generar el PDF
                                 val htmlContent = context.assets.open("documents/test_label.html")
                                     .use { it.readBytes().toString(Charsets.UTF_8) }
                                 val outputFile = File(context.getExternalFilesDir(null), "etiqueta_prueba_preview.pdf")
-                                Log.d("OtrosDocumentosScreen", "PDF generado: ${outputFile.absolutePath}, tamaño: ${outputFile.length()} bytes")
+                                if (outputFile.exists()) outputFile.delete()
+                                val pdfLabelPrinter = PDFLabelPrinterZebra(context)
+                                pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
+                                currentPrintStatus = "PDF generado para previsualización"
 
-                                // 2. Convertir a Bitmap (usamos la primera página para previsualización)
                                 val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
-
                                 if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
-                                    val bitmap = bitmaps[0]!!
-                                    // Guardar el Bitmap como archivo para inspección
-                                    val bitmapFile = File(context.getExternalFilesDir(null), "test_bitmap.png")
-                                    FileOutputStream(bitmapFile).use { out ->
-                                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                                    }
-                                    Log.d("OtrosDocumentosScreen", "Bitmap guardado en: ${bitmapFile.absolutePath}, dimensiones: ${bitmap.width}x${bitmap.height}")
-
-                                    previewBitmap = bitmap
-                                    showPreviewDialog = true
-                                    currentPrintStatus = "Previsualización lista"
+                                    previewBitmap = bitmaps[0]
+                                    showPreviewDialog = "test"
+                                    currentPrintStatus = "Mostrando previsualización"
                                 } else {
                                     withContext(Dispatchers.Main) {
                                         currentPrintStatus = "Error al generar previsualización"
                                         Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
+                                        isPrintingTest = false
                                     }
                                 }
+                                // Limpiar archivo temporal
+                                outputFile.delete()
                             } catch (e: Exception) {
                                 withContext(Dispatchers.Main) {
                                     currentPrintStatus = "Error: ${e.message}"
                                     Toast.makeText(context, "Error al generar previsualización: ${e.message}", Toast.LENGTH_LONG).show()
-                                }
-                            } finally {
-                                if (!showPreviewDialog) {
-                                    withContext(Dispatchers.Main) { isPrintingTest = false }
+                                    isPrintingTest = false
+                                    Log.e("OtrosDocumentosScreen", "Error en previsualización: ${e.message}", e)
                                 }
                             }
                         }
                     }
                 },
-                text = if (isPrintingTest) "GENERANDO PREVISUALIZACIÓN..." else "PRUEBA IMPRESIÓN",
+                text = if (isPrintingTest) "GENERANDO..." else "PRUEBA IMPRESIÓN",
                 mensaje = "Pulse aquí para previsualizar e imprimir una etiqueta de prueba",
                 enabled = !isPrintingTest
             )
         }
 
-        if (isPrintingTest) {
+        if (isPrintingAssistance || isPrintingTest) {
             PrintingProgressIndicator(text = currentPrintStatus)
         }
-        if (isPrintingAssistance) {
-            PrintingProgressIndicator(text = currentPrintStatus)
+    }
+
+    // Diálogo de previsualización renombrado para evitar conflictos
+    CustomBitmapPreviewDialog(
+        bitmap = previewBitmap,
+        onConfirm = {
+            showPreviewDialog = null // Dispara la impresión
+        },
+        onDismiss = {
+            showPreviewDialog = null
+            previewBitmap?.recycle()
+            previewBitmap = null
+            if (isPrintingAssistance) isPrintingAssistance = false
+            if (isPrintingTest) isPrintingTest = false
+            currentPrintStatus = "Impresión cancelada"
+            scope.launch {
+                Toast.makeText(context, "Impresión cancelada", Toast.LENGTH_SHORT).show()
+            }
         }
+    )
+}
+
+// Diálogo de previsualización renombrado
+@Composable
+fun CustomBitmapPreviewDialog(
+    bitmap: Bitmap?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (bitmap != null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Previsualización") },
+            text = {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Previsualización del documento",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Log.d("OtrosDocumentosScreen", "Botón Imprimir pulsado en diálogo")
+                        onConfirm()
+                    }
+                ) {
+                    Text("Imprimir")
+                }
+            },
+            dismissButton = {
+                Button(onClick = onDismiss) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 

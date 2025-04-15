@@ -366,6 +366,37 @@ class ImpresoraViewModel(
             }
         }
     }
+    /** Imprime un archivo desde una ruta absoluta en el sistema de archivos. */
+    fun printFileFromPath(filePath: String) {
+        viewModelScope.launch {
+            val selectedDevice = bluetoothViewModel.selectedDevice.value
+            if (selectedDevice == null) {
+                Log.w("ImpresoraViewModel", "No hay impresora seleccionada")
+                Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
+                _uiState.update { it.copy(errorMessage = "No hay impresora seleccionada") }
+                return@launch
+            }
+
+            Log.d("ImpresoraViewModel", "Iniciando impresión de archivo en ${selectedDevice.name}: $filePath")
+            val result = printerHelper.printFromFile(filePath, selectedDevice.address) { status ->
+                Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
+                Log.i("ImpresoraViewModel", "Estado de impresión: $status")
+            }
+
+            when (result) {
+                is ZebraPrinterHelper.PrintResult.Success -> {
+                    Log.i("ImpresoraViewModel", "Impresión exitosa: ${result.details}")
+                    _uiState.update { it.copy(errorMessage = null) }
+                }
+                is ZebraPrinterHelper.PrintResult.Error -> {
+                    Log.e("ImpresoraViewModel", "Fallo al imprimir: ${result.message}")
+                    val errorMsg = "Error al imprimir: ${result.message}"
+                    Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                    _uiState.update { it.copy(errorMessage = errorMsg) }
+                }
+            }
+        }
+    }
 
     /** Devuelve la dirección MAC de la impresora seleccionada. */
     fun getSelectedPrinterMac(): String? {

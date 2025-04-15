@@ -12,15 +12,16 @@ import com.zebra.sdk.printer.PrinterLanguage
 import com.zebra.sdk.printer.ZebraPrinter
 import com.zebra.sdk.printer.ZebraPrinterFactory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 class PDFToBitmapPrinter(private val context: Context) {
 
     companion object {
         private const val TAG = "PDFToBitmapPrinter"
-        const val PRINT_WIDTH = 787  // 100 mm a 200 DPI (100 / 25.4 * 200 ≈ 787 píxeles)
+        // 99 mm a 200 DPI (99 / 25.4 * 200 ≈ 780 píxeles)
+        const val PRINT_WIDTH = 780
         private const val PRINT_TIMEOUT_MS = 8000L
     }
 
@@ -30,27 +31,33 @@ class PDFToBitmapPrinter(private val context: Context) {
     }
 
     suspend fun printHtmlAsBitmap(
-        htmlAssetPath: String,
+        htmlAssetPath: String = "",
         macAddress: String,
         outputFileName: String = "temp_label.pdf",
+        htmlContent: String? = null,
         onStatusUpdate: (String) -> Unit = {}
     ): PrintResult = withContext(Dispatchers.IO) {
         try {
             onStatusUpdate("Iniciando...")
 
-            // 1. Generar el PDF desde HTML (sobrescribe el archivo si ya existe)
-            val htmlInputStream = context.assets.open(htmlAssetPath)
-            val htmlContent = htmlInputStream.readBytes().toString(Charsets.UTF_8)
-            htmlInputStream.close()
+            // Determinar el contenido HTML a usar
+            val finalHtmlContent = when {
+                !htmlContent.isNullOrEmpty() -> htmlContent
+                htmlAssetPath.isNotEmpty() -> context.assets.open(htmlAssetPath).use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                }
+                else -> throw IllegalArgumentException("Debe proporcionar htmlContent o un htmlAssetPath válido")
+            }
+
+            // Generar el PDF desde HTML
             val outputFile = File(context.getExternalFilesDir(null), outputFileName)
-            if (outputFile.exists()) outputFile.delete() // Sobrescribir el PDF anterior
+            if (outputFile.exists()) outputFile.delete()
             val pdfLabelPrinter = PDFLabelPrinterZebra(context)
-            pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
+            pdfLabelPrinter.generarEtiquetaPdf(finalHtmlContent, outputFile)
             onStatusUpdate("PDF generado en ${outputFile.absolutePath}")
 
-            // 2. Convertir todas las páginas a Bitmaps monocromos
+            // Convertir a Bitmaps monocromos
             val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
-
             if (bitmaps.isEmpty()) {
                 onStatusUpdate("Error al convertir PDF a imágenes")
                 return@withContext PrintResult.Error("No se pudo convertir el PDF a imágenes")
@@ -64,16 +71,9 @@ class PDFToBitmapPrinter(private val context: Context) {
                 }
             }
 
-            // 3. Imprimir cada Bitmap y luego reciclarlo
+            // Imprimir y reciclar
             val printResult = printBitmaps(macAddress, monoBitmaps, onStatusUpdate)
-
-            // 4. Reciclar los Bitmaps después de imprimir
-            monoBitmaps.forEach { bitmap ->
-                if (!bitmap.isRecycled) {
-                    bitmap.recycle()
-                    Log.d(TAG, "Bitmap reciclado")
-                }
-            }
+            monoBitmaps.forEach { if (!it.isRecycled) it.recycle() }
 
             printResult
         } catch (e: Exception) {
@@ -107,43 +107,55 @@ class PDFToBitmapPrinter(private val context: Context) {
             val printerLanguage = printer.getPrinterControlLanguage()
             onStatusUpdate("Impresora inicializada: $printerLanguage")
 
+            // Dimensiones objetivo: 99 mm x 280 mm a 200 DPI
+            val targetWidth = PRINT_WIDTH // 99 mm
+            val targetHeight = ((280f / 99f) * targetWidth).toInt() // Proporcional a 280 mm
+            val maxHeightRW420 = 1024 // Límite conservador para RW420
+
             bitmaps.forEachIndexed { index, bitmap ->
-                val zebraImage = ZebraImageFactory.getImage(bitmap) as ZebraImageAndroid
-                Log.d(TAG, "Dimensiones originales Bitmap: ${bitmap.width}x${bitmap.height}")
-
-                if (printerLanguage == PrinterLanguage.CPCL) {
-                    // Configuración para impresoras CPCL
-                    connection.write("! U1 setvar \"device.languages\" \"cpcl\"\r\n".toByteArray())
-                    TimeUnit.MILLISECONDS.sleep(500)
-
-                    // Comando CPCL corregido (sin rotación y con dimensiones exactas)
-                    val cpclCommand = """
-                    ! U1 JOURNAL
-                    ! U1 CLR
-                    ! U1 DEL R:TEMP.PCX
-                    PW ${bitmap.width}
-                    PCX 0 0 R:TEMP.PCX
-                    PRINT
-                """.trimIndent()
-
-                    printer.storeImage("R:TEMP.PCX", zebraImage, bitmap.width, bitmap.height)
-                    connection.write(cpclCommand.toByteArray())
+                // Ajustar el bitmap al ancho objetivo
+                val scaledBitmap = if (bitmap.width != targetWidth) {
+                    Bitmap.createScaledBitmap(bitmap, targetWidth, (bitmap.height * targetWidth.toFloat() / bitmap.width).toInt(), true)
                 } else {
-                    // Configuración para impresoras ZPL
-                    connection.write("^XA^POI^XZ".toByteArray()) // Establece orientación normal
-                    TimeUnit.MILLISECONDS.sleep(500)
-
-                    // Imprimir con dimensiones exactas
-                    printer.printImage(
-                        zebraImage,
-                        0,
-                        0,
-                        bitmap.width,
-                        bitmap.height,
-                        false
-                    )
+                    bitmap
                 }
-                TimeUnit.MILLISECONDS.sleep(2000)
+
+                // Determinar si segmentar (solo para RW420 si excede memoria)
+                val segments = if (scaledBitmap.height > maxHeightRW420 && macAddress.contains("RW", ignoreCase = true)) {
+                    segmentBitmap(scaledBitmap, targetWidth, maxHeightRW420)
+                } else {
+                    listOf(scaledBitmap)
+                }
+
+                segments.forEachIndexed { segmentIndex, segmentBitmap ->
+                    val zebraImage = ZebraImageFactory.getImage(segmentBitmap) as ZebraImageAndroid
+                    Log.d(TAG, "Segmento $segmentIndex de página $index: ${segmentBitmap.width}x${segmentBitmap.height}")
+
+                    if (printerLanguage == PrinterLanguage.CPCL) {
+                        connection.write("! U1 setvar \"device.languages\" \"cpcl\"\r\n".toByteArray())
+                        delay(500)
+
+                        val cpclCommand = """
+                            ! U1 JOURNAL
+                            ! U1 CLR
+                            ! U1 DEL R:TEMP.PCX
+                            PW $targetWidth
+                            PCX 0 0 R:TEMP.PCX
+                            PRINT
+                        """.trimIndent()
+
+                        printer.storeImage("R:TEMP.PCX", zebraImage, segmentBitmap.width, segmentBitmap.height)
+                        connection.write(cpclCommand.toByteArray())
+                    } else {
+                        printer.printImage(zebraImage, 0, 0, segmentBitmap.width, segmentBitmap.height, false)
+                    }
+                    delay(2000) // Espera entre segmentos
+                }
+
+                // Reciclar el bitmap escalado si no es el original
+                if (scaledBitmap != bitmap && !scaledBitmap.isRecycled) {
+                    scaledBitmap.recycle()
+                }
             }
 
             return PrintResult.Success("Zebra ($macAddress)", "Impresión de ${bitmaps.size} páginas completada")
@@ -157,6 +169,22 @@ class PDFToBitmapPrinter(private val context: Context) {
         }
     }
 
+    private fun segmentBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): List<Bitmap> {
+        val segments = mutableListOf<Bitmap>()
+        var remainingHeight = bitmap.height
+        var yOffset = 0
+
+        while (remainingHeight > 0) {
+            val segmentHeight = minOf(remainingHeight, maxHeight)
+            val segmentBitmap = Bitmap.createBitmap(bitmap, 0, yOffset, bitmap.width, segmentHeight)
+            segments.add(segmentBitmap)
+            yOffset += segmentHeight
+            remainingHeight -= segmentHeight
+        }
+
+        return segments
+    }
+
     private fun convertToMonochrome(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
@@ -164,8 +192,7 @@ class PDFToBitmapPrinter(private val context: Context) {
         for (x in 0 until width) {
             for (y in 0 until height) {
                 val pixel = bitmap.getPixel(x, y)
-                val brightness =
-                    (Color.red(pixel) * 0.3 + Color.green(pixel) * 0.59 + Color.blue(pixel) * 0.11).toInt()
+                val brightness = (Color.red(pixel) * 0.3 + Color.green(pixel) * 0.59 + Color.blue(pixel) * 0.11).toInt()
                 val color = if (brightness < 128) Color.BLACK else Color.WHITE
                 monoBitmap.setPixel(x, y, color)
             }

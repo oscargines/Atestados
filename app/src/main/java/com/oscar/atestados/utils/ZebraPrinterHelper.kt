@@ -13,6 +13,7 @@ import com.zebra.sdk.printer.PrinterLanguage
 import com.zebra.sdk.printer.ZebraPrinterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 class ZebraPrinterHelper(private val context: Context) {
@@ -221,6 +222,36 @@ class ZebraPrinterHelper(private val context: Context) {
             TimeUnit.MILLISECONDS.sleep(500)
         } catch (e: Exception) {
             Log.e(TAG, "Error configurando orientación", e)
+        }
+    }
+    @SuppressLint("MissingPermission")
+    fun printFromFile(filePath: String, macAddress: String, onStatusUpdate: (String) -> Unit): PrintResult {
+        return try {
+            val file = File(filePath)
+            if (!file.exists()) {
+                onStatusUpdate("Archivo no encontrado: $filePath")
+                return PrintResult.Error("Archivo no encontrado")
+            }
+
+            // Obtener el dispositivo Bluetooth para el nombre de la impresora
+            val device = bluetoothAdapter?.getRemoteDevice(macAddress)
+            val printerName = device?.name ?: "Impresora Zebra"
+
+            onStatusUpdate("Imprimiendo archivo desde $filePath a $printerName")
+            // Implementar lógica para leer el archivo y enviarlo a la impresora Zebra
+            val content = file.readText(Charsets.UTF_8)
+
+            // Conectar y enviar el contenido
+            val connection = BluetoothConnection(macAddress)
+            connection.open()
+            connection.write(content.toByteArray(Charsets.UTF_8))
+            TimeUnit.MILLISECONDS.sleep(PRINT_TIMEOUT_MS) // Esperar a que se complete la impresión
+            connection.close()
+
+            PrintResult.Success(printerName, "Archivo impreso correctamente")
+        } catch (e: Exception) {
+            onStatusUpdate("Error al imprimir: ${e.message}")
+            PrintResult.Error(e.message ?: "Error desconocido", e)
         }
     }
 }

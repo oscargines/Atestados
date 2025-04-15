@@ -10,12 +10,6 @@ import java.io.File
 object PdfToBitmapConverter {
     private const val TAG = "PdfToBitmapConverter"
 
-    /**
-     * Convierte todas las páginas de un PDF a Bitmaps con DPI específico
-     * @param pdfFile Archivo PDF de entrada
-     * @param targetDpi DPI deseado (ej: 200 para impresoras Zebra)
-     * @return Lista de Bitmaps (una por página) o lista vacía si hay error
-     */
     fun convertAllPagesToBitmaps(pdfFile: File, targetDpi: Int = 200): List<Bitmap> {
         if (!pdfFile.exists() || pdfFile.length() == 0L) {
             Log.e(TAG, "Archivo PDF no existe o está vacío: ${pdfFile.absolutePath}")
@@ -52,7 +46,6 @@ object PdfToBitmapConverter {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error al convertir PDF: ${e.message}", e)
-            // Limpiar bitmaps generados si hay error
             bitmaps.forEach { it.recycle() }
             return emptyList()
         } finally {

@@ -245,11 +245,18 @@ fun NavGraphBuilder.appNavigation(
      */
     composable("CitacionScreen") {
         val citacionViewModel: CitacionViewModel = viewModel()
+        val bluetoothViewModel: BluetoothViewModel = viewModel()
+        val factory = ImpresoraViewModelFactory(
+            bluetoothViewModel = bluetoothViewModel,
+            context = navController.context
+        )
+        val impresoraViewModel: ImpresoraViewModel = viewModel(factory = factory)
         CitacionScreen(
             navigateToScreen = { route ->
                 navController.navigate(route)
             },
-            citacionViewModel = citacionViewModel
+            citacionViewModel = citacionViewModel,
+            impresoraViewModel = impresoraViewModel
         )
     }
 }
