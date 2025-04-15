@@ -16,6 +16,11 @@ import com.itextpdf.layout.properties.UnitValue
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * Clase para generar etiquetas PDF compatibles con impresoras Zebra.
+ *
+ * @property context Contexto de Android para acceder a recursos como fuentes.
+ */
 class PDFLabelPrinterZebra(private val context: Context) {
     companion object {
         private const val TAG = "PDFLabelPrinterZebra"
@@ -24,6 +29,13 @@ class PDFLabelPrinterZebra(private val context: Context) {
         private const val MARGIN_MM = 2f * 2.83465f   // ≈ 5.67 pt
     }
 
+    /**
+     * Genera un archivo PDF con el contenido HTML formateado para impresión en etiquetas Zebra.
+     *
+     * @param htmlContent Contenido HTML a convertir en PDF.
+     * @param outputFile Archivo de destino donde se guardará el PDF generado.
+     * @throws Exception Si ocurre algún error durante la generación del PDF.
+     */
     fun generarEtiquetaPdf(htmlContent: String, outputFile: File) {
         Log.d(TAG, "Iniciando generación de PDF en ${outputFile.absolutePath}")
 
@@ -100,6 +112,11 @@ class PDFLabelPrinterZebra(private val context: Context) {
         }
     }
 
+    /**
+     * Carga las fuentes necesarias desde los assets de la aplicación.
+     *
+     * @return Mapa de fuentes con claves: "escudo", "title", "regular", "boldItalic".
+     */
     private fun loadFonts(): Map<String, PdfFont> {
         return mapOf(
             "escudo" to PdfFontFactory.createFont(
@@ -121,6 +138,12 @@ class PDFLabelPrinterZebra(private val context: Context) {
         )
     }
 
+    /**
+     * Añade elementos decorativos (A y G) al documento PDF.
+     *
+     * @param document Documento PDF donde se añadirán los elementos.
+     * @param escudoFont Fuente especial para los caracteres decorativos.
+     */
     private fun addDecorativeElements(document: Document, escudoFont: PdfFont) {
         Log.v(TAG, "Añadiendo elementos decorativos A y G")
         document.add(
@@ -137,6 +160,18 @@ class PDFLabelPrinterZebra(private val context: Context) {
         )
     }
 
+    /**
+     * Divide el contenido en partes que caben en una página PDF.
+     *
+     * @param tempDiv Div que contiene todo el contenido a dividir.
+     * @param maxHeight Altura máxima disponible por página.
+     * @param pdfDocument Documento PDF actual.
+     * @param document Documento de layout actual.
+     * @param contentAreaX Posición X del área de contenido.
+     * @param contentAreaY Posición Y del área de contenido.
+     * @param contentWidth Ancho del área de contenido.
+     * @return Lista de partes de contenido, cada una representando lo que cabe en una página.
+     */
     private fun splitContentToFitPage(
         tempDiv: Div,
         maxHeight: Float,
@@ -173,6 +208,12 @@ class PDFLabelPrinterZebra(private val context: Context) {
         return parts
     }
 
+    /**
+     * Estima la altura que ocupará un elemento en el PDF.
+     *
+     * @param element Elemento del cual estimar la altura.
+     * @return Altura estimada en puntos.
+     */
     private fun estimateElementHeight(element: com.itextpdf.layout.element.IElement): Float {
         return try {
             when (element) {
@@ -208,6 +249,15 @@ class PDFLabelPrinterZebra(private val context: Context) {
         }
     }
 
+    /**
+     * Procesa un elemento HTML y lo convierte en elementos PDF.
+     *
+     * @param element Elemento HTML a procesar.
+     * @param div Contenedor Div donde se añadirán los elementos resultantes.
+     * @param regularFont Fuente regular para texto normal.
+     * @param boldItalicFont Fuente para títulos y énfasis.
+     * @param indentLevel Nivel de indentación para elementos anidados.
+     */
     private fun processElement(
         element: HtmlUtils.HtmlElement,
         div: Div,

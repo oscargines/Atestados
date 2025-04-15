@@ -16,6 +16,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * Clase para imprimir contenido HTML/PDF en impresoras Zebra mediante conversión a imágenes.
+ *
+ * @property context Contexto de Android para acceder a recursos y almacenamiento.
+ */
 class PDFToBitmapPrinter(private val context: Context) {
 
     companion object {
@@ -25,11 +30,38 @@ class PDFToBitmapPrinter(private val context: Context) {
         private const val PRINT_TIMEOUT_MS = 8000L
     }
 
+    /**
+     * Resultado de la operación de impresión.
+     */
     sealed interface PrintResult {
+        /**
+         * Indica que la impresión fue exitosa.
+         * @property printerName Nombre/identificador de la impresora.
+         * @property details Detalles adicionales del resultado.
+         */
         data class Success(val printerName: String, val details: String) : PrintResult
+
+        /**
+         * Indica que ocurrió un error durante la impresión.
+         * @property message Descripción del error.
+         * @property cause Excepción que causó el error (opcional).
+         */
         data class Error(val message: String, val cause: Exception? = null) : PrintResult
     }
 
+    /**
+     * Procesa e imprime contenido HTML como imágenes en una impresora Zebra.
+     *
+     * @param htmlAssetPath Ruta al archivo HTML en assets (alternativa a htmlContent).
+     * @param macAddress Dirección MAC de la impresora Bluetooth.
+     * @param outputFileName Nombre del archivo PDF temporal a generar.
+     * @param htmlContent Contenido HTML directo (alternativa a htmlAssetPath).
+     * @param onStatusUpdate Callback para actualizaciones de estado durante el proceso.
+     * @return [PrintResult] con el resultado de la operación.
+     *
+     * @throws IllegalArgumentException Si no se proporciona contenido HTML válido.
+     * @throws SecurityException Si no hay permisos para escribir en almacenamiento.
+     */
     suspend fun printHtmlAsBitmap(
         htmlAssetPath: String = "",
         macAddress: String,
@@ -84,6 +116,16 @@ class PDFToBitmapPrinter(private val context: Context) {
         }
     }
 
+    /**
+     * Envía los bitmaps a la impresora Zebra.
+     *
+     * @param macAddress Dirección MAC de la impresora Bluetooth.
+     * @param bitmaps Lista de bitmaps a imprimir.
+     * @param onStatusUpdate Callback para actualizaciones de estado.
+     * @return [PrintResult] con el resultado de la impresión.
+     *
+     * @note Maneja automáticamente la segmentación de imágenes grandes para impresoras RW420.
+     */
     private suspend fun printBitmaps(
         macAddress: String,
         bitmaps: List<Bitmap>,
@@ -169,6 +211,14 @@ class PDFToBitmapPrinter(private val context: Context) {
         }
     }
 
+    /**
+     * Divide un bitmap en segmentos verticales para impresoras con memoria limitada.
+     *
+     * @param bitmap Bitmap original a segmentar.
+     * @param maxWidth Ancho máximo de los segmentos.
+     * @param maxHeight Altura máxima de cada segmento.
+     * @return Lista de bitmaps segmentados.
+     */
     private fun segmentBitmap(bitmap: Bitmap, maxWidth: Int, maxHeight: Int): List<Bitmap> {
         val segments = mutableListOf<Bitmap>()
         var remainingHeight = bitmap.height
@@ -185,6 +235,12 @@ class PDFToBitmapPrinter(private val context: Context) {
         return segments
     }
 
+    /**
+     * Convierte un bitmap a escala de grises (monocromo) usando dithering.
+     *
+     * @param bitmap Bitmap original en color.
+     * @return Nuevo bitmap en blanco y negro.
+     */
     private fun convertToMonochrome(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height

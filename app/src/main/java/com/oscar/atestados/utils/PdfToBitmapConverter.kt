@@ -7,9 +7,34 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.File
 
+/**
+ * Objeto utilitario para convertir páginas de un archivo PDF en imágenes Bitmap.
+ *
+ * Proporciona funcionalidad para renderizar todas las páginas de un PDF
+ * en imágenes de mapa de bits con un DPI objetivo específico.
+ */
 object PdfToBitmapConverter {
     private const val TAG = "PdfToBitmapConverter"
 
+    /**
+     * Convierte todas las páginas de un archivo PDF en una lista de Bitmaps.
+     *
+     * @param pdfFile Archivo PDF a convertir.
+     * @param targetDpi Resolución objetivo en DPI (puntos por pulgada). Por defecto es 200 DPI.
+     * @return Lista de Bitmaps, uno por cada página del PDF. Lista vacía si hay errores.
+     *
+     * @throws SecurityException Si no se tienen permisos para leer el archivo.
+     * @throws IllegalStateException Si el PDF está corrupto o no se puede leer.
+     *
+     * @sample Ejemplo de uso:
+     * ```
+     * val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(File("ruta/al/archivo.pdf"))
+     * bitmaps.forEach { imageView.setImageBitmap(it) }
+     * ```
+     *
+     * @note Los recursos (PdfRenderer y FileDescriptor) se manejan automáticamente
+     * y se liberan correctamente incluso en caso de error.
+     */
     fun convertAllPagesToBitmaps(pdfFile: File, targetDpi: Int = 200): List<Bitmap> {
         if (!pdfFile.exists() || pdfFile.length() == 0L) {
             Log.e(TAG, "Archivo PDF no existe o está vacío: ${pdfFile.absolutePath}")

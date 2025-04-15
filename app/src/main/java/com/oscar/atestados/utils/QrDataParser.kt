@@ -4,7 +4,35 @@ import com.oscar.atestados.data.DniData
 import android.util.Log
 import java.util.regex.Pattern
 
+/**
+ * Clase para analizar y extraer datos estructurados de códigos QR de documentos de identidad.
+ *
+ * Implementa el parsing de contenido de QR según el formato estándar de DNIs españoles,
+ * extrayendo información como nombre, apellidos, número de documento, etc.
+ */
 class QrDataParser {
+
+    /**
+     * Analiza el contenido de un código QR y extrae los datos de identificación.
+     *
+     * @param qrContent Cadena de texto cruda obtenida del escaneo del QR.
+     * @return [DniData] con los campos extraídos. En caso de error, los campos serán nulos
+     *         y se incluirá un mensaje en la propiedad `error`.
+     *
+     * @throws IllegalArgumentException Si el contenido del QR está vacío o es inválido.
+     *
+     * @sample Ejemplo de uso:
+     * ```
+     * val parser = QrDataParser()
+     * val dniData = parser.parseQrContent(qrString)
+     * if (dniData.error != null) {
+     *     // Manejar error
+     * }
+     * ```
+     *
+     * @note Los patrones de regex están diseñados para el formato específico de DNIs españoles.
+     *       Puede requerir ajustes para otros formatos de documentos.
+     */
     fun parseQrContent(qrContent: String): DniData {
         try {
             // Limpiar caracteres no imprimibles

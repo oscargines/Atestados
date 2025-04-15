@@ -16,6 +16,17 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
 
+/**
+ * Clase helper para manejar la comunicación e impresión con impresoras Zebra vía Bluetooth.
+ *
+ * Proporciona métodos para imprimir desde diferentes fuentes:
+ * - Archivos de assets (formato ZPL)
+ * - Imágenes Bitmap
+ * - Comandos ZPL directos
+ * - Archivos locales
+ *
+ * @property context Contexto de Android para acceder a recursos y funcionalidades del sistema.
+ */
 class ZebraPrinterHelper(private val context: Context) {
 
     companion object {
@@ -28,11 +39,33 @@ class ZebraPrinterHelper(private val context: Context) {
 
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
 
+    /**
+     * Resultado de las operaciones de impresión.
+     */
     sealed interface PrintResult {
+        /**
+         * Indica que la impresión fue exitosa.
+         * @property printerName Nombre de la impresora.
+         * @property details Detalles adicionales del resultado.
+         */
         data class Success(val printerName: String, val details: String) : PrintResult
+
+        /**
+         * Indica que ocurrió un error durante la impresión.
+         * @property message Descripción del error.
+         * @property cause Excepción que causó el error (opcional).
+         */
         data class Error(val message: String, val cause: Exception? = null) : PrintResult
     }
 
+    /**
+     * Imprime un archivo ZPL desde los assets de la aplicación.
+     *
+     * @param assetFileName Nombre del archivo en la carpeta assets/formatos/.
+     * @param macAddress Dirección MAC de la impresora Bluetooth.
+     * @param onStatusUpdate Callback para actualizaciones de estado durante el proceso.
+     * @return [PrintResult] con el resultado de la operación.
+     */
     @SuppressLint("MissingPermission")
     suspend fun printFromAsset(
         assetFileName: String,
@@ -73,6 +106,14 @@ class ZebraPrinterHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Imprime una imagen Bitmap en la impresora Zebra.
+     *
+     * @param macAddress Dirección MAC de la impresora Bluetooth.
+     * @param bitmap Imagen a imprimir.
+     * @param onStatusUpdate Callback para actualizaciones de estado durante el proceso.
+     * @return [PrintResult] con el resultado de la operación.
+     */
     @SuppressLint("MissingPermission")
     suspend fun printBitmap(
         macAddress: String,
@@ -115,12 +156,22 @@ class ZebraPrinterHelper(private val context: Context) {
         }
     }
 
-    // Funciones auxiliares privadas
+    // ========== Funciones auxiliares privadas ========== //
+
+    /**
+     * Actualiza el estado de la operación y registra en log.
+     * @param onStatusUpdate Callback para enviar actualizaciones.
+     * @param message Mensaje de estado.
+     */
     private suspend fun updateStatus(onStatusUpdate: (String) -> Unit, message: String) {
         withContext(Dispatchers.Main) { onStatusUpdate(message) }
         Log.i(TAG, message)
     }
 
+    /**
+     * Verifica si el Bluetooth está habilitado.
+     * @return Boolean? true si está habilitado, false si no, null si no hay adaptador.
+     */
     private suspend fun verifyBluetoothEnabled(): Boolean? {
         return if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
             Log.e(TAG, "Bluetooth no habilitado")
@@ -128,10 +179,22 @@ class ZebraPrinterHelper(private val context: Context) {
         } else true
     }
 
+    /**
+     * Obtiene el dispositivo Bluetooth por dirección MAC.
+     * @param macAddress Dirección MAC del dispositivo.
+     * @return Dispositivo Bluetooth o null si no se encuentra.
+     */
     @SuppressLint("MissingPermission")
     private suspend fun getBluetoothDevice(macAddress: String) =
         bluetoothAdapter?.getRemoteDevice(macAddress)
 
+    /**
+     * Establece conexión con la impresora Zebra.
+     * @param macAddress Dirección MAC de la impresora.
+     * @param printerName Nombre de la impresora para logs.
+     * @param onStatusUpdate Callback para actualizaciones.
+     * @return Conexión establecida o null si falla.
+     */
     private suspend fun establishConnection(
         macAddress: String,
         printerName: String,
@@ -150,6 +213,10 @@ class ZebraPrinterHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Limpia la memoria de la impresora con comando ZPL.
+     * @param connection Conexión activa con la impresora.
+     */
     private fun clearPrinterMemory(connection: Connection) {
         try {
             connection.write("^XA^MCY^XZ".toByteArray()) // Limpia buffer en ZPL
@@ -159,6 +226,13 @@ class ZebraPrinterHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Lee el contenido de un archivo desde assets.
+     * @param assetFileName Nombre del archivo en assets/formatos/.
+     * @param onStatusUpdate Callback para actualizaciones.
+     * @return Contenido del archivo como String.
+     * @throws Exception Si falla la lectura del archivo.
+     */
     private suspend fun readAssetContent(assetFileName: String, onStatusUpdate: (String) -> Unit): String {
         return try {
             updateStatus(onStatusUpdate, "Leyendo archivo...")
@@ -172,6 +246,12 @@ class ZebraPrinterHelper(private val context: Context) {
         }
     }
 
+    /**
+     * Envía un trabajo de impresión a la impresora.
+     * @param connection Conexión activa con la impresora.
+     * @param content Contenido ZPL a imprimir.
+     * @param onStatusUpdate Callback para actualizaciones.
+     */
     private suspend fun sendPrintJob(
         connection: Connection,
         content: String,
@@ -182,6 +262,12 @@ class ZebraPrinterHelper(private val context: Context) {
         TimeUnit.MILLISECONDS.sleep(PRINT_TIMEOUT_MS)
     }
 
+    /**
+     * Verifica el estado de la impresora después de imprimir.
+     * @param connection Conexión activa con la impresora.
+     * @param printerName Nombre de la impresora para logs.
+     * @param onStatusUpdate Callback para actualizaciones.
+     */
     private suspend fun verifyPrintStatus(
         connection: Connection,
         printerName: String,
@@ -198,7 +284,11 @@ class ZebraPrinterHelper(private val context: Context) {
         updateStatus(onStatusUpdate, "Estado de $printerName: ${status ?: "desconocido"}")
     }
 
-    // Método para enviar comandos ZPL crudos
+    /**
+     * Envía un comando ZPL directamente a la impresora.
+     * @param macAddress Dirección MAC de la impresora.
+     * @param zplCommand Comando ZPL a enviar.
+     */
     fun sendRawCommand(macAddress: String, zplCommand: String) {
         val connection = BluetoothConnection(macAddress)
         try {
@@ -213,6 +303,11 @@ class ZebraPrinterHelper(private val context: Context) {
             }
         }
     }
+
+    /**
+     * Configura la orientación de impresión.
+     * @param connection Conexión activa con la impresora.
+     */
     private fun setPrintOrientation(connection: Connection) {
         try {
             // Para ZPL
@@ -224,6 +319,14 @@ class ZebraPrinterHelper(private val context: Context) {
             Log.e(TAG, "Error configurando orientación", e)
         }
     }
+
+    /**
+     * Imprime el contenido de un archivo local.
+     * @param filePath Ruta completa al archivo.
+     * @param macAddress Dirección MAC de la impresora.
+     * @param onStatusUpdate Callback para actualizaciones.
+     * @return [PrintResult] con el resultado de la operación.
+     */
     @SuppressLint("MissingPermission")
     fun printFromFile(filePath: String, macAddress: String, onStatusUpdate: (String) -> Unit): PrintResult {
         return try {
@@ -238,14 +341,13 @@ class ZebraPrinterHelper(private val context: Context) {
             val printerName = device?.name ?: "Impresora Zebra"
 
             onStatusUpdate("Imprimiendo archivo desde $filePath a $printerName")
-            // Implementar lógica para leer el archivo y enviarlo a la impresora Zebra
             val content = file.readText(Charsets.UTF_8)
 
             // Conectar y enviar el contenido
             val connection = BluetoothConnection(macAddress)
             connection.open()
             connection.write(content.toByteArray(Charsets.UTF_8))
-            TimeUnit.MILLISECONDS.sleep(PRINT_TIMEOUT_MS) // Esperar a que se complete la impresión
+            TimeUnit.MILLISECONDS.sleep(PRINT_TIMEOUT_MS)
             connection.close()
 
             PrintResult.Success(printerName, "Archivo impreso correctamente")

@@ -28,9 +28,36 @@ import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.DefaultDecoderFactory
 import com.oscar.atestados.data.DniData
 
+/**
+ * Diálogo componible que maneja el escaneo de códigos QR y el parseo de datos de DNI.
+ *
+ * Este componente integra la cámara del dispositivo para escanear códigos QR y parsea automáticamente
+ * el contenido en datos estructurados [DniData] usando [QrDataParser]. Maneja los permisos de cámara
+ * y proporciona retroalimentación al usuario.
+ *
+ * @sample Ejemplo de uso:
+ * ```
+ * QrScannerDialog(
+ *     onQrCodeScanned = { dniData ->
+ *         // Manejar los datos del DNI parseados
+ *     },
+ *     onDismiss = {
+ *         // Manejar el cierre del diálogo
+ *     }
+ * )
+ * ```
+ */
 @Composable
 fun QrScannerDialog(
-    onQrCodeScanned: (DniData) -> Unit, // Cambiar a DniData
+    /**
+     * Callback que se invoca cuando se escanea y parsea correctamente un código QR.
+     * @param dniData Los datos del DNI parseados que contienen todos los campos extraídos.
+     */
+    onQrCodeScanned: (DniData) -> Unit,
+
+    /**
+     * Callback que se invoca cuando el usuario cierra el diálogo.
+     */
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -43,7 +70,7 @@ fun QrScannerDialog(
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    val qrDataParser = remember { QrDataParser() } // Instanciar el parser
+    val qrDataParser = remember { QrDataParser() }
 
     // Verificar permisos al iniciar
     LaunchedEffect(Unit) {
@@ -55,6 +82,7 @@ fun QrScannerDialog(
         }
     }
 
+    // Mostrar diálogo de solicitud de permisos si es necesario
     if (!hasCameraPermission) {
         AlertDialog(
             onDismissRequest = onDismiss,
@@ -69,6 +97,9 @@ fun QrScannerDialog(
         return
     }
 
+    /**
+     * Diálogo principal del escáner QR que contiene la vista previa de la cámara.
+     */
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Escanear Código QR") },
@@ -78,27 +109,39 @@ fun QrScannerDialog(
                     .fillMaxWidth()
                     .height(400.dp)
             ) {
+                /**
+                 * Vista personalizada de Android que implementa el escáner QR usando la biblioteca ZXing.
+                 */
                 AndroidView(
                     factory = { ctx ->
                         val barcodeView = DecoratedBarcodeView(ctx).apply {
+                            // Configurar decodificador solo para códigos QR
                             val formats = listOf(BarcodeFormat.QR_CODE)
                             decoderFactory = DefaultDecoderFactory(formats)
+
+                            // Optimizar configuración del escáner
                             cameraSettings.isAutoFocusEnabled = true
                             cameraSettings.isContinuousFocusEnabled = true
-                            cameraSettings.requestedCameraId = -1
+                            cameraSettings.requestedCameraId = -1 // Usar cámara trasera
+
+                            // Establecer layout a tamaño completo
                             layoutParams = android.widget.FrameLayout.LayoutParams(
                                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                             )
+
+                            /**
+                             * Callback que maneja los resultados del escaneo QR.
+                             */
                             decodeContinuous(object : BarcodeCallback {
                                 override fun barcodeResult(result: BarcodeResult) {
                                     val qrContent = result.text
                                     if (qrContent != null) {
                                         Log.d("QrScannerDialog", "QR detectado: $qrContent")
-                                        // Parsear el contenido a DniData
+                                        // Parsear contenido QR a DniData
                                         val dniData = qrDataParser.parseQrContent(qrContent)
                                         onQrCodeScanned(dniData)
-                                        pause()
+                                        pause() // Pausar después de escaneo exitoso
                                     } else {
                                         Log.w("QrScannerDialog", "QR detectado pero sin contenido")
                                     }
@@ -108,6 +151,8 @@ fun QrScannerDialog(
                                     Log.d("QrScannerDialog", "Puntos detectados: ${resultPoints?.size ?: 0}")
                                 }
                             })
+
+                            // Texto de guía para el usuario
                             statusView.text = "Apunte al QR y mantenga la cámara estable"
                             statusView.setTextColor(android.graphics.Color.WHITE)
                         }
@@ -129,6 +174,9 @@ fun QrScannerDialog(
         }
     )
 
+    /**
+     * Diálogo de error que se muestra cuando hay problemas en el proceso de escaneo.
+     */
     if (errorMessage != null) {
         AlertDialog(
             onDismissRequest = { errorMessage = null },
@@ -142,6 +190,9 @@ fun QrScannerDialog(
         )
     }
 
+    /**
+     * Efecto de limpieza que se ejecuta cuando el componente se descompone.
+     */
     DisposableEffect(Unit) {
         onDispose {
             Log.d("QrScannerDialog", "Escáner cerrado")

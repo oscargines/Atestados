@@ -27,9 +27,23 @@ import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import com.journeyapps.barcodescanner.DefaultDecoderFactory
 
+/**
+ * Componente Composable que muestra un diálogo para escanear códigos QR.
+ *
+ * Maneja automáticamente los permisos de cámara y configura el escáner QR optimizado.
+ * Utiliza la biblioteca ZXing para el escaneo de códigos QR.
+ */
 @Composable
 fun QrScannerDialog(
+    /**
+     * Callback invocado cuando se detecta un código QR válido.
+     * @param qrContent Contenido del código QR escaneado.
+     */
     onQrCodeScanned: (String) -> Unit,
+
+    /**
+     * Callback invocado cuando el usuario cierra el diálogo.
+     */
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -67,6 +81,10 @@ fun QrScannerDialog(
         return
     }
 
+    /**
+     * Diálogo principal del escáner QR.
+     * Contiene una vista de cámara configurada específicamente para escanear códigos QR.
+     */
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Escanear Código QR") },
@@ -76,6 +94,9 @@ fun QrScannerDialog(
                     .fillMaxWidth()
                     .height(400.dp) // Área grande para QR complejos
             ) {
+                /**
+                 * Vista personalizada del escáner QR usando la biblioteca ZXing.
+                 */
                 AndroidView(
                     factory = { ctx ->
                         val barcodeView = DecoratedBarcodeView(ctx).apply {
@@ -94,7 +115,9 @@ fun QrScannerDialog(
                                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                             )
 
-                            // Callback para manejar resultados
+                            /**
+                             * Callback para manejar los resultados del escaneo.
+                             */
                             decodeContinuous(object : BarcodeCallback {
                                 override fun barcodeResult(result: BarcodeResult) {
                                     val qrContent = result.text
@@ -134,6 +157,9 @@ fun QrScannerDialog(
         }
     )
 
+    /**
+     * Diálogo de error que se muestra cuando ocurre algún problema.
+     */
     if (errorMessage != null) {
         AlertDialog(
             onDismissRequest = { errorMessage = null },
@@ -147,6 +173,9 @@ fun QrScannerDialog(
         )
     }
 
+    /**
+     * Efecto para limpieza cuando el componente se descompone.
+     */
     DisposableEffect(Unit) {
         onDispose {
             Log.d("QrScannerDialog", "Escáner cerrado")
