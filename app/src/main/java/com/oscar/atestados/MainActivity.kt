@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 private const val TAG = "MainActivity"
 
@@ -296,7 +297,9 @@ class MainActivity : ComponentActivity() {
             listOf("paises.db", "juzgados.db", "dispositivos.db").forEach { dbName ->
                 loadingStatus = "Cargando $dbName..."
                 Log.d(TAG, "Cargando base de datos: $dbName")
-                AccesoBaseDatos(this@MainActivity, dbName, 1).use { it.createDatabase() }
+
+                val dbHelper = AccesoBaseDatos(this@MainActivity, dbName)
+                dbHelper.initializeDatabases()
             }
             loadingStatus = "Bases de datos listas"
             Log.d(TAG, "Bases de datos cargadas exitosamente")

@@ -1,6 +1,5 @@
 package com.oscar.atestados.data
 
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
@@ -15,21 +14,39 @@ import java.io.IOException
  *
  * @property context Contexto de la aplicación.
  * @property nombreBaseDatos Nombre del archivo de la base de datos.
- * @property version Versión de la base de datos.
  */
-class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
-    SQLiteOpenHelper(context, nombreBaseDatos, null, version) {
+class AccesoBaseDatos(context: Context, nombreBaseDatos: String) :
+    SQLiteOpenHelper(context, nombreBaseDatos, null, EXPECTED_DATABASE_VERSION) {
 
     private val DATABASE_NAME = nombreBaseDatos
-    private val DATABASE_VERSION = version
-    private lateinit var DB_PATH: String
+    private val DATABASE_VERSION = EXPECTED_DATABASE_VERSION
     private val myContext: Context = context
+    private val DB_PATH: String = context.getDatabasePath(DATABASE_NAME).toString()
+
+    companion object {
+        const val EXPECTED_DATABASE_VERSION = 2 // Incrementar cuando se actualice cualquier .db en assets
+        private const val TAG = "AccesoBaseDatos"
+    }
 
     init {
-        DB_PATH = context.getDatabasePath(DATABASE_NAME).toString()
-        Log.d("AccesoBaseDatos", "Ruta de la base de datos: $DB_PATH")
+        Log.d(TAG, "Ruta de la base de datos: $DB_PATH")
+    }
+
+    /**
+     * Inicializa la base de datos, verificando si existe y si su versión es la esperada.
+     * Si no existe o está obsoleta, la copia desde assets.
+     */
+    fun initializeDatabases() {
         if (!checkDatabase()) {
-            createDatabase()
+            try {
+                createDatabase()
+            } catch (e: IOException) {
+                Log.e(TAG, "Error inicializando $DATABASE_NAME: ${e.message}", e)
+                // Crear una base de datos vacía como respaldo
+                ensureTableExists()
+            }
+        } else {
+            Log.d(TAG, "Base de datos $DATABASE_NAME ya está actualizada")
         }
     }
 
@@ -40,31 +57,36 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
      */
     @Throws(IOException::class)
     fun createDatabase() {
-        val dbExist = checkDatabase()
-        if (!dbExist) {
-            this.close()
-            try {
-                copyDatabase()
-            } catch (e: IOException) {
-                Log.e("AccesoBaseDatos", "Error copiando la base de datos: ${e.message}")
-                throw Error("Error copiando la base de datos")
-            }
+        this.close()
+        try {
+            copyDatabase()
+        } catch (e: IOException) {
+            Log.e(TAG, "Error copiando la base de datos $DATABASE_NAME: ${e.message}", e)
+            throw IOException("No se pudo copiar la base de datos desde dataBases/$DATABASE_NAME: ${e.message}", e)
         }
     }
 
     /**
-     * Verifica si la base de datos existe en la ruta especificada.
+     * Verifica si la base de datos existe en la ruta especificada y tiene la versión correcta.
      *
-     * @return true si la base de datos existe, false en caso contrario.
+     * @return true si la base de datos existe y está actualizada, false si no existe o está obsoleta.
      */
-    private fun checkDatabase(): Boolean {
+    fun checkDatabase(): Boolean {
         var db: SQLiteDatabase? = null
         return try {
+            Log.d(TAG, "Verificando existencia de $DATABASE_NAME en $DB_PATH")
             db = SQLiteDatabase.openDatabase(DB_PATH, null, SQLiteDatabase.OPEN_READONLY)
-            Log.e(TAG, "Se ha encontrado la base de datos, se encuentra en $DB_PATH")
-            true
+            val version = db.version
+            Log.d(TAG, "Base de datos $DATABASE_NAME encontrada con versión $version")
+            if (version < EXPECTED_DATABASE_VERSION) {
+                Log.d(TAG, "Versión obsoleta (v$version < v$EXPECTED_DATABASE_VERSION)")
+                false
+            } else {
+                Log.d(TAG, "Versión válida (v$version)")
+                true
+            }
         } catch (e: SQLiteException) {
-            Log.e(TAG, "La base de datos no existe")
+            Log.e(TAG, "Error verificando $DATABASE_NAME: ${e.message}", e)
             false
         } finally {
             db?.close()
@@ -79,51 +101,110 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
     @Throws(IOException::class)
     private fun copyDatabase() {
         val dbFile = File(DB_PATH)
+        Log.d(TAG, "Iniciando copia de $DATABASE_NAME desde assets")
         if (!dbFile.parentFile.exists()) {
-            dbFile.parentFile.mkdirs()
-        }
-        val inputStream = myContext.assets.open(DATABASE_NAME)
-        val outputStream = FileOutputStream(dbFile)
-        val buffer = ByteArray(1024)
-        var length: Int
-        try {
-            while (inputStream.read(buffer).also { length = it } > 0) {
-                outputStream.write(buffer, 0, length)
+            Log.d(TAG, "Creando directorio padre: ${dbFile.parentFile.path}")
+            if (!dbFile.parentFile.mkdirs()) {
+                throw IOException("No se pudo crear el directorio padre: ${dbFile.parentFile.path}")
             }
-            outputStream.flush()
-            Log.d("AccesoBaseDatos", "Base de datos copiada exitosamente a $DB_PATH")
+            Log.d(TAG, "Copia de $DATABASE_NAME completada con éxito")
+        }
+        try {
+            val assetPath = "dataBases/$DATABASE_NAME"
+            val inputStream = myContext.assets.open(assetPath)
+            Log.d(TAG, "Abriendo archivo desde assets: $assetPath")
+            val outputStream = FileOutputStream(dbFile)
+            val buffer = ByteArray(1024)
+            var length: Int
+            try {
+                while (inputStream.read(buffer).also { length = it } > 0) {
+                    outputStream.write(buffer, 0, length)
+                }
+                outputStream.flush()
+                Log.d(TAG, "Base de datos $DATABASE_NAME copiada exitosamente a $DB_PATH")
+            } catch (e: IOException) {
+                Log.e(TAG, "Error durante la copia de la base de datos $DATABASE_NAME: ${e.message}", e)
+                throw e
+            } finally {
+                outputStream.close()
+                inputStream.close()
+            }
+            SQLiteDatabase.openDatabase(DB_PATH, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                db.version = EXPECTED_DATABASE_VERSION
+            }
+            Log.d(TAG, "Base de datos $DATABASE_NAME copiada con versión $EXPECTED_DATABASE_VERSION")
         } catch (e: IOException) {
-            Log.e("AccesoBaseDatos", "Error copiando la base de datos: ${e.message}")
+            Log.e(TAG, "No se pudo abrir el archivo dataBases/$DATABASE_NAME desde assets: ${e.message}", e)
             throw e
-        } finally {
-            outputStream.close()
-            inputStream.close()
         }
     }
 
-    /**
-     * Método llamado cuando se crea la base de datos por primera vez.
-     *
-     * @param db La base de datos.
-     */
-    override fun onCreate(db: SQLiteDatabase?) {}
+    override fun onCreate(db: SQLiteDatabase?) {
+        when (DATABASE_NAME) {
+            "dispositivos.db" -> {
+                db?.execSQL("""
+                CREATE TABLE IF NOT EXISTS dispositivos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    mac TEXT NOT NULL UNIQUE
+                )
+            """)
+                Log.d(TAG, "Tabla 'dispositivos' creada en $DATABASE_NAME")
+            }
+            "paises.db" -> {
+                db?.execSQL("""
+                CREATE TABLE IF NOT EXISTS paises (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL
+                )
+            """)
+                Log.d(TAG, "Tabla 'paises' creada en $DATABASE_NAME")
+            }
+            "juzgados.db" -> {
+                db?.execSQL("""
+                CREATE TABLE IF NOT EXISTS juzgados (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    ubicacion TEXT
+                )
+            """)
+                db?.execSQL("""
+                CREATE TABLE IF NOT EXISTS partidos_judiciales (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    municipio TEXT NOT NULL,
+                    partido_judicial TEXT NOT NULL
+                )
+            """)
+                Log.d(TAG, "Tablas 'juzgados' y 'partidos_judiciales' creadas en $DATABASE_NAME")
+            }
+        }
+    }
 
-    /**
-     * Método llamado cuando la base de datos necesita ser actualizada.
-     *
-     * @param db La base de datos.
-     * @param oldVersion La versión antigua de la base de datos.
-     * @param newVersion La nueva versión de la base de datos.
-     */
-    override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {}
+    override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
+        Log.d(TAG, "Actualizando $DATABASE_NAME de versión $oldVersion a $newVersion")
+        try {
+            createDatabase() // Copia la nueva base de datos desde assets
+        } catch (e: IOException) {
+            Log.e(TAG, "Error al actualizar $DATABASE_NAME: ${e.message}", e)
+            // Opcional: Crear tablas de respaldo si la copia falla
+            onCreate(db)
+        }
+    }
 
-    /**
-     * Ejecuta una consulta SQL en la base de datos y devuelve los resultados como una lista de mapas.
-     *
-     * @param query Consulta SQL a ejecutar.
-     * @param args Argumentos para la consulta SQL (opcional).
-     * @return Lista de mapas donde cada mapa representa una fila con nombres de columnas como claves y valores como datos.
-     */
+    override fun onDowngrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
+        Log.w(TAG, "Downgrade detectado: de versión $oldVersion a $newVersion")
+        val dbFile = File(DB_PATH)
+        if (dbFile.exists()) {
+            dbFile.delete()
+            Log.d(TAG, "Base de datos $DATABASE_NAME eliminada debido a downgrade")
+        }
+        try {
+            createDatabase()
+        } catch (e: IOException) {
+            Log.e(TAG, "Error recreando la base de datos tras downgrade: ${e.message}", e)
+        }
+    }
+
     fun query(query: String, args: Array<String>? = null): List<Map<String, Any>> {
         return SQLiteDatabase.openDatabase(DB_PATH, null, SQLiteDatabase.OPEN_READONLY).use { db ->
             db.rawQuery(query, args).use { cursor ->
@@ -142,44 +223,27 @@ class AccesoBaseDatos(context: Context, nombreBaseDatos: String, version: Int) :
         }
     }
 
-    /**
-     * Copia la base de datos desde los assets y verifica si se copió correctamente.
-     *
-     * @return true si la copia fue exitosa, false en caso contrario.
-     */
-    fun copiaBD(): Boolean {
+    fun ensureTableExists() {
         try {
-            copyDatabase()
-            return checkDatabase()
-        } catch (e: IOException) {
-            Log.e("AccesoBaseDatos", "Error copiando la base de datos: ${e.message}")
-            return false
+            val db = this.writableDatabase
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS dispositivos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    mac TEXT NOT NULL UNIQUE
+                )
+            """)
+            Log.d(TAG, "Tabla 'dispositivos' asegurada con UNIQUE en mac")
+        } catch (e: SQLiteException) {
+            Log.e(TAG, "Error asegurando la tabla dispositivos: ${e.message}", e)
         }
     }
 
-    /**
-     * Asegura que la tabla 'dispositivos' exista en la base de datos con las columnas requeridas.
-     * Si la tabla no existe, la crea con las columnas id, nombre y mac (única).
-     */
-    fun ensureTableExists() {
-        val db = this.writableDatabase
-        db.execSQL("""
-            CREATE TABLE IF NOT EXISTS dispositivos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
-                mac TEXT NOT NULL UNIQUE
-            )
-        """)
-        Log.d("AccesoBaseDatos", "Tabla 'dispositivos' asegurada con UNIQUE en mac")
-    }
-
-    /**
-     * Ejecuta una sentencia SQL en la base de datos.
-     *
-     * @param query Sentencia SQL a ejecutar.
-     * @param args Argumentos para la sentencia SQL (opcional).
-     */
     fun execSQL(query: String, args: Array<Any?> = emptyArray()) {
         writableDatabase.execSQL(query, args)
+    }
+
+    fun getDatabasePath(): String {
+        return DB_PATH
     }
 }

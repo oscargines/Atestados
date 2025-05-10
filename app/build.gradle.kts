@@ -1,5 +1,6 @@
 
 import com.android.build.api.dsl.Packaging
+import org.gradle.api.JavaVersion.VERSION_11
 
 plugins {
     alias(libs.plugins.android.application)
@@ -19,9 +20,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         manifestPlaceholders["nfcPermission"] = "android.permission.NFC"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["nfcPermission"] = "android.permission.NFC"
     }
 
     buildTypes {
@@ -50,7 +49,7 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
 
@@ -95,6 +94,9 @@ dependencies {
 
     // Localización
     implementation (libs.play.services.location)
+    implementation (libs.okhttp)
+    implementation (libs.json)
+    implementation (libs.androidx.datastore.preferences.v100)
 
     // Splashscreen
     implementation(libs.androidx.core.splashscreen)
@@ -122,8 +124,6 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.74")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.74")
     implementation("org.bouncycastle:bcutil-jdk18on:1.74")
-    /*implementation(libs.jmrtd)
-    implementation(libs.scuba.smartcards)*/
 
     // Gson
     implementation(libs.gson)
@@ -152,6 +152,10 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Coroutines support for Play Services Tasks
+    implementation(libs.kotlinx.coroutines.play.services)
+
 }
 
 // Forzar versión 1.78 para BouncyCastle

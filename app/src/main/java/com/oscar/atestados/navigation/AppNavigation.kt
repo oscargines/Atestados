@@ -221,11 +221,32 @@ fun NavGraphBuilder.appNavigation(
      */
     composable("Alcoholemia02Screen") {
         val alcoholemiaDosViewModel: AlcoholemiaDosViewModel = viewModel()
+        val alcoholemiaUnoViewModel: AlcoholemiaUnoViewModel = viewModel()
+        val vehiculoViewModel: VehiculoViewModel = viewModel()
+        val tomaDerechosViewModel: TomaDerechosViewModel = viewModel()
+        val tomaManifestacionViewModel: TomaManifestacionAlcoholViewModel = viewModel()
+        val lecturaDerechosViewModel: LecturaDerechosViewModel = viewModel()
+        val guardiasViewModel: GuardiasViewModel = viewModel()
+        val bluetoothViewModel: BluetoothViewModel = viewModel()
+        val factory = ImpresoraViewModelFactory(
+            bluetoothViewModel = bluetoothViewModel,
+            context = navController.context
+        )
+        val impresoraViewModel: ImpresoraViewModel = viewModel(factory = factory)
+
         Alcoholemia02Screen(
             navigateToScreen = { route ->
                 navController.navigate(route)
             },
-            alcoholemiaDosViewModel = alcoholemiaDosViewModel
+            alcoholemiaDosViewModel = alcoholemiaDosViewModel,
+            alcoholemiaUnoViewModel = alcoholemiaUnoViewModel,
+            personaViewModel = personaViewModel, // Reutilizando desde los parámetros de appNavigation
+            vehiculoViewModel = vehiculoViewModel,
+            tomaDerechosViewModel = tomaDerechosViewModel,
+            tomaManifestacionViewModel = tomaManifestacionViewModel,
+            lecturaDerechosViewModel = lecturaDerechosViewModel,
+            guardiasViewModel = guardiasViewModel,
+            impresoraViewModel = impresoraViewModel
         )
     }
 

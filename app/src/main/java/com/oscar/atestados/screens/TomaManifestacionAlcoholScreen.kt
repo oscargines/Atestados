@@ -10,12 +10,16 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.oscar.atestados.ui.theme.BotonesNormales
+import com.oscar.atestados.ui.theme.TextoBotonesNormales
 import com.oscar.atestados.ui.theme.TextoNormales
 import com.oscar.atestados.ui.theme.TextoSecundarios
+import com.oscar.atestados.ui.theme.TextoTerciarios
 import com.oscar.atestados.viewModel.TomaManifestacionAlcoholViewModel
 
 /**
@@ -32,10 +36,12 @@ fun TomaManifestacionAlcoholScreen(
     navigateToScreen: (String) -> Unit,
     tomaManifestacionAlcoholViewModel: TomaManifestacionAlcoholViewModel
 ) {
+    val context = LocalContext.current
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = { TomaManifestacionAlcoholTopBar() },
-        bottomBar = { TomaManifestacionAlcoholBottomBar(tomaManifestacionAlcoholViewModel, navigateToScreen) }
+        bottomBar = { TomaManifestacionAlcoholBottomBar(tomaManifestacionAlcoholViewModel, navigateToScreen, context) }
     ) { paddingValues ->
         TomaManifestacionAlcoholContent(
             modifier = Modifier.padding(paddingValues),
@@ -242,7 +248,8 @@ private fun TomaManifestacionAlcoholContent(
 @Composable
 private fun TomaManifestacionAlcoholBottomBar(
     viewModel: TomaManifestacionAlcoholViewModel,
-    navigateToScreen: (String) -> Unit
+    navigateToScreen: (String) -> Unit,
+    context: android.content.Context
 ) {
     Row(
         modifier = Modifier
@@ -252,11 +259,15 @@ private fun TomaManifestacionAlcoholBottomBar(
     ) {
         Button(
             onClick = {
-                viewModel.guardarDatos()
+                viewModel.guardarDatos(context)
                 navigateToScreen("Alcoholemia02Screen")
             },
             modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(0.dp)
+            shape = RoundedCornerShape(0.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BotonesNormales,
+                contentColor = TextoBotonesNormales
+            )
         ) {
             Text("GUARDAR")
         }
@@ -266,7 +277,11 @@ private fun TomaManifestacionAlcoholBottomBar(
         Button(
             onClick = { viewModel.limpiarDatos() },
             modifier = Modifier.weight(1f),
-            shape = RoundedCornerShape(0.dp)
+            shape = RoundedCornerShape(0.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BotonesNormales,
+                contentColor = TextoBotonesNormales
+            )
         ) {
             Text("LIMPIAR")
         }
@@ -327,11 +342,19 @@ private fun CustomTextField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label, fontWeight = FontWeight.Bold) },
+        label = { Text(label, fontWeight = FontWeight.Bold, color = TextoTerciarios) },
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         singleLine = singleLine,
-        maxLines = maxLines
+        maxLines = maxLines,
+        colors = TextFieldDefaults.colors(
+            focusedLabelColor = TextoTerciarios,
+            unfocusedLabelColor = TextoTerciarios,
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            focusedIndicatorColor = TextoNormales,
+            unfocusedIndicatorColor = TextoSecundarios
+        )
     )
 }

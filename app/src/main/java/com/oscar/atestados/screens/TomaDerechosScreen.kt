@@ -57,6 +57,7 @@ fun TomaDerechosScreen(
     tomaDerechosViewModel: TomaDerechosViewModel
 ) {
     val mensajes = ObtenerDerechos(context = LocalContext.current)
+    val context = LocalContext.current
 
     // Solo lanza el alert si hay mensajes cargados
     if (mensajes.isNotEmpty() && mensajes != listOf("Cargando mensajes...")) {
@@ -68,7 +69,7 @@ fun TomaDerechosScreen(
             .fillMaxSize()
             .padding(top = 16.dp),
         topBar = { TomaDerechosTopBar() },
-        bottomBar = { LecturaDerechosDosBottomBar(tomaDerechosViewModel, navigateToScreen) }
+        bottomBar = { LecturaDerechosDosBottomBar(tomaDerechosViewModel, navigateToScreen, context) }
     ) { paddingValues ->
         TomaDerechosContent(
             modifier = Modifier.padding(paddingValues),
@@ -327,7 +328,8 @@ private fun TomaDerechosContent(
 @Composable
 private fun LecturaDerechosDosBottomBar(
     viewModel: TomaDerechosViewModel,
-    navigateToScreen: (String) -> Unit
+    navigateToScreen: (String) -> Unit,
+    context: android.content.Context
 ) {
     Row(
         modifier = Modifier
@@ -337,7 +339,7 @@ private fun LecturaDerechosDosBottomBar(
     ) {
         Button(
             onClick = {
-                viewModel.guardarDatos()
+                viewModel.guardarDatos(context)
                 navigateToScreen("TomaManifestacionAlcoholScreen")
             },
             colors = ButtonDefaults.buttonColors(

@@ -1,12 +1,14 @@
 package com.oscar.atestados.viewModel
 
+import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.appcompat.app.AlertDialog
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.oscar.atestados.screens.dataStoreVeh
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +20,7 @@ import kotlinx.coroutines.withContext
  * Maneja la persistencia de datos utilizando DataStore y expone los datos a través de LiveData.
  * Incluye información sobre matrícula, fechas, características del vehículo y datos del seguro.
  */
-class VehiculoViewModel : ViewModel() {
+class VehiculoViewModel(application: Application) : AndroidViewModel(application) {
 
     /** LiveData privado para la matrícula del vehículo. */
     private val _matricula = MutableLiveData<String>()
@@ -239,6 +241,9 @@ class VehiculoViewModel : ViewModel() {
             _fechaITV.value = ""
         }
     }
+    init {
+        loadData(getApplication()) // Cargar datos al inicializar
+    }
 
     /**
      * Carga los datos del vehículo almacenados en el DataStore y los asigna a los LiveData correspondientes.
@@ -260,6 +265,7 @@ class VehiculoViewModel : ViewModel() {
                 _aseguradora.value = preferences[VehiculoKeys.ASEGURADORA] ?: ""
                 _numeroPoliza.value = preferences[VehiculoKeys.NUMERO_POLIZA] ?: ""
                 _fechaITV.value = preferences[VehiculoKeys.FECHA_ITV] ?: ""
+                Log.d("VehiculoViewModel", "Datos cargados - matricula: ${_matricula.value}")
             }
         }
     }

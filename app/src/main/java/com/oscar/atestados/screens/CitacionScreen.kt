@@ -1,6 +1,5 @@
 package com.oscar.atestados.screens
 
-import android.content.Intent
 import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
@@ -25,9 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.FileProvider
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
+import com.oscar.atestados.data.CitacionDataProvider
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.utils.HtmlParser
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
@@ -58,55 +57,97 @@ fun CitacionScreen(
     var generateResult by remember { mutableStateOf<Result<String>?>(null) }
     var triggerGenerate by remember { mutableStateOf(false) }
     var isPrintingActa by remember { mutableStateOf(false) }
-    var showPreviewDialog by remember { mutableStateOf(false) } // Nuevo estado para el diálogo
-    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) } // Bitmap para previsualización
+    var showPreviewDialog by remember { mutableStateOf(false) }
+    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
+    var showMissingFieldsDialog by remember { mutableStateOf(false) }
+    var missingFieldsToShow by remember { mutableStateOf<List<String>>(emptyList()) }
     val htmlParser = remember { HtmlParser(context) }
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
+    val dataProvider = remember { CitacionDataProvider(citacionViewModel) }
 
     Log.v(TAG, "CitacionScreen iniciada")
 
-    // ... (mantén el resto del código hasta el LaunchedEffect para isPrintingActa)
+    // Manejar el trigger de generación
+    LaunchedEffect(triggerGenerate) {
+        if (triggerGenerate) {
+            isGenerating = true
+            try {
+                val (isValid, missingFields) = dataProvider.validateData()
+                if (!isValid) {
+                    missingFieldsToShow = missingFields
+                    showMissingFieldsDialog = true
+                    generateResult = Result.failure(Exception("Por favor, complete todos los campos requeridos"))
+                } else {
+                    val filePath = withContext(Dispatchers.IO) {
+                        htmlParser.generateHtmlFile(
+                            templateAssetPath = "documents/acta_citacion.html",
+                            dataProvider = dataProvider
+                        )
+                    }
+                    generateResult = Result.success("Datos guardados y archivo HTML generado en: $filePath")
+                }
+            } catch (e: Exception) {
+                generateResult = Result.failure(e)
+            } finally {
+                isGenerating = false
+                triggerGenerate = false
+            }
+        }
+    }
 
+    // Manejar la impresión del acta
     LaunchedEffect(isPrintingActa) {
         if (isPrintingActa) {
             try {
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
-                if (!macAddress.isNullOrEmpty()) {
-                    currentPrintStatus = "Preparando documento..."
-
-                    // Generar el archivo HTML temporal con HtmlParser
-                    val tempHtmlFilePath = withContext(Dispatchers.IO) {
-                        htmlParser.generateHtmlFile("documents/acta_citacion.html", citacionViewModel)
-                    }
-                    val htmlContent = withContext(Dispatchers.IO) {
-                        File(tempHtmlFilePath).readText(Charsets.UTF_8)
-                    }
-
-                    // Generar el PDF para previsualización
-                    val outputFile = File(context.getExternalFilesDir(null), "acta_citacion_preview.pdf")
-                    if (outputFile.exists()) outputFile.delete()
-                    val pdfLabelPrinter = PDFLabelPrinterZebra(context)
-                    pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
-                    currentPrintStatus = "PDF generado para previsualización"
-
-                    // Convertir a Bitmap para previsualización
-                    val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
-                    if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
-                        previewBitmap = bitmaps[0] // Usar la primera página para previsualización
-                        showPreviewDialog = true
-                        currentPrintStatus = "Mostrando previsualización"
-                    } else {
-                        currentPrintStatus = "Error al generar previsualización"
-                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
-                        withContext(Dispatchers.IO) {
-                            File(tempHtmlFilePath).delete()
-                        }
-                        isPrintingActa = false
-                    }
-                } else {
+                if (macAddress.isNullOrEmpty()) {
                     currentPrintStatus = "No hay impresora seleccionada"
                     Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
+                    isPrintingActa = false
+                    return@LaunchedEffect
+                }
+
+                val (isValid, missingFields) = dataProvider.validateData()
+                if (!isValid) {
+                    missingFieldsToShow = missingFields
+                    showMissingFieldsDialog = true
+                    currentPrintStatus = "Datos incompletos"
+                    Toast.makeText(context, "Por favor, complete todos los campos requeridos", Toast.LENGTH_SHORT).show()
+                    isPrintingActa = false
+                    return@LaunchedEffect
+                }
+
+                currentPrintStatus = "Preparando documento..."
+                val tempHtmlFilePath = withContext(Dispatchers.IO) {
+                    htmlParser.generateHtmlFile(
+                        templateAssetPath = "documents/acta_citacion.html",
+                        dataProvider = dataProvider
+                    )
+                }
+                val htmlContent = withContext(Dispatchers.IO) {
+                    File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                }
+
+                // Generar el PDF para previsualización
+                val outputFile = File(context.getExternalFilesDir(null), "acta_citacion_preview.pdf")
+                if (outputFile.exists()) outputFile.delete()
+                val pdfLabelPrinter = PDFLabelPrinterZebra(context)
+                pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
+                currentPrintStatus = "PDF generado para previsualización"
+
+                // Convertir a Bitmap para previsualización
+                val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
+                if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
+                    previewBitmap = bitmaps[0]
+                    showPreviewDialog = true
+                    currentPrintStatus = "Mostrando previsualización"
+                } else {
+                    currentPrintStatus = "Error al generar previsualización"
+                    Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
+                    withContext(Dispatchers.IO) {
+                        File(tempHtmlFilePath).delete()
+                    }
                     isPrintingActa = false
                 }
             } catch (e: Exception) {
@@ -122,9 +163,12 @@ fun CitacionScreen(
     LaunchedEffect(showPreviewDialog) {
         if (!showPreviewDialog && isPrintingActa && previewBitmap != null) {
             try {
-                val macAddress = impresoraViewModel.getSelectedPrinterMac()
+                val macAddress = impresoraViewModel.getSelectedPrinterMac() ?: throw Exception("No hay impresora seleccionada")
                 val tempHtmlFilePath = withContext(Dispatchers.IO) {
-                    htmlParser.generateHtmlFile("documents/acta_citacion.html", citacionViewModel)
+                    htmlParser.generateHtmlFile(
+                        templateAssetPath = "documents/acta_citacion.html",
+                        dataProvider = dataProvider
+                    )
                 }
                 val htmlContent = withContext(Dispatchers.IO) {
                     File(tempHtmlFilePath).readText(Charsets.UTF_8)
@@ -133,7 +177,7 @@ fun CitacionScreen(
                 currentPrintStatus = "Enviando a imprimir..."
                 val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
                     htmlAssetPath = "",
-                    macAddress = macAddress!!,
+                    macAddress = macAddress,
                     outputFileName = "acta_citacion_temp.pdf",
                     htmlContent = htmlContent,
                     onStatusUpdate = { status ->
@@ -152,7 +196,6 @@ fun CitacionScreen(
                     }
                 }
 
-                // Limpiar recursos
                 withContext(Dispatchers.IO) {
                     File(tempHtmlFilePath).delete()
                 }
@@ -168,6 +211,7 @@ fun CitacionScreen(
         }
     }
 
+    // Manejar el resultado de la generación
     generateResult?.let { result ->
         LaunchedEffect(result) {
             result.onSuccess { status ->
@@ -204,6 +248,7 @@ fun CitacionScreen(
     if (isGenerating || isPrintingActa) {
         FullScreenProgressIndicator(text = if (isGenerating) "Guardando datos..." else "Imprimiendo acta...")
     }
+
     BitmapPreviewDialog(
         bitmap = previewBitmap,
         onConfirm = {
@@ -220,10 +265,6 @@ fun CitacionScreen(
             }
         }
     )
-
-    if (isGenerating) {
-        FullScreenProgressIndicator(text = "Guardando datos...")
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -286,7 +327,7 @@ private fun CitacionContent(
     val datePickerState = rememberDatePickerState()
     val timePickerState = rememberTimePickerState()
 
-    val db = remember { AccesoBaseDatos(context, "juzgados.db", 1) }
+    val db = remember { AccesoBaseDatos(context, "juzgados.db") }
 
     val provincias by remember { mutableStateOf(getProvincias(db)) }
     val municipios by remember(provincia) { mutableStateOf(getMunicipios(db, provincia)) }

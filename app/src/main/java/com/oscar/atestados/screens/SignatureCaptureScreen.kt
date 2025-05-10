@@ -31,12 +31,12 @@ import com.oscar.atestados.ui.theme.White
 import kotlinx.coroutines.launch
 
 /**
- * A composable function that provides a signature capture screen.
- * This screen allows users to draw their signature and save it as a bitmap.
+ * Una función componible que proporciona una pantalla de captura de firma.
+ * Esta pantalla permite a los usuarios dibujar su firma y guardarla como un bitmap.
  *
- * @param onSignatureCaptured A callback function that is invoked when the signature is captured.
- *                            It receives the captured signature as a [Bitmap].
- * @param onDismiss A callback function that is invoked when the dialog is dismissed.
+ * @param onSignatureCaptured Una función de devolución de llamada que se invoca cuando se captura la firma.
+ *                            Recibe la firma capturada como un [Bitmap].
+ * @param onDismiss Una función de devolución de llamada que se invoca cuando se cierra el diálogo.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -44,7 +44,7 @@ fun SignatureCaptureScreen(
     onSignatureCaptured: (Bitmap) -> Unit,
     onDismiss: () -> Unit
 ) {
-    // Estado para mantener la ruta de la firma
+    // Estado para mantener la trayectoria de la firma
     var path by remember { mutableStateOf(Path()) }
     // Estado para forzar la recomposición del Canvas
     var forceRedraw by remember { mutableStateOf(0) }
@@ -99,7 +99,7 @@ fun SignatureCaptureScreen(
                                     val y = event.y
                                     when (event.action) {
                                         MotionEvent.ACTION_DOWN -> {
-                                            Log.d("SignatureScreen", "ACTION_DOWN at: ($x, $y)")
+                                            Log.d("SignatureScreen", "Inicio de toque en: ($x, $y)")
                                             path.moveTo(x, y)
                                             lastX = x
                                             lastY = y
@@ -107,7 +107,7 @@ fun SignatureCaptureScreen(
                                             true
                                         }
                                         MotionEvent.ACTION_MOVE -> {
-                                            Log.d("SignatureScreen", "ACTION_MOVE to: ($x, $y)")
+                                            Log.d("SignatureScreen", "Movimiento a: ($x, $y)")
                                             val dx = kotlin.math.abs(x - lastX)
                                             val dy = kotlin.math.abs(y - lastY)
                                             if (dx >= 4f || dy >= 4f) {
@@ -124,7 +124,7 @@ fun SignatureCaptureScreen(
                                             true
                                         }
                                         MotionEvent.ACTION_UP -> {
-                                            Log.d("SignatureScreen", "ACTION_UP at: ($x, $y)")
+                                            Log.d("SignatureScreen", "Fin de toque en: ($x, $y)")
                                             path.lineTo(lastX, lastY)
                                             forceRedraw++ // Forzar recomposición
                                             true

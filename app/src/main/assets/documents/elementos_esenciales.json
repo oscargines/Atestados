@@ -1,0 +1,11 @@
+{
+  "item": [
+    "Se muestra tickets obtenidos tras realizar pruebas de alcoholemia en etilómetro de precisión legalmente calibrado y certificado.",
+    "Se muestra hoja de sintomatología, recibiendo explicación sobre los síntomas que se observan que dan inicio a la investigación.",
+    "Recibe explicación sobre los hechos objetivos al sufrir siniestro, o similar, que inician la investigación."
+  ],
+  "mensaje":[
+    "ESTA INFORMACIÓN SOLO SERÁ MOSTRADA EN CASOS MUY EXCEPCIONALES Y DEBE VALORAR LA CONVENIENCIA DE HACERLO Y ANTE QUIEN HACERLO.",
+    "Realice una valoración sobre la conveniencia o no de mostrar este tipo de información"
+  ]
+}

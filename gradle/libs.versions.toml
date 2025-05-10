@@ -1,38 +1,42 @@
 [versions]
 # Android Gradle Plugin y Kotlin
-agp = "8.9.1"                   # Última versión estable
+agp = "8.10.0"                   # Última versión estable
 barcodeScanning = "17.2.0"
 core = "3.5.3"
+datastorePreferencesVersion = "1.0.0"
 html2pdf = "6.1.0"
+json = "20230227"
 jsoup = "1.19.1"
 kotlin = "2.0.0"                # Última versión de Kotlin
 
 # AndroidX Core y Lifecycle
-coreKtx = "1.15.0"              # Última versión estable
+coreKtx = "1.16.0"              # Última versión estable
 lifecycleRuntimeKtx = "2.8.7"   # Última versión estable
 
 # Jetpack Compose
 activityCompose = "1.10.1"      # Última versión estable
-composeBom = "2025.02.00"       # Versión reciente y válida
-material3 = "1.3.1"             # Última versión estable
-navigationCompose = "2.8.8"     # Última versión estable
+composeBom = "2025.04.01"       # Versión reciente y válida
+material3 = "1.3.2"             # Última versión estable
+navigationCompose = "2.8.9"     # Última versión estable
+okhttp = "4.11.0"
 playServicesLocation = "21.3.0"
-runtimeLivedata = "1.7.8"       # Última versión estable
+repo = "Tag"
+runtimeLivedata = "1.8.0"       # Última versión estable
 slf4jSimple = "2.0.13"
-ui = "1.7.8"                    # Última versión estable
+ui = "1.8.0"                    # Última versión estable
 
 # Coroutines y Serialización
 kotlinxCoroutines = "1.7.3"     # Última versión estable
 kotlinxSerialization = "1.7.3"  # Última versión estable
 
 # DataStore
-datastorePreferences = "1.1.3"  # Última versión estable
+datastorePreferences = "1.1.1"  # Última versión estable
 
 # Splashscreen
 coreSplashscreen = "1.0.1"      # Última versión estable
 
 # Cámara
-camera = "1.4.1"                # Versión unificada para camera-core, camera-view, camera-lifecycle
+camera = "1.4.2"                # Versión unificada para camera-core, camera-view, camera-lifecycle
 
 # ML Kit
 visionCommon = "17.3.0"         # Última versión estable
@@ -64,13 +68,14 @@ espressoCore = "3.6.1"          # Última versión estable
 # PDF y Marckdown
 commonmark = "0.18.2"
 itextCore = "9.1.0"
-roomKtx = "2.6.1"
+roomKtx = "2.7.1"
 playServicesMlkitBarcodeScanning = "18.3.1"
 zxingAndroidEmbedded = "4.3.0"
 
 [libraries]
 # AndroidX Core y Lifecycle
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-datastore-preferences-v100 = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferencesVersion" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
 
@@ -91,9 +96,11 @@ barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref =
 barcode-scanning-v1720 = { module = "com.google.mlkit:barcode-scanning", version.ref = "barcodeScanning" }
 core = { module = "com.google.zxing:core", version.ref = "core" }
 html2pdf = { module = "com.itextpdf:html2pdf", version.ref = "html2pdf" }
+json = { module = "org.json:json", version.ref = "json" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
 # DataStore
@@ -109,7 +116,9 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camera" }
 
 # ML Kit
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+repo = { module = "com.github.User:Repo", version.ref = "repo" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
 vision-common = { group = "com.google.mlkit", name = "vision-common", version.ref = "visionCommon" }
 play-services-mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }

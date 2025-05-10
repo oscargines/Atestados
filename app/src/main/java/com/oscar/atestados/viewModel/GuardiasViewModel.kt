@@ -1,6 +1,8 @@
 package com.oscar.atestados.viewModel
 
+import android.app.Application
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.datastore.preferences.core.edit
@@ -8,7 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +25,7 @@ val Context.dataStoreGua by preferencesDataStore(name = "GUARDIAS_PREFERENCES")
  * ViewModel para gestionar los datos de los guardias intervinientes (primer y segundo interviniente).
  * Utiliza LiveData para observar cambios y DataStore para persistir los datos.
  */
-class GuardiasViewModel : ViewModel() {
+class GuardiasViewModel(application: Application) : AndroidViewModel(application) {
 
     // Estados para el Primer Interviniente
     /** LiveData privado para el rol del primer interviniente. */
@@ -164,6 +166,10 @@ class GuardiasViewModel : ViewModel() {
         _segundoUnidad.value = valor
     }
 
+    init {
+        loadData(getApplication()) // Cargar datos al inicializar
+    }
+
     /**
      * Carga los datos de los intervinientes desde DataStore de manera asíncrona.
      *
@@ -183,6 +189,7 @@ class GuardiasViewModel : ViewModel() {
                 _segundoTip.value = preferences[PreferencesKeys.SEGUNDO_TIP] ?: ""
                 _empleoSegundoInterviniente.value = preferences[PreferencesKeys.SEGUNDO_GUARDIA] ?: "Guardia Civil"
                 _segundoUnidad.value = preferences[PreferencesKeys.SEGUNDO_UNIDAD] ?: ""
+                Log.d("GuardiasViewModel", "Datos cargados - primerTip: ${_primerTip.value}, segundoTip: ${_segundoTip.value}")
             }
         }
     }

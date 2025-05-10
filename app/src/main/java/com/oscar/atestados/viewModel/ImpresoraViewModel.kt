@@ -40,7 +40,7 @@ class ImpresoraViewModel(
 ) : ViewModel() {
 
     private val printerHelper = ZebraPrinterHelper(context)
-    private val database = AccesoBaseDatos(context, "dispositivos.db", 1)
+    private val database = AccesoBaseDatos(context, "dispositivos.db")
     private val _savedDevices = MutableStateFlow<List<BluetoothDeviceDB>>(emptyList())
     val savedDevices: StateFlow<List<BluetoothDeviceDB>> = _savedDevices.asStateFlow()
     private val _foundDevices = MutableStateFlow<List<BluetoothDeviceDB>>(emptyList())

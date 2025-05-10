@@ -2,6 +2,7 @@ package com.oscar.atestados.viewModel
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -286,6 +287,7 @@ class AlcoholemiaUnoViewModel(application: Application) : AndroidViewModel(appli
             _primeraHora.value = preferences[PreferencesKeys.PRIMERA_HORA] ?: ""
             _segundaTasa.value = preferences[PreferencesKeys.SEGUNDA_TASA] ?: ""
             _segundaHora.value = preferences[PreferencesKeys.SEGUNDA_HORA] ?: ""
+            Log.d("AlcoholemiaUnoViewModel", "Datos cargados - opcionMotivo: ${_opcionMotivo.value}")
         }
     }
 }

@@ -3,6 +3,10 @@ package com.oscar.atestados.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.oscar.atestados.R
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
@@ -29,6 +34,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
+
+private const val TAG = "LecturaDerechosScreen"
 
 @Composable
 fun LecturaDerechosScreen(
@@ -41,7 +48,10 @@ fun LecturaDerechosScreen(
 
     if (showInitialDialog) {
         AlertDialog(
-            onDismissRequest = { showInitialDialog = false },
+            onDismissRequest = {
+                showInitialDialog = false
+                Log.d(TAG, "Initial dialog dismissed")
+            },
             title = {
                 Text(
                     "ATENCIÓN",
@@ -63,7 +73,10 @@ fun LecturaDerechosScreen(
             },
             confirmButton = {
                 TextButton(
-                    onClick = { showInitialDialog = false },
+                    onClick = {
+                        showInitialDialog = false
+                        Log.d(TAG, "Initial dialog confirmed with ENTENDIDO button")
+                    },
                     colors = ButtonDefaults.textButtonColors(contentColor = BotonesNormales)
                 ) {
                     Text("ENTENDIDO")
@@ -76,7 +89,7 @@ fun LecturaDerechosScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize().padding(top = 16.dp),
         topBar = { LecturaDerechosTopBar() },
-        bottomBar = { LecturaDerechosBottomBar(lecturaDerechosViewModel, navigateToScreen) }
+        bottomBar = { LecturaDerechosBottomBar(lecturaDerechosViewModel, navigateToScreen, context) }
     ) { paddingValues ->
         LecturaDerechosContent(
             modifier = Modifier.padding(paddingValues),
@@ -127,6 +140,29 @@ private fun LecturaDerechosContent(
     val relacionIndicios by lecturaDerechosViewModel.relacionIndicios.observeAsState("")
     val context = LocalContext.current
 
+    // Log initial state of all fields
+    LaunchedEffect(Unit) {
+        Log.d(TAG, "Initial state - MomentoLectura: $momentoLectura, " +
+                "LugarInvestigacion: $lugarInvestigacion, " +
+                "LugarDelito: $lugarDelito, " +
+                "ResumenHechos: $resumenHechos, " +
+                "CalificacionHechos: $calificacionHechos, " +
+                "RelacionIndicios: $relacionIndicios")
+    }
+
+    // Launcher para solicitar permisos de ubicación
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d(TAG, "Permiso de ubicación concedido")
+        } else {
+            Log.w(TAG, "Permiso de ubicación denegado")
+            lecturaDerechosViewModel.updateLugarInvestigacion("Permiso de ubicación denegado", null, null)
+            Log.d(TAG, "LugarInvestigacion actualizado a: Permiso de ubicación denegado")
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -141,7 +177,10 @@ private fun LecturaDerechosContent(
                 RadioOption(
                     text = opcion,
                     selected = momentoLectura == opcion,
-                    onSelect = { lecturaDerechosViewModel.setMomentoLectura(opcion) }
+                    onSelect = {
+                        lecturaDerechosViewModel.setMomentoLectura(opcion)
+                        Log.d(TAG, "MomentoLectura changed to: $opcion")
+                    }
                 )
             }
         }
@@ -150,48 +189,69 @@ private fun LecturaDerechosContent(
 
         CustomTextField(
             value = lugarInvestigacion,
-            onValueChange = { lecturaDerechosViewModel.updateLugarInvestigacion(it) },
+            onValueChange = {
+                lecturaDerechosViewModel.updateLugarInvestigacion(it, null, null)
+                Log.d(TAG, "LugarInvestigacion updated to: $it")
+            },
             label = "Lugar, hora y fecha de la investigación",
             singleLine = false,
             maxLines = 1,
             leadingIcon = {
                 IconButton(
                     onClick = {
+                        Log.d(TAG, "Botón GPS presionado para obtener ubicación")
+                        Toast.makeText(context, "Espere a que la aplicación obtenga y cargue los datos", Toast.LENGTH_SHORT).show()
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                                location?.let {
-                                    val geocoder = Geocoder(context, Locale.getDefault())
-                                    try {
-                                        val addresses = geocoder.getFromLocation(it.latitude, it.longitude, 1)
-                                        if (addresses?.isNotEmpty() == true) {
-                                            val address = addresses[0]
-                                            val thoroughfare = address.thoroughfare ?: "Carretera desconocida"
-                                            val featureName = address.featureName ?: ""
-                                            val pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
-                                            val currentDateTime = Instant.now()
-                                                .atZone(ZoneId.systemDefault())
-                                                .toLocalDateTime()
-                                            val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "ES"))
-                                            val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("es", "ES"))
-                                            val formattedTime = currentDateTime.format(timeFormatter)
-                                            val formattedDate = currentDateTime.format(dateFormatter)
-                                            val locationDetails = "$thoroughfare, $pk, $formattedTime, $formattedDate"
+                            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                                .addOnSuccessListener { location ->
+                                    location?.let {
+                                        Log.d(TAG, "Ubicación obtenida: lat=${it.latitude}, lon=${it.longitude}")
+                                        val geocoder = Geocoder(context, Locale.getDefault())
+                                        try {
+                                            val addresses = geocoder.getFromLocation(it.latitude, it.longitude, 1)
+                                            if (addresses?.isNotEmpty() == true) {
+                                                val address = addresses[0]
+                                                val thoroughfare = address.thoroughfare ?: "Carretera desconocida"
+                                                val featureName = address.featureName ?: ""
+                                                val pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
+                                                val currentDateTime = Instant.now()
+                                                    .atZone(ZoneId.systemDefault())
+                                                    .toLocalDateTime()
+                                                val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "ES"))
+                                                val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("es", "ES"))
+                                                val formattedTime = currentDateTime.format(timeFormatter)
+                                                val formattedDate = currentDateTime.format(dateFormatter)
+                                                val locationDetails = "$thoroughfare, $pk, $formattedTime, $formattedDate"
 
-                                            // Rellenar ambos campos
-                                            lecturaDerechosViewModel.updateLugarInvestigacion(locationDetails)
-                                            lecturaDerechosViewModel.updateLugarDelito(locationDetails)
+                                                Log.d(TAG, "LocationDetails generado: $locationDetails")
+                                                Log.d(TAG, "Coordenadas obtenidas - Latitud: ${it.latitude}, Longitud: ${it.longitude}")
+                                                // Rellenar ambos campos con coordenadas
+                                                lecturaDerechosViewModel.updateLugarInvestigacion(locationDetails, it.latitude, it.longitude)
+                                                lecturaDerechosViewModel.updateLugarDelito(locationDetails, it.latitude, it.longitude)
+                                                Log.d(TAG, "Campos actualizados - LugarInvestigacion: $locationDetails, LugarDelito: $locationDetails")
+                                            } else {
+                                                Log.w(TAG, "No se encontraron direcciones para las coordenadas: lat=${it.latitude}, lon=${it.longitude}")
+                                                lecturaDerechosViewModel.updateLugarInvestigacion("Dirección no encontrada", null, null)
+                                                Log.d(TAG, "LugarInvestigacion actualizado a: Dirección no encontrada")
+                                            }
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "Error al obtener dirección: ${e.message}", e)
+                                            lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}", null, null)
+                                            Log.d(TAG, "LugarInvestigacion actualizado a: Error al obtener ubicación: ${e.message}")
                                         }
-                                    } catch (e: Exception) {
-                                        lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}")
+                                    } ?: run {
+                                        Log.w(TAG, "Ubicación no disponible")
+                                        lecturaDerechosViewModel.updateLugarInvestigacion("Ubicación no disponible", null, null)
+                                        Log.d(TAG, "LugarInvestigacion actualizado a: Ubicación no disponible")
                                     }
-                                } ?: run {
-                                    lecturaDerechosViewModel.updateLugarInvestigacion("Ubicación no disponible")
+                                }.addOnFailureListener { e ->
+                                    Log.e(TAG, "Error al obtener ubicación: ${e.message}", e)
+                                    lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}", null, null)
+                                    Log.d(TAG, "LugarInvestigacion actualizado a: Error al obtener ubicación: ${e.message}")
                                 }
-                            }.addOnFailureListener { e ->
-                                lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}")
-                            }
                         } else {
-                            lecturaDerechosViewModel.updateLugarInvestigacion("Permisos de ubicación no concedidos")
+                            Log.w(TAG, "Permisos de ubicación no concedidos, solicitando permiso")
+                            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                         }
                     }
                 ) {
@@ -206,7 +266,10 @@ private fun LecturaDerechosContent(
 
         CustomTextField(
             value = lugarDelito,
-            onValueChange = { lecturaDerechosViewModel.updateLugarDelito(it) },
+            onValueChange = {
+                lecturaDerechosViewModel.updateLugarDelito(it, null, null)
+                Log.d(TAG, "LugarDelito updated to: $it")
+            },
             label = "Lugar, hora y fecha de la comisión del delito",
             singleLine = false,
             maxLines = 1
@@ -214,7 +277,10 @@ private fun LecturaDerechosContent(
 
         CustomTextField(
             value = resumenHechos,
-            onValueChange = { lecturaDerechosViewModel.updateResumenHechos(it) },
+            onValueChange = {
+                lecturaDerechosViewModel.updateResumenHechos(it)
+                Log.d(TAG, "ResumenHechos updated to: $it")
+            },
             label = "Breve resumen de los hechos",
             modifier = Modifier.height(150.dp),
             singleLine = false,
@@ -223,7 +289,10 @@ private fun LecturaDerechosContent(
 
         CustomTextField(
             value = calificacionHechos,
-            onValueChange = { lecturaDerechosViewModel.updateCalificacionHechos(it) },
+            onValueChange = {
+                lecturaDerechosViewModel.updateCalificacionHechos(it)
+                Log.d(TAG, "CalificacionHechos updated to: $it")
+            },
             label = "Calificación provisional de los hechos",
             modifier = Modifier.height(100.dp),
             singleLine = false,
@@ -232,7 +301,10 @@ private fun LecturaDerechosContent(
 
         CustomTextField(
             value = relacionIndicios,
-            onValueChange = { lecturaDerechosViewModel.updateRelacionIndicios(it) },
+            onValueChange = {
+                lecturaDerechosViewModel.updateRelacionIndicios(it)
+                Log.d(TAG, "RelacionIndicios updated to: $it")
+            },
             label = "Relación de indicios de los que se deduce la investigación",
             modifier = Modifier.height(250.dp),
             singleLine = false,
@@ -244,7 +316,8 @@ private fun LecturaDerechosContent(
 @Composable
 private fun LecturaDerechosBottomBar(
     viewModel: LecturaDerechosViewModel,
-    navigateToScreen: (String) -> Unit
+    navigateToScreen: (String) -> Unit,
+    context: android.content.Context
 ) {
     Row(
         modifier = Modifier
@@ -254,7 +327,9 @@ private fun LecturaDerechosBottomBar(
     ) {
         Button(
             onClick = {
-                viewModel.guardarDatos()
+                Log.d(TAG, "Botón GUARDAR presionado")
+                viewModel.guardarDatos(context)
+                Log.d(TAG, "Datos guardados, navegando a TomaDerechosScreen")
                 navigateToScreen("TomaDerechosScreen")
             },
             colors = ButtonDefaults.buttonColors(
@@ -270,7 +345,11 @@ private fun LecturaDerechosBottomBar(
         Spacer(modifier = Modifier.width(16.dp))
 
         Button(
-            onClick = { viewModel.limpiarDatos() },
+            onClick = {
+                Log.d(TAG, "Botón LIMPIAR presionado")
+                viewModel.limpiarDatos()
+                Log.d(TAG, "Datos limpiados")
+            },
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,
                 contentColor = TextoBotonesNormales

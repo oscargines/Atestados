@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 
 @Composable
-fun BitmapPreviewDialog(
+fun BitmapPreviewDialogCompact(
     bitmap: Bitmap?,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit

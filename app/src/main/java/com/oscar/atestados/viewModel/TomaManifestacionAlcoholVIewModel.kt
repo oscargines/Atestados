@@ -206,7 +206,7 @@ class TomaManifestacionAlcoholViewModel(application: Application) : AndroidViewM
     /**
      * Guarda los datos actuales en DataStore de manera asíncrona.
      */
-    fun guardarDatos() {
+    fun guardarDatos(context: Context) {
         viewModelScope.launch {
             getApplication<Application>().dataStoreManifestacionAlcohol.edit { preferences ->
                 _deseaDeclarar.value?.let { preferences[PreferencesKeys.DESEA_DECLARAR] = it }

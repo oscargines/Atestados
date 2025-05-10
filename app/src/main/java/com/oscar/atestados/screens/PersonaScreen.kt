@@ -874,6 +874,6 @@ fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (S
 }
 
 fun getPaises(context: Context): List<String> {
-    val myDB = AccesoBaseDatos(context, "paises.db", 1)
+    val myDB = AccesoBaseDatos(context, "paises.db")
     return myDB.query("SELECT nombre FROM paises").map { it["nombre"] as String }
 }

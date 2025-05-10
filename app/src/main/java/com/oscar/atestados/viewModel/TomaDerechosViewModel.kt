@@ -198,7 +198,7 @@ class TomaDerechosViewModel(application: Application) : AndroidViewModel(applica
     /**
      * Guarda los datos actuales en DataStore de manera asíncrona.
      */
-    fun guardarDatos() {
+    fun guardarDatos(context: Context) {
         viewModelScope.launch {
             getApplication<Application>().dataStoreTomaDerechos.edit { preferences ->
                 _prestarDeclaracion.value?.let { preferences[PreferencesKeys.PRESTAR_DECLARACION] = it }
