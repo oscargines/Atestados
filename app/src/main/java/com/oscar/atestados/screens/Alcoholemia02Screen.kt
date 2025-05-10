@@ -336,13 +336,13 @@ fun getLocationData(
                 .addOnSuccessListener { location: Location? ->
                     if (location != null) {
                         Log.d(TAG, "Ubicación obtenida: lat=${location.latitude}, lon=${location.longitude}")
-                        val geocoder = Geocoder(context, Locale.getDefault())
                         var thoroughfare = "Carretera desconocida"
                         var pk = "PK no disponible"
                         var municipio = "Municipio desconocido"
                         var provincia = "Provincia desconocida"
 
-                        // Intentar con Geocoder para carretera y PK
+                        // Intentar con Geocoder como respaldo
+                        val geocoder = Geocoder(context, Locale.getDefault())
                         try {
                             val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                             if (addresses?.isNotEmpty() == true) {
@@ -355,11 +355,11 @@ fun getLocationData(
                             Log.e(TAG, "Error al usar Geocoder: ${e.message}", e)
                         }
 
-                        // Usar Nominatim para municipio y provincia
+                        // Usar Nominatim para detalles precisos
                         viewModel.viewModelScope.launch {
                             try {
                                 val client = OkHttpClient()
-                                val url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}&zoom=12&addressdetails=1"
+                                val url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}&zoom=16&addressdetails=1"
                                 val request = Request.Builder()
                                     .url(url)
                                     .header("User-Agent", "AtestadosApp/1.0")
@@ -371,20 +371,17 @@ fun getLocationData(
                                     val json = JSONObject(response.body?.string() ?: "{}")
                                     val addressJson = json.optJSONObject("address")
                                     if (addressJson != null) {
-                                        // Priorizar municipality para el término municipal
+                                        thoroughfare = addressJson.optString("ref", thoroughfare)
                                         municipio = addressJson.optString("municipality",
                                             addressJson.optString("town",
                                                 addressJson.optString("city", "Municipio desconocido")))
-                                        // Evitar localidades (village)
                                         if (addressJson.has("village") && municipio == addressJson.optString("village")) {
                                             municipio = addressJson.optString("municipality", "Municipio desconocido")
                                         }
-                                        // Obtener la provincia
                                         provincia = addressJson.optString("state", "Provincia desconocida")
-                                        // Normalizar provincia
                                         provincia = provincia.split("/")[0].trim()
                                     }
-                                    Log.d(TAG, "Nominatim response - Municipio: $municipio, Provincia: $provincia")
+                                    Log.d(TAG, "Nominatim response - Vía: $thoroughfare, Municipio: $municipio, Provincia: $provincia")
                                 } else {
                                     Log.w(TAG, "Error en Nominatim: ${response.code}")
                                 }
@@ -392,7 +389,6 @@ fun getLocationData(
                                 Log.e(TAG, "Error al consultar Nominatim: ${e.message}", e)
                             }
 
-                            // Limpieza de valores para evitar problemas con juzgados.db
                             municipio = municipio.replace(Regex("[^A-Za-zÀ-ÿ\\s-]"), "").trim()
                             provincia = provincia.replace(Regex("[^A-Za-zÀ-ÿ\\s-]"), "").trim()
 
@@ -403,7 +399,6 @@ fun getLocationData(
                             viewModel.updateLongitud(location.longitude.toString())
                             viewModel.updateLugarDiligencias(locationDetails)
 
-                            // Actualizar partido judicial en el ViewModel
                             val partidoJudicial = getPartidoJudicial(locationDetails, context)
                             viewModel.updatePartidoJudicial(partidoJudicial)
                             Log.d(TAG, "Partido judicial actualizado: $partidoJudicial")

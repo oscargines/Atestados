@@ -30,6 +30,13 @@ import com.google.android.gms.location.Priority
 import com.oscar.atestados.R
 import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -206,48 +213,69 @@ private fun LecturaDerechosContent(
                                 .addOnSuccessListener { location ->
                                     location?.let {
                                         Log.d(TAG, "Ubicación obtenida: lat=${it.latitude}, lon=${it.longitude}")
+                                        var thoroughfare = "Carretera desconocida"
+                                        var pk = "PK no disponible"
+                                        // Intentar con Geocoder como respaldo
                                         val geocoder = Geocoder(context, Locale.getDefault())
                                         try {
                                             val addresses = geocoder.getFromLocation(it.latitude, it.longitude, 1)
                                             if (addresses?.isNotEmpty() == true) {
                                                 val address = addresses[0]
-                                                val thoroughfare = address.thoroughfare ?: "Carretera desconocida"
+                                                thoroughfare = address.thoroughfare ?: "Carretera desconocida"
                                                 val featureName = address.featureName ?: ""
-                                                val pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
-                                                val currentDateTime = Instant.now()
-                                                    .atZone(ZoneId.systemDefault())
-                                                    .toLocalDateTime()
-                                                val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "ES"))
-                                                val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("es", "ES"))
-                                                val formattedTime = currentDateTime.format(timeFormatter)
-                                                val formattedDate = currentDateTime.format(dateFormatter)
-                                                val locationDetails = "$thoroughfare, $pk, $formattedTime, $formattedDate"
-
-                                                Log.d(TAG, "LocationDetails generado: $locationDetails")
-                                                Log.d(TAG, "Coordenadas obtenidas - Latitud: ${it.latitude}, Longitud: ${it.longitude}")
-                                                // Rellenar ambos campos con coordenadas
-                                                lecturaDerechosViewModel.updateLugarInvestigacion(locationDetails, it.latitude, it.longitude)
-                                                lecturaDerechosViewModel.updateLugarDelito(locationDetails, it.latitude, it.longitude)
-                                                Log.d(TAG, "Campos actualizados - LugarInvestigacion: $locationDetails, LugarDelito: $locationDetails")
-                                            } else {
-                                                Log.w(TAG, "No se encontraron direcciones para las coordenadas: lat=${it.latitude}, lon=${it.longitude}")
-                                                lecturaDerechosViewModel.updateLugarInvestigacion("Dirección no encontrada", null, null)
-                                                Log.d(TAG, "LugarInvestigacion actualizado a: Dirección no encontrada")
+                                                pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
                                             }
                                         } catch (e: Exception) {
-                                            Log.e(TAG, "Error al obtener dirección: ${e.message}", e)
-                                            lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}", null, null)
-                                            Log.d(TAG, "LugarInvestigacion actualizado a: Error al obtener ubicación: ${e.message}")
+                                            Log.e(TAG, "Error al usar Geocoder: ${e.message}", e)
+                                        }
+                                        // Usar Nominatim para obtener la denominación de la vía
+                                        CoroutineScope(Dispatchers.Main).launch {
+                                            try {
+                                                val client = OkHttpClient()
+                                                val url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=${it.latitude}&lon=${it.longitude}&zoom=16&addressdetails=1"
+                                                val request = Request.Builder()
+                                                    .url(url)
+                                                    .header("User-Agent", "AtestadosApp/1.0")
+                                                    .build()
+                                                val response = withContext(Dispatchers.IO) {
+                                                    client.newCall(request).execute()
+                                                }
+                                                if (response.isSuccessful) {
+                                                    val json = JSONObject(response.body?.string() ?: "{}")
+                                                    val addressJson = json.optJSONObject("address")
+                                                    if (addressJson != null) {
+                                                        // Priorizar ref sobre road
+                                                        thoroughfare = addressJson.optString("ref", thoroughfare)
+                                                    }
+                                                    Log.d(TAG, "Nominatim response - Vía: $thoroughfare")
+                                                } else {
+                                                    Log.w(TAG, "Error en Nominatim: ${response.code}")
+                                                }
+                                            } catch (e: Exception) {
+                                                Log.e(TAG, "Error al consultar Nominatim: ${e.message}", e)
+                                            }
+
+                                            // Formatear fecha y hora
+                                            val currentDateTime = Instant.now()
+                                                .atZone(ZoneId.systemDefault())
+                                                .toLocalDateTime()
+                                            val timeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "ES"))
+                                            val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale("es", "ES"))
+                                            val formattedTime = currentDateTime.format(timeFormatter)
+                                            val formattedDate = currentDateTime.format(dateFormatter)
+                                            val locationDetails = "$thoroughfare, $pk, $formattedTime, $formattedDate"
+
+                                            Log.d(TAG, "LocationDetails generado: $locationDetails")
+                                            lecturaDerechosViewModel.updateLugarInvestigacion(locationDetails, it.latitude, it.longitude)
+                                            lecturaDerechosViewModel.updateLugarDelito(locationDetails, it.latitude, it.longitude)
                                         }
                                     } ?: run {
                                         Log.w(TAG, "Ubicación no disponible")
                                         lecturaDerechosViewModel.updateLugarInvestigacion("Ubicación no disponible", null, null)
-                                        Log.d(TAG, "LugarInvestigacion actualizado a: Ubicación no disponible")
                                     }
                                 }.addOnFailureListener { e ->
                                     Log.e(TAG, "Error al obtener ubicación: ${e.message}", e)
                                     lecturaDerechosViewModel.updateLugarInvestigacion("Error al obtener ubicación: ${e.message}", null, null)
-                                    Log.d(TAG, "LugarInvestigacion actualizado a: Error al obtener ubicación: ${e.message}")
                                 }
                         } else {
                             Log.w(TAG, "Permisos de ubicación no concedidos, solicitando permiso")
