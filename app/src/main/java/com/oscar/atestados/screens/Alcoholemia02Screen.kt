@@ -1,10 +1,17 @@
 package com.oscar.atestados.screens
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -31,37 +38,35 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.itextpdf.kernel.pdf.PdfDocument
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.ui.theme.*
-import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PDFToBitmapPrinter
 import com.oscar.atestados.utils.PdfToBitmapConverter
 import com.oscar.atestados.utils.HtmlParser
+import com.oscar.atestados.utils.PDFA4Printer
 import com.oscar.atestados.data.AlcoholemiaDataProvider
 import com.oscar.atestados.viewModel.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 import kotlin.text.Regex
+import com.itextpdf.kernel.pdf.PdfReader
+import com.oscar.atestados.utils.PDFLabelPrinterZebra
 
 private const val TAG = "Alcoholemia02Screen"
 
@@ -102,6 +107,7 @@ fun Alcoholemia02Screen(
     val context = LocalContext.current
     val db = remember { AccesoBaseDatos(context, "juzgados.db") }
     val htmlParser = remember { HtmlParser(context) }
+    val pdfA4Printer = remember { PDFA4Printer(context) }
     var showInvalidLugarInvestigacionDialog by remember { mutableStateOf(false) }
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
     val dataProvider = remember {
@@ -120,7 +126,126 @@ fun Alcoholemia02Screen(
     var showMissingFieldsDialog by remember { mutableStateOf(false) }
     var missingFieldsToShow by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    // Manejar la impresión del atestado
+    // Función para escribir PDF en el directorio Documents/Atestados
+    suspend fun writePdfToStorage(
+        content: String,
+        fileName: String,
+        pdfA4Printer: PDFA4Printer,
+        context: Context // Add context parameter
+    ): File? {
+        return withContext(Dispatchers.IO) {
+            Log.d(TAG, "writePdfToStorage: Iniciando escritura de PDF, fileName: $fileName")
+            try {
+                // Acceder al directorio Documents
+                val documentsDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+                if (!documentsDir.exists()) {
+                    documentsDir.mkdirs()
+                }
+
+                // Crear el directorio Atestados si no existe
+                val atestadosDir = File(documentsDir, "Atestados")
+                if (!atestadosDir.exists()) {
+                    atestadosDir.mkdirs()
+                    Log.d(
+                        TAG,
+                        "writePdfToStorage: Directorio Atestados creado en ${atestadosDir.absolutePath}"
+                    )
+                }
+
+                // Crear el archivo en Documents/Atestados
+                val outputFile = File(atestadosDir, fileName)
+                // Generar el PDF
+                pdfA4Printer.generarDocumentoA4(htmlContent = content, outputFile = outputFile)
+                Log.d(TAG, "writePdfToStorage: PDF generado en ${outputFile.absolutePath}")
+
+                // Verify the file exists and is not empty
+                if (!outputFile.exists() || outputFile.length() == 0L) {
+                    Log.e(
+                        TAG,
+                        "writePdfToStorage: El archivo PDF no se creó correctamente o está vacío"
+                    )
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            context,
+                            "Error: El archivo PDF no se creó correctamente",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    return@withContext null
+                }
+
+                // Set file permissions to rw-rw-r-- (664)
+                try {
+                    outputFile.setReadable(true, false) // Readable by all
+                    outputFile.setWritable(true, false) // Writable by all
+                    Log.d(
+                        TAG,
+                        "writePdfToStorage: Permisos establecidos para ${outputFile.absolutePath}"
+                    )
+                } catch (e: SecurityException) {
+                    Log.w(
+                        TAG,
+                        "writePdfToStorage: No se pudieron establecer permisos: ${e.message}"
+                    )
+                }
+
+                // Notify MediaStore to index the file
+                try {
+                    val contentUri = MediaStore.Files.getContentUri("external")
+                    val values = ContentValues().apply {
+                        put(MediaStore.Files.FileColumns.DATA, outputFile.absolutePath)
+                        put(MediaStore.Files.FileColumns.DISPLAY_NAME, fileName)
+                        put(MediaStore.Files.FileColumns.MIME_TYPE, "application/pdf")
+                        put(
+                            MediaStore.Files.FileColumns.DATE_MODIFIED,
+                            System.currentTimeMillis() / 1000
+                        )
+                    }
+                    context.contentResolver.insert(contentUri, values)
+                    Log.d(
+                        TAG,
+                        "writePdfToStorage: Archivo indexado en MediaStore: ${outputFile.absolutePath}"
+                    )
+                } catch (e: Exception) {
+                    Log.w(TAG, "writePdfToStorage: Error al indexar en MediaStore: ${e.message}")
+                }
+
+                // Scan file to ensure visibility
+                try {
+                    MediaScannerConnection.scanFile(
+                        context,
+                        arrayOf(outputFile.absolutePath),
+                        arrayOf("application/pdf")
+                    ) { path, uri ->
+                        Log.d(
+                            TAG,
+                            "writePdfToStorage: MediaScanner completado para $path, URI: $uri"
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "writePdfToStorage: Error al escanear archivo: ${e.message}")
+                }
+
+                outputFile
+            } catch (e: SecurityException) {
+                Log.e(TAG, "writePdfToStorage: Error de permisos al escribir PDF: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error de permisos al guardar PDF", Toast.LENGTH_LONG)
+                        .show()
+                }
+                null
+            } catch (e: Exception) {
+                Log.e(TAG, "writePdfToStorage: Error al escribir PDF: ${e.message}", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error al guardar PDF: ${e.message}", Toast.LENGTH_LONG)
+                        .show()
+                }
+                null
+            }
+        }
+    }
+
     LaunchedEffect(isPrintingAtestado) {
         if (isPrintingAtestado) {
             try {
@@ -164,35 +289,107 @@ fun Alcoholemia02Screen(
                     File(tempHtmlFilePath).readText(Charsets.UTF_8)
                 }
 
-                // Generar el PDF para previsualización
-                val outputFile = File(context.getExternalFilesDir(null), "atestado_preview.pdf")
-                if (outputFile.exists()) outputFile.delete()
-                val pdfLabelPrinter = PDFLabelPrinterZebra(context)
-                pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
-                currentPrintStatus = "PDF generado para previsualización"
+                // Generar el PDF para Zebra para previsualización
+                currentPrintStatus = "Generando PDF para impresora Zebra..."
+                val zebraPrinter = PDFLabelPrinterZebra(context)
+                val previewFile =
+                    File.createTempFile("atestado_zebra_preview", ".pdf", context.cacheDir)
+                zebraPrinter.generarEtiquetaPdf(htmlContent, previewFile)
 
-                // Convertir a Bitmap para previsualización
-                val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
-                if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
-                    previewBitmap = bitmaps[0]
-                    showPreviewDialog = true
-                    currentPrintStatus = "Mostrando previsualización"
-                } else {
-                    currentPrintStatus = "Error al generar previsualización"
-                    Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
+                if (!previewFile.exists() || previewFile.length() == 0L) {
+                    currentPrintStatus = "Error al generar PDF para Zebra"
+                    Toast.makeText(
+                        context,
+                        "Error al generar PDF para impresora Zebra",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    isPrintingAtestado = false
+                    withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
+                    return@LaunchedEffect
+                }
+
+                // Generar PDF A4 solo para guardar en almacenamiento
+                currentPrintStatus = "Generando PDF A4..."
+                val outputFile =
+                    writePdfToStorage(htmlContent, "atestado_a4.pdf", pdfA4Printer, context)
+                if (outputFile == null) {
+                    currentPrintStatus = "Error al generar PDF A4"
+                    Toast.makeText(context, "Error al generar PDF A4", Toast.LENGTH_LONG).show()
+                    isPrintingAtestado = false
                     withContext(Dispatchers.IO) {
                         File(tempHtmlFilePath).delete()
+                        previewFile.delete()
+                    }
+                    return@LaunchedEffect
+                }
+
+                // Abrir el PDF A4 usando FileProvider (opcional, si aún quieres mantener esta funcionalidad)
+                withContext(Dispatchers.Main) {
+                    try {
+                        val contentUri = FileProvider.getUriForFile(
+                            context,
+                            "com.oscar.atestados.fileprovider",
+                            outputFile
+                        )
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(contentUri, "application/pdf")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        try {
+                            context.startActivity(
+                                Intent.createChooser(
+                                    intent,
+                                    "Seleccionar aplicación para abrir PDF"
+                                )
+                            )
+                            currentPrintStatus = "PDF A4 abierto"
+                            Log.d(TAG, "PDF intent lanzado para abrir: $contentUri")
+                        } catch (e: ActivityNotFoundException) {
+                            currentPrintStatus = "No hay aplicación para abrir PDFs"
+                            Log.w(TAG, "No se encontró aplicación para abrir PDFs", e)
+                        }
+                    } catch (e: Exception) {
+                        currentPrintStatus = "Error al abrir PDF A4: ${e.message}"
+                        Log.e(TAG, "Error al abrir PDF A4: ${e.message}", e)
+                    }
+                }
+
+                // Previsualizar el PDF de Zebra
+                if (!isValidPdf(previewFile)) {
+                    currentPrintStatus = "Error: El archivo PDF no es válido"
+                    Toast.makeText(context, "Error: El archivo PDF no es válido", Toast.LENGTH_LONG)
+                        .show()
+                    withContext(Dispatchers.IO) {
+                        File(tempHtmlFilePath).delete()
+                        previewFile.delete()
                     }
                     isPrintingAtestado = false
+                } else {
+                    val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(previewFile)
+                    if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
+                        previewBitmap = bitmaps[0]
+                        showPreviewDialog = true
+                        currentPrintStatus = "Mostrando previsualización"
+                    } else {
+                        currentPrintStatus = "Error al generar previsualización"
+                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT)
+                            .show()
+                        withContext(Dispatchers.IO) {
+                            File(tempHtmlFilePath).delete()
+                            previewFile.delete()
+                        }
+                        isPrintingAtestado = false
+                    }
                 }
             } catch (e: Exception) {
-                currentPrintStatus = "Error al generar previsualización: ${e.message}"
+                currentPrintStatus = "Error al generar documentos: ${e.message}"
                 Toast.makeText(
                     context,
-                    "Error al generar previsualización: ${e.message}",
+                    "Error al generar documentos: ${e.message}",
                     Toast.LENGTH_LONG
                 ).show()
-                Log.e(TAG, "Error en previsualización: ${e.message}", e)
+                Log.e(TAG, "Error en generación de documentos: ${e.message}", e)
                 isPrintingAtestado = false
             }
         }
@@ -242,9 +439,7 @@ fun Alcoholemia02Screen(
                     }
                 }
 
-                withContext(Dispatchers.IO) {
-                    File(tempHtmlFilePath).delete()
-                }
+                withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
             } catch (e: Exception) {
                 currentPrintStatus = "Error al imprimir: ${e.message}"
                 Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
@@ -278,8 +473,119 @@ fun Alcoholemia02Screen(
             onDatePickerFechaDiligenciasClicked = { showDatePickerFechaDiligencias = true },
             showDatePickerFechaDiligencias = showDatePickerFechaDiligencias,
             isPrintingAtestado = isPrintingAtestado,
-            onPrintAtestadoTrigger = { isPrintingAtestado = true },
-            onInvalidLugarInvestigacion = { showInvalidLugarInvestigacionDialog = true }
+            onPrintAtestadoTrigger = {
+                Log.d(TAG, "Botón 'IMPRIMIR ATESTADO' presionado")
+                isPrintingAtestado = true
+            },
+            onInvalidLugarInvestigacion = { showInvalidLugarInvestigacionDialog = true },
+            onOpenStorage = {
+                Log.d(TAG, "Botón 'ABRIR ALMACENAMIENTO' presionado")
+                try {
+                    val atestadosDir = File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+                        "Atestados"
+                    )
+                    if (!atestadosDir.exists()) {
+                        atestadosDir.mkdirs()
+                        Log.d(TAG, "Directorio Atestados creado en ${atestadosDir.absolutePath}")
+                    }
+                    // Log files in directory for debugging
+                    atestadosDir.listFiles()?.forEach { file ->
+                        Log.d(
+                            TAG,
+                            "Archivo en Atestados: ${file.name}, readable: ${file.canRead()}, size: ${file.length()}"
+                        )
+                    } ?: Log.d(TAG, "No hay archivos en Atestados o directorio inaccesible")
+                    // Crear una DocumentsContract URI
+                    val documentsUri =
+                        Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments%2FAtestados")
+                    // Intent para DocumentsUI
+                    val documentsUiIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        putExtra("android.content.extra.SHOW_ADVANCED", true)
+                        putExtra("android.provider.extra.INITIAL_URI", documentsUri)
+                        setPackage("com.google.android.documentsui")
+                    }
+                    // Intent genérico como fallback
+                    val genericIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        putExtra("android.content.extra.SHOW_ADVANCED", true)
+                        putExtra("android.provider.extra.INITIAL_URI", documentsUri)
+                    }
+                    // Verificar si DocumentsUI está disponible
+                    val documentsUiAvailable =
+                        context.packageManager.queryIntentActivities(documentsUiIntent, 0)
+                            .isNotEmpty()
+                    val chosenIntent =
+                        if (documentsUiAvailable) documentsUiIntent else genericIntent
+                    // Log apps que pueden manejar el intent
+                    val resolveInfoList =
+                        context.packageManager.queryIntentActivities(chosenIntent, 0)
+                    if (resolveInfoList.isNotEmpty()) {
+                        Log.d(TAG, "Apps que pueden manejar ACTION_GET_CONTENT:")
+                        resolveInfoList.forEach {
+                            Log.d(TAG, "- ${it.activityInfo.packageName}: ${it.activityInfo.name}")
+                        }
+                    } else {
+                        Log.w(TAG, "Ninguna app puede manejar ACTION_GET_CONTENT")
+                    }
+                    // Mostrar toast de guía
+                    Toast.makeText(
+                        context,
+                        "Busque los PDFs en Documents > Atestados",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    try {
+                        context.startActivity(
+                            Intent.createChooser(
+                                chosenIntent,
+                                "Seleccionar aplicación para abrir carpeta"
+                            )
+                        )
+                        Log.d(
+                            TAG,
+                            "openStorage: Intent lanzado con ACTION_GET_CONTENT, URI: $documentsUri"
+                        )
+                    } catch (e: ActivityNotFoundException) {
+                        Log.w(
+                            TAG,
+                            "openStorage: No se encontró aplicación para abrir directorio",
+                            e
+                        )
+                        Toast.makeText(
+                            context,
+                            "No hay administrador de archivos instalado. Instale 'Archivos de Google' desde Google Play.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        try {
+                            val playStoreIntent = Intent(Intent.ACTION_VIEW).apply {
+                                data =
+                                    Uri.parse("market://details?id=com.google.android.apps.nbu.files")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(playStoreIntent)
+                        } catch (e: ActivityNotFoundException) {
+                            Log.w(TAG, "No se pudo abrir Google Play Store", e)
+                            Toast.makeText(
+                                context,
+                                "No se pudo abrir Google Play. Busque 'Archivos de Google' manualmente.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "openStorage: Error al abrir directorio: ${e.message}", e)
+                    Toast.makeText(
+                        context,
+                        "Error al abrir el directorio: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         )
 
         if (showDatePickerFechaDiligencias) {
@@ -296,9 +602,7 @@ fun Alcoholemia02Screen(
         }
         BitmapPreviewDialog(
             bitmap = previewBitmap,
-            onConfirm = {
-                showPreviewDialog = false // Continúa con la impresión
-            },
+            onConfirm = { showPreviewDialog = false },
             onDismiss = {
                 showPreviewDialog = false
                 previewBitmap?.recycle()
@@ -312,6 +616,7 @@ fun Alcoholemia02Screen(
         )
     }
 }
+
 /**
  * Obtiene los datos de ubicación actual usando FusedLocationProviderClient.
  *
@@ -335,7 +640,10 @@ fun getLocationData(
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                 .addOnSuccessListener { location: Location? ->
                     if (location != null) {
-                        Log.d(TAG, "Ubicación obtenida: lat=${location.latitude}, lon=${location.longitude}")
+                        Log.d(
+                            TAG,
+                            "Ubicación obtenida: lat=${location.latitude}, lon=${location.longitude}"
+                        )
                         var thoroughfare = "Carretera desconocida"
                         var pk = "PK no disponible"
                         var municipio = "Municipio desconocido"
@@ -344,12 +652,14 @@ fun getLocationData(
                         // Intentar con Geocoder como respaldo
                         val geocoder = Geocoder(context, Locale.getDefault())
                         try {
-                            val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
+                            val addresses =
+                                geocoder.getFromLocation(location.latitude, location.longitude, 1)
                             if (addresses?.isNotEmpty() == true) {
                                 val address = addresses[0]
                                 thoroughfare = address.thoroughfare ?: "Carretera desconocida"
                                 val featureName = address.featureName ?: ""
-                                pk = if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
+                                pk =
+                                    if (featureName.matches(Regex("\\d+\\.?\\d*"))) "PK $featureName" else "PK no disponible"
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error al usar Geocoder: ${e.message}", e)
@@ -359,7 +669,8 @@ fun getLocationData(
                         viewModel.viewModelScope.launch {
                             try {
                                 val client = OkHttpClient()
-                                val url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}&zoom=16&addressdetails=1"
+                                val url =
+                                    "https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.latitude}&lon=${location.longitude}&zoom=16&addressdetails=1"
                                 val request = Request.Builder()
                                     .url(url)
                                     .header("User-Agent", "AtestadosApp/1.0")
@@ -372,16 +683,33 @@ fun getLocationData(
                                     val addressJson = json.optJSONObject("address")
                                     if (addressJson != null) {
                                         thoroughfare = addressJson.optString("ref", thoroughfare)
-                                        municipio = addressJson.optString("municipality",
-                                            addressJson.optString("town",
-                                                addressJson.optString("city", "Municipio desconocido")))
-                                        if (addressJson.has("village") && municipio == addressJson.optString("village")) {
-                                            municipio = addressJson.optString("municipality", "Municipio desconocido")
+                                        municipio = addressJson.optString(
+                                            "municipality",
+                                            addressJson.optString(
+                                                "town",
+                                                addressJson.optString(
+                                                    "city",
+                                                    "Municipio desconocido"
+                                                )
+                                            )
+                                        )
+                                        if (addressJson.has("village") && municipio == addressJson.optString(
+                                                "village"
+                                            )
+                                        ) {
+                                            municipio = addressJson.optString(
+                                                "municipality",
+                                                "Municipio desconocido"
+                                            )
                                         }
-                                        provincia = addressJson.optString("state", "Provincia desconocida")
+                                        provincia =
+                                            addressJson.optString("state", "Provincia desconocida")
                                         provincia = provincia.split("/")[0].trim()
                                     }
-                                    Log.d(TAG, "Nominatim response - Vía: $thoroughfare, Municipio: $municipio, Provincia: $provincia")
+                                    Log.d(
+                                        TAG,
+                                        "Nominatim response - Vía: $thoroughfare, Municipio: $municipio, Provincia: $provincia"
+                                    )
                                 } else {
                                     Log.w(TAG, "Error en Nominatim: ${response.code}")
                                 }
@@ -472,7 +800,10 @@ fun getPartidoJudicial(lugarDiligencias: String, context: Context): String {
         val result = db.query(query, args)
         if (result.isNotEmpty()) {
             val partidoJudicial = result[0]["partido_judicial"]?.toString() ?: "no disponible"
-            Log.d(TAG, "Partido judicial encontrado: $partidoJudicial para municipio: $normalizedMunicipio")
+            Log.d(
+                TAG,
+                "Partido judicial encontrado: $partidoJudicial para municipio: $normalizedMunicipio"
+            )
             return partidoJudicial
         } else {
             Log.w(TAG, "No se encontró partido judicial para municipio: $normalizedMunicipio")
@@ -497,6 +828,7 @@ fun getPartidoJudicial(lugarDiligencias: String, context: Context): String {
  * @param isPrintingAtestado Estado que indica si se está imprimiendo el atestado.
  * @param onPrintAtestadoTrigger Callback para disparar la impresión del atestado.
  * @param onInvalidLugarInvestigacion Callback para manejar lugarInvestigacion inválido.
+ * @param onOpenStorage Callback para abrir el directorio de almacenamiento.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -509,7 +841,8 @@ private fun Alcoholemia02Content(
     showDatePickerFechaDiligencias: Boolean,
     isPrintingAtestado: Boolean,
     onPrintAtestadoTrigger: () -> Unit,
-    onInvalidLugarInvestigacion: () -> Unit
+    onInvalidLugarInvestigacion: () -> Unit,
+    onOpenStorage: () -> Unit
 ) {
     val context = LocalContext.current
     var showTimePicker by remember { mutableStateOf(false) }
@@ -550,6 +883,7 @@ private fun Alcoholemia02Content(
             onInvalidLugarInvestigacion()
         }
     }
+
     // Inicializar partido judicial al cargar la pantalla
     LaunchedEffect(Unit) {
         if (lugarCoincide && lugarInvestigacion.isNotBlank()) {
@@ -569,7 +903,9 @@ private fun Alcoholemia02Content(
                 Button(
                     onClick = {
                         alcoholemiaDosViewModel.updateHoraInicio(
-                            "${timePickerState.hour}:${timePickerState.minute.toString().padStart(2, '0')}"
+                            "${timePickerState.hour}:${
+                                timePickerState.minute.toString().padStart(2, '0')
+                            }"
                         )
                         showTimePicker = false
                     }
@@ -656,7 +992,6 @@ private fun Alcoholemia02Content(
             onCheckedChange = { alcoholemiaDosViewModel.updateLugarCoincide(it) }
         )
 
-        // Campo no editable si lugarCoincide es true, muestra lugarInvestigacion
         CustomTextField(
             value = lugarDiligencias,
             onValueChange = { alcoholemiaDosViewModel.updateLugarDiligencias(it) },
@@ -666,7 +1001,7 @@ private fun Alcoholemia02Content(
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Partido Judicial de " + partidoJudicial,
+            text = "Partido Judicial de $partidoJudicial",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Black,
             modifier = Modifier
@@ -679,15 +1014,22 @@ private fun Alcoholemia02Content(
             onClick = {
                 Log.d(TAG, "Botón 'Obtener Ubicación Actual' presionado")
                 scope.launch {
-                    Toast.makeText(context, "Espere a que se calcule y se muestre la ubicación", Toast.LENGTH_SHORT).show()
-                    getLocationData(fusedLocationClient, context, alcoholemiaDosViewModel) { locationDetails ->
+                    Toast.makeText(
+                        context,
+                        "Espere a que se calcule y se muestre la ubicación",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    getLocationData(
+                        fusedLocationClient,
+                        context,
+                        alcoholemiaDosViewModel
+                    ) { locationDetails ->
                         Log.d(TAG, "Ubicación obtenida: $locationDetails")
                         locationText = locationDetails
                         alcoholemiaDosViewModel.updateLugarDiligencias(locationDetails)
                         Log.d(
                             "Alcoholemia02",
-                            "Latitud: ${alcoholemiaDosViewModel.latitud.value}, " +
-                                    "Longitud: ${alcoholemiaDosViewModel.longitud.value}"
+                            "Latitud: ${alcoholemiaDosViewModel.latitud.value}, Longitud: ${alcoholemiaDosViewModel.longitud.value}"
                         )
                     }
                 }
@@ -755,6 +1097,7 @@ private fun Alcoholemia02Content(
                         "segundo_conductor" -> alcoholemiaDosViewModel.updateFirmaSegundoConductor(
                             bitmap
                         )
+
                         "instructor" -> alcoholemiaDosViewModel.updateFirmaInstructor(bitmap)
                         "secretario" -> alcoholemiaDosViewModel.updateFirmaSecretario(bitmap)
                     }
@@ -866,12 +1209,14 @@ private fun Alcoholemia02Content(
                 )
             }
         }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // Botón para imprimir atestado
         Button(
             onClick = {
                 if (!isPrintingAtestado) {
+                    Log.d(TAG, "Botón 'IMPRIMIR ATESTADO' presionado")
                     onPrintAtestadoTrigger()
                 }
             },
@@ -882,11 +1227,33 @@ private fun Alcoholemia02Content(
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = 2.dp),
             shape = RoundedCornerShape(0.dp)
         ) {
             Text(
                 text = if (isPrintingAtestado) "IMPRIMIENDO..." else "IMPRIMIR ATESTADO",
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Botón para abrir almacenamiento
+        Button(
+            onClick = {
+                Log.d(TAG, "Botón 'ABRIR ALMACENAMIENTO' presionado")
+                onOpenStorage()
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BotonesNormales,
+                contentColor = TextoBotonesNormales
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            shape = RoundedCornerShape(0.dp)
+        ) {
+            Text(
+                text = "ABRIR ALMACENAMIENTO",
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1255,4 +1622,17 @@ fun MissingFieldsDialog(
             }
         }
     )
+}
+
+private fun isValidPdf(file: File): Boolean {
+    return try {
+        PdfReader(file).use { reader ->
+            PdfDocument(reader).use { document ->
+                document.numberOfPages > 0
+            }
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "Invalid PDF file: ${file.absolutePath}, error: ${e.message}", e)
+        false
+    }
 }

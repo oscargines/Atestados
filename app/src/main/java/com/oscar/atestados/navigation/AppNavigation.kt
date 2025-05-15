@@ -1,7 +1,6 @@
 package com.oscar.atestados.navigation
 
 import android.content.Context
-import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,23 +35,6 @@ import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.viewModel.TomaDerechosViewModel
 import com.oscar.atestados.viewModel.TomaManifestacionAlcoholViewModel
 import com.oscar.atestados.viewModel.VehiculoViewModel
-
-/**
- * Función composable que inicializa la navegación de la aplicación.
- * Actualmente solo inicializa el ViewModel de Bluetooth.
- *
- * @param navController Controlador de navegación para manejar transiciones entre pantallas.
- * @param personaViewModel ViewModel para manejar datos de personas.
- * @param nfcViewModel ViewModel para manejar funcionalidad NFC.
- */
-@Composable
-fun AppNavigation(
-    navController: NavHostController,
-    personaViewModel: PersonaViewModel,
-    nfcViewModel: NfcViewModel
-) {
-    val bluetoothViewModel: BluetoothViewModel = viewModel()
-}
 
 /**
  * Define el grafo de navegación de la aplicación con todas las pantallas disponibles.
@@ -240,7 +222,7 @@ fun NavGraphBuilder.appNavigation(
             },
             alcoholemiaDosViewModel = alcoholemiaDosViewModel,
             alcoholemiaUnoViewModel = alcoholemiaUnoViewModel,
-            personaViewModel = personaViewModel, // Reutilizando desde los parámetros de appNavigation
+            personaViewModel = personaViewModel,
             vehiculoViewModel = vehiculoViewModel,
             tomaDerechosViewModel = tomaDerechosViewModel,
             tomaManifestacionViewModel = tomaManifestacionViewModel,

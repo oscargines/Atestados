@@ -156,6 +156,8 @@ dependencies {
     // Coroutines support for Play Services Tasks
     implementation(libs.kotlinx.coroutines.play.services)
 
+    implementation(libs.androidx.documentfile)
+
 }
 
 // Forzar versión 1.78 para BouncyCastle

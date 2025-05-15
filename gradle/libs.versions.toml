@@ -4,6 +4,7 @@ agp = "8.10.0"                   # Última versión estable
 barcodeScanning = "17.2.0"
 core = "3.5.3"
 datastorePreferencesVersion = "1.0.0"
+documentfile = "1.1.0"
 html2pdf = "6.1.0"
 json = "20230227"
 jsoup = "1.19.1"
@@ -76,6 +77,7 @@ zxingAndroidEmbedded = "4.3.0"
 # AndroidX Core y Lifecycle
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences-v100 = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferencesVersion" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
 
