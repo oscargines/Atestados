@@ -1,5 +1,6 @@
 package com.oscar.atestados.screens
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import android.view.MotionEvent
@@ -17,51 +18,36 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.oscar.atestados.ui.theme.BlueGray50
-import com.oscar.atestados.ui.theme.BotonesNormales
-import com.oscar.atestados.ui.theme.BotonesSecundarios
-import com.oscar.atestados.ui.theme.FirmaColor
-import com.oscar.atestados.ui.theme.White
+import com.oscar.atestados.ui.theme.*
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
-/**
- * Una función componible que proporciona una pantalla de captura de firma.
- * Esta pantalla permite a los usuarios dibujar su firma y guardarla como un bitmap.
- *
- * @param onSignatureCaptured Una función de devolución de llamada que se invoca cuando se captura la firma.
- *                            Recibe la firma capturada como un [Bitmap].
- * @param onDismiss Una función de devolución de llamada que se invoca cuando se cierra el diálogo.
- */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SignatureCaptureScreen(
-    onSignatureCaptured: (Bitmap) -> Unit,
+    onSignatureCaptured: (String) -> Unit, // Devuelve la ruta con prefijo file://
     onDismiss: () -> Unit
 ) {
-    // Estado para mantener la trayectoria de la firma
     var path by remember { mutableStateOf(Path()) }
-    // Estado para forzar la recomposición del Canvas
     var forceRedraw by remember { mutableStateOf(0) }
-    // Ámbito de corrutina para tareas asíncronas
     val coroutineScope = rememberCoroutineScope()
-    // Densidad de la pantalla
     val density = LocalDensity.current
-    // Estado para mantener el tamaño del Canvas
     var canvasSize by remember { mutableStateOf(DpSize(0.dp, 0.dp)) }
-    // Estado para mantener las últimas coordenadas X e Y del evento táctil
     var lastX by remember { mutableStateOf(0f) }
     var lastY by remember { mutableStateOf(0f) }
+    val context = LocalContext.current
 
-    // Diálogo para mostrar la pantalla de captura de firma
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false) // Desactiva el ancho predeterminado del diálogo
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
@@ -119,14 +105,14 @@ fun SignatureCaptureScreen(
                                                 )
                                                 lastX = x
                                                 lastY = y
-                                                forceRedraw++ // Forzar recomposición
+                                                forceRedraw++
                                             }
                                             true
                                         }
                                         MotionEvent.ACTION_UP -> {
                                             Log.d("SignatureScreen", "Fin de toque en: ($x, $y)")
                                             path.lineTo(lastX, lastY)
-                                            forceRedraw++ // Forzar recomposición
+                                            forceRedraw++
                                             true
                                         }
                                         else -> false
@@ -141,7 +127,6 @@ fun SignatureCaptureScreen(
                                 color = FirmaColor,
                                 style = Stroke(width = 4f)
                             )
-                            // Usar forceRedraw para asegurar que el Canvas se redibuje
                             @Suppress("UNUSED_EXPRESSION")
                             forceRedraw
                         }
@@ -183,7 +168,15 @@ fun SignatureCaptureScreen(
                                         style = android.graphics.Paint.Style.STROKE
                                     }
                                 )
-                                onSignatureCaptured(bitmap)
+                                // Guardar el bitmap como archivo PNG
+                                val signatureFile = File(context.cacheDir, "signature_${System.currentTimeMillis()}.png")
+                                FileOutputStream(signatureFile).use { outputStream ->
+                                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                                }
+                                bitmap.recycle() // Liberar memoria
+                                val fileUri = "file://${signatureFile.absolutePath}"
+                                Log.d("SignatureScreen", "Firma guardada en: $fileUri")
+                                onSignatureCaptured(fileUri)
                                 onDismiss()
                             }
                         },

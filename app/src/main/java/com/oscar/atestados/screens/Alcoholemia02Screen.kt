@@ -14,7 +14,6 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +25,6 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -35,8 +33,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewModelScope
@@ -52,6 +48,9 @@ import com.oscar.atestados.utils.PdfToBitmapConverter
 import com.oscar.atestados.utils.HtmlParser
 import com.oscar.atestados.utils.PDFA4Printer
 import com.oscar.atestados.data.AlcoholemiaDataProvider
+import com.oscar.atestados.ui.composables.MissingFieldsDialog
+import com.oscar.atestados.ui.composables.FullScreenProgressIndicator
+import com.oscar.atestados.ui.composables.BitmapPreviewDialog
 import com.oscar.atestados.viewModel.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,6 +66,7 @@ import java.util.*
 import kotlin.text.Regex
 import com.itextpdf.kernel.pdf.PdfReader
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
+import com.tuapp.utils.PdfUtils
 
 private const val TAG = "Alcoholemia02Screen"
 
@@ -104,11 +104,11 @@ fun Alcoholemia02Screen(
     var showPreviewDialog by remember { mutableStateOf(false) }
     var previewBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
+    var showInvalidLugarInvestigacionDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val db = remember { AccesoBaseDatos(context, "juzgados.db") }
     val htmlParser = remember { HtmlParser(context) }
     val pdfA4Printer = remember { PDFA4Printer(context) }
-    var showInvalidLugarInvestigacionDialog by remember { mutableStateOf(false) }
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
     val dataProvider = remember {
         AlcoholemiaDataProvider(
@@ -125,126 +125,6 @@ fun Alcoholemia02Screen(
     }
     var showMissingFieldsDialog by remember { mutableStateOf(false) }
     var missingFieldsToShow by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    // Función para escribir PDF en el directorio Documents/Atestados
-    suspend fun writePdfToStorage(
-        content: String,
-        fileName: String,
-        pdfA4Printer: PDFA4Printer,
-        context: Context // Add context parameter
-    ): File? {
-        return withContext(Dispatchers.IO) {
-            Log.d(TAG, "writePdfToStorage: Iniciando escritura de PDF, fileName: $fileName")
-            try {
-                // Acceder al directorio Documents
-                val documentsDir =
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-                if (!documentsDir.exists()) {
-                    documentsDir.mkdirs()
-                }
-
-                // Crear el directorio Atestados si no existe
-                val atestadosDir = File(documentsDir, "Atestados")
-                if (!atestadosDir.exists()) {
-                    atestadosDir.mkdirs()
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: Directorio Atestados creado en ${atestadosDir.absolutePath}"
-                    )
-                }
-
-                // Crear el archivo en Documents/Atestados
-                val outputFile = File(atestadosDir, fileName)
-                // Generar el PDF
-                pdfA4Printer.generarDocumentoA4(htmlContent = content, outputFile = outputFile)
-                Log.d(TAG, "writePdfToStorage: PDF generado en ${outputFile.absolutePath}")
-
-                // Verify the file exists and is not empty
-                if (!outputFile.exists() || outputFile.length() == 0L) {
-                    Log.e(
-                        TAG,
-                        "writePdfToStorage: El archivo PDF no se creó correctamente o está vacío"
-                    )
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            context,
-                            "Error: El archivo PDF no se creó correctamente",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                    return@withContext null
-                }
-
-                // Set file permissions to rw-rw-r-- (664)
-                try {
-                    outputFile.setReadable(true, false) // Readable by all
-                    outputFile.setWritable(true, false) // Writable by all
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: Permisos establecidos para ${outputFile.absolutePath}"
-                    )
-                } catch (e: SecurityException) {
-                    Log.w(
-                        TAG,
-                        "writePdfToStorage: No se pudieron establecer permisos: ${e.message}"
-                    )
-                }
-
-                // Notify MediaStore to index the file
-                try {
-                    val contentUri = MediaStore.Files.getContentUri("external")
-                    val values = ContentValues().apply {
-                        put(MediaStore.Files.FileColumns.DATA, outputFile.absolutePath)
-                        put(MediaStore.Files.FileColumns.DISPLAY_NAME, fileName)
-                        put(MediaStore.Files.FileColumns.MIME_TYPE, "application/pdf")
-                        put(
-                            MediaStore.Files.FileColumns.DATE_MODIFIED,
-                            System.currentTimeMillis() / 1000
-                        )
-                    }
-                    context.contentResolver.insert(contentUri, values)
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: Archivo indexado en MediaStore: ${outputFile.absolutePath}"
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "writePdfToStorage: Error al indexar en MediaStore: ${e.message}")
-                }
-
-                // Scan file to ensure visibility
-                try {
-                    MediaScannerConnection.scanFile(
-                        context,
-                        arrayOf(outputFile.absolutePath),
-                        arrayOf("application/pdf")
-                    ) { path, uri ->
-                        Log.d(
-                            TAG,
-                            "writePdfToStorage: MediaScanner completado para $path, URI: $uri"
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "writePdfToStorage: Error al escanear archivo: ${e.message}")
-                }
-
-                outputFile
-            } catch (e: SecurityException) {
-                Log.e(TAG, "writePdfToStorage: Error de permisos al escribir PDF: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Error de permisos al guardar PDF", Toast.LENGTH_LONG)
-                        .show()
-                }
-                null
-            } catch (e: Exception) {
-                Log.e(TAG, "writePdfToStorage: Error al escribir PDF: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Error al guardar PDF: ${e.message}", Toast.LENGTH_LONG)
-                        .show()
-                }
-                null
-            }
-        }
-    }
 
     LaunchedEffect(isPrintingAtestado) {
         if (isPrintingAtestado) {
@@ -308,10 +188,10 @@ fun Alcoholemia02Screen(
                     return@LaunchedEffect
                 }
 
-                // Generar PDF A4 solo para guardar en almacenamiento
+                // Generar PDF A4 solo para guardar en almacenamiento usando PdfUtils
                 currentPrintStatus = "Generando PDF A4..."
                 val outputFile =
-                    writePdfToStorage(htmlContent, "atestado_a4.pdf", pdfA4Printer, context)
+                    PdfUtils.writePdfToStorage(htmlContent, "atestado_a4.pdf", pdfA4Printer, context)
                 if (outputFile == null) {
                     currentPrintStatus = "Error al generar PDF A4"
                     Toast.makeText(context, "Error al generar PDF A4", Toast.LENGTH_LONG).show()
@@ -323,7 +203,7 @@ fun Alcoholemia02Screen(
                     return@LaunchedEffect
                 }
 
-                // Abrir el PDF A4 usando FileProvider (opcional, si aún quieres mantener esta funcionalidad)
+                // Abrir el PDF A4 usando FileProvider
                 withContext(Dispatchers.Main) {
                     try {
                         val contentUri = FileProvider.getUriForFile(
@@ -1091,15 +971,12 @@ private fun Alcoholemia02Content(
 
         if (showSignatureDialog) {
             SignatureCaptureScreen(
-                onSignatureCaptured = { bitmap ->
+                onSignatureCaptured = { filePath ->
                     when (signatureType) {
-                        "investigado" -> alcoholemiaDosViewModel.updateFirmaInvestigado(bitmap)
-                        "segundo_conductor" -> alcoholemiaDosViewModel.updateFirmaSegundoConductor(
-                            bitmap
-                        )
-
-                        "instructor" -> alcoholemiaDosViewModel.updateFirmaInstructor(bitmap)
-                        "secretario" -> alcoholemiaDosViewModel.updateFirmaSecretario(bitmap)
+                        "investigado" -> alcoholemiaDosViewModel.updateFirmaInvestigado(filePath)
+                        "segundo_conductor" -> alcoholemiaDosViewModel.updateFirmaSegundoConductor(filePath)
+                        "instructor" -> alcoholemiaDosViewModel.updateFirmaInstructor(filePath)
+                        "secretario" -> alcoholemiaDosViewModel.updateFirmaSecretario(filePath)
                     }
                     showSignatureDialog = false
                 },
@@ -1507,122 +1384,6 @@ fun getDateDialogDiligencias(
     }
 }
 
-/**
- * Diálogo para previsualizar el bitmap antes de imprimir.
- * Muestra una imagen del documento generado y permite confirmar o cancelar la impresión.
- *
- * @param bitmap Bitmap a previsualizar.
- * @param onConfirm Callback cuando se confirma la impresión.
- * @param onDismiss Callback cuando se cancela la previsualización.
- */
-@Composable
-fun BitmapPreviewDialog(
-    bitmap: android.graphics.Bitmap?,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    if (bitmap != null) {
-        Dialog(
-            onDismissRequest = onDismiss,
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .fillMaxHeight(0.9f)
-                    .background(Color.White, RoundedCornerShape(8.dp)),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    androidx.compose.foundation.Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Previsualización del documento",
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Button(
-                            onClick = onDismiss,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.Gray,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Cancelar")
-                        }
-                        Button(
-                            onClick = onConfirm,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = BotonesNormales,
-                                contentColor = TextoBotonesNormales
-                            )
-                        ) {
-                            Text("Imprimir")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Diálogo que muestra los campos requeridos faltantes antes de imprimir el atestado.
- * Permite al usuario corregir los datos navegando a la pantalla correspondiente.
- *
- * @param missingFields Lista de campos faltantes.
- * @param onDismiss Callback cuando se cancela el diálogo.
- * @param navigateToScreen Función para navegar a otras pantallas.
- */
-@Composable
-fun MissingFieldsDialog(
-    missingFields: List<String>,
-    onDismiss: () -> Unit,
-    navigateToScreen: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Campos requeridos faltantes") },
-        text = {
-            Column {
-                Text("Por favor, complete los siguientes campos:")
-                Spacer(modifier = Modifier.height(8.dp))
-                missingFields.forEach { field ->
-                    Text("• $field")
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                if (missingFields.contains("Nombre y apellidos") || missingFields.contains("Documento de identidad")) {
-                    navigateToScreen("Alcoholemia01Screen")
-                } else if (missingFields.contains("TIP del instructor")) {
-                    navigateToScreen("GuardiasScreen")
-                } else {
-                    onDismiss()
-                }
-            }) {
-                Text("Corregir")
-            }
-        },
-        dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
-        }
-    )
-}
 
 private fun isValidPdf(file: File): Boolean {
     return try {

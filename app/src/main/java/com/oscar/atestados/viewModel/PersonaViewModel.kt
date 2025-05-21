@@ -143,8 +143,9 @@ class PersonaViewModel : ViewModel() {
                 preferences[PersonaKeys.EMAIL] = _email.value ?: ""
                 preferences[PersonaKeys.CODIGO_CAN] = _codigoCan.value ?: ""
                 preferences[PersonaKeys.UID] = _uid.value ?: ""
+
+                Log.d("PersonaViewModel", "Número de documento guardado: ${_numeroDocumento.value}")
             }
-            Toast.makeText(context, "Datos guardados correctamente", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -194,24 +195,32 @@ class PersonaViewModel : ViewModel() {
 
     fun loadData(context: Context) {
         viewModelScope.launch {
-            val preferences = context.dataStorePer.data.firstOrNull()
-            _genero.value = preferences?.get(PersonaKeys.GENERO)
-            _nacionalidad.value = preferences?.get(PersonaKeys.NACIONALIDAD)
-            _tipoDocumento.value = preferences?.get(PersonaKeys.TIPO_DOCUMENTO)
-            _numeroDocumento.value = preferences?.get(PersonaKeys.NUMERO_DOCUMENTO)
-            _nombre.value = preferences?.get(PersonaKeys.NOMBRE)
-            _apellidos.value = preferences?.get(PersonaKeys.APELLIDOS)
-            _nombrePadre.value = preferences?.get(PersonaKeys.NOMBRE_PADRE)
-            _nombreMadre.value = preferences?.get(PersonaKeys.NOMBRE_MADRE)
-            _fechaNacimiento.value = preferences?.get(PersonaKeys.FECHA_NACIMIENTO)
-            _lugarNacimiento.value = preferences?.get(PersonaKeys.LUGAR_NACIMIENTO)
-            _domicilio.value = preferences?.get(PersonaKeys.DOMICILIO)
-            _codigoPostal.value = preferences?.get(PersonaKeys.CODIGO_POSTAL)
-            _telefono.value = preferences?.get(PersonaKeys.TELEFONO)
-            _email.value = preferences?.get(PersonaKeys.EMAIL)
-            _codigoCan.value = preferences?.get(PersonaKeys.CODIGO_CAN)
-            _uid.value = preferences?.get(PersonaKeys.UID)
-            Log.d("PersonaViewModel", "Datos cargados - canCode: ${_codigoCan.value}")
+            try {
+                val preferences = context.dataStorePer.data.firstOrNull()
+                if (preferences == null) {
+                    Log.e("PersonaViewModel", "No se encontraron datos en DataStore")
+                    return@launch
+                }
+                _genero.value = preferences[PersonaKeys.GENERO]
+                _nacionalidad.value = preferences[PersonaKeys.NACIONALIDAD]
+                _tipoDocumento.value = preferences[PersonaKeys.TIPO_DOCUMENTO]
+                _numeroDocumento.value = preferences[PersonaKeys.NUMERO_DOCUMENTO]
+                _nombre.value = preferences[PersonaKeys.NOMBRE]
+                _apellidos.value = preferences[PersonaKeys.APELLIDOS]
+                _nombrePadre.value = preferences[PersonaKeys.NOMBRE_PADRE]
+                _nombreMadre.value = preferences[PersonaKeys.NOMBRE_MADRE]
+                _fechaNacimiento.value = preferences[PersonaKeys.FECHA_NACIMIENTO]
+                _lugarNacimiento.value = preferences[PersonaKeys.LUGAR_NACIMIENTO]
+                _domicilio.value = preferences[PersonaKeys.DOMICILIO]
+                _codigoPostal.value = preferences[PersonaKeys.CODIGO_POSTAL]
+                _telefono.value = preferences[PersonaKeys.TELEFONO]
+                _email.value = preferences[PersonaKeys.EMAIL]
+                _codigoCan.value = preferences[PersonaKeys.CODIGO_CAN]
+                _uid.value = preferences[PersonaKeys.UID]
+                Log.d("PersonaViewModel", "Datos cargados - numeroDocumento: ${_numeroDocumento.value}, canCode: ${_codigoCan.value}")
+            } catch (e: Exception) {
+                Log.e("PersonaViewModel", "Error cargando datos de DataStore: ${e.message}", e)
+            }
         }
     }
 

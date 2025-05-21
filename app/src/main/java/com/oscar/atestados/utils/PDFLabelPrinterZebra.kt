@@ -86,7 +86,7 @@ class PDFLabelPrinterZebra(private val context: Context) {
                                         .setFontSize(10f)
                                         .setUnderline()
                                         .setTextAlignment(TextAlignment.CENTER)
-                                        .setFixedPosition(45f, PAGE_HEIGHT - 40f, PAGE_WIDTH - 90f) // Ajustado para 100 mm
+                                        .setFixedPosition(45f, PAGE_HEIGHT - 40f, PAGE_WIDTH - 90f)
                                         .setMultipliedLeading(1.2f)
                                 )
                             }
@@ -107,7 +107,7 @@ class PDFLabelPrinterZebra(private val context: Context) {
             }
             Log.d(TAG, "PDF generado exitosamente en ${outputFile.absolutePath}")
         } catch (e: Exception) {
-            Log.e(TAG, "Error al generar PDF", e)
+            Log.e(TAG, "Error al generar PDF: ${e.message}", e)
             throw e
         }
     }
@@ -118,24 +118,29 @@ class PDFLabelPrinterZebra(private val context: Context) {
      * @return Mapa de fuentes con claves: "escudo", "title", "regular", "boldItalic".
      */
     private fun loadFonts(): Map<String, PdfFont> {
-        return mapOf(
-            "escudo" to PdfFontFactory.createFont(
-                context.assets.open("fonts/escudo.ttf").readBytes(),
-                PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
-            ),
-            "title" to PdfFontFactory.createFont(
-                context.assets.open("fonts/calibri-bold.ttf").readBytes(),
-                PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
-            ),
-            "regular" to PdfFontFactory.createFont(
-                context.assets.open("fonts/calibri-regular.ttf").readBytes(),
-                PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
-            ),
-            "boldItalic" to PdfFontFactory.createFont(
-                context.assets.open("fonts/calibri-bold-italic.ttf").readBytes(),
-                PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
+        return try {
+            mapOf(
+                "escudo" to PdfFontFactory.createFont(
+                    context.assets.open("fonts/escudo.ttf").readBytes(),
+                    PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
+                ),
+                "title" to PdfFontFactory.createFont(
+                    context.assets.open("fonts/calibri-bold.ttf").readBytes(),
+                    PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
+                ),
+                "regular" to PdfFontFactory.createFont(
+                    context.assets.open("fonts/calibri-regular.ttf").readBytes(),
+                    PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
+                ),
+                "boldItalic" to PdfFontFactory.createFont(
+                    context.assets.open("fonts/calibri-bold-italic.ttf").readBytes(),
+                    PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
+                )
             )
-        )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al cargar fuentes: ${e.message}", e)
+            throw e
+        }
     }
 
     /**
@@ -150,13 +155,13 @@ class PDFLabelPrinterZebra(private val context: Context) {
             Paragraph("A")
                 .setFont(escudoFont)
                 .setFontSize(36f)
-                .setFixedPosition(MARGIN_MM, PAGE_HEIGHT - MARGIN_MM - 50f, 50f) // Posición original
+                .setFixedPosition(MARGIN_MM, PAGE_HEIGHT - MARGIN_MM - 50f, 50f)
         )
         document.add(
             Paragraph("G")
                 .setFont(escudoFont)
                 .setFontSize(36f)
-                .setFixedPosition(PAGE_WIDTH - MARGIN_MM - 30f, PAGE_HEIGHT - MARGIN_MM - 50f, 50f) // Ajustado para 100 mm
+                .setFixedPosition(PAGE_WIDTH - MARGIN_MM - 30f, PAGE_HEIGHT - MARGIN_MM - 50f, 50f)
         )
     }
 
@@ -219,15 +224,20 @@ class PDFLabelPrinterZebra(private val context: Context) {
             when (element) {
                 is Paragraph -> {
                     val fontSize = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.FONT_SIZE)?.value ?: 10f
-                    val leading = element.getProperty<Float>(com.itextpdf.layout.properties.Property.LEADING) ?: 1.2f
+                    // Obtener el objeto Leading
+                    val leadingProperty = element.getProperty<com.itextpdf.layout.properties.Leading>(com.itextpdf.layout.properties.Property.LEADING)
+                    // Usar el valor de leading directamente, asumiendo que es un multiplicador
+                    val leading = leadingProperty?.value ?: 1.2f // Valor por defecto si no hay leading
                     val text = element.children.filterIsInstance<Text>().joinToString("") { it.text }
                     val avgCharsPerLine = ((PAGE_WIDTH - (2 * MARGIN_MM)) / (fontSize * 0.5f)).toInt()
                     val estimatedLines = text.length / avgCharsPerLine.coerceAtLeast(1)
                     val actualLines = text.count { it == '\n' } + 1
                     val lineCount = maxOf(estimatedLines, actualLines).coerceAtLeast(1)
                     val height = fontSize * leading * lineCount
-                    val marginBottom = element.getProperty<Float>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM) ?: 0f
-                    Log.v(TAG, "Paragraph: fontSize=$fontSize, leading=$leading, chars=${text.length}, líneas estimadas=$lineCount, height=$height")
+                    // Obtener MARGIN_BOTTOM como UnitValue
+                    val marginBottomProperty = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)
+                    val marginBottom = marginBottomProperty?.value ?: 0f // Usar el valor de UnitValue o 0f por defecto
+                    Log.v(TAG, "Paragraph: fontSize=$fontSize, leading=$leading, chars=${text.length}, líneas estimadas=$lineCount, height=$height, marginBottom=$marginBottom")
                     height + marginBottom + 10f
                 }
                 is Div -> {
@@ -244,7 +254,7 @@ class PDFLabelPrinterZebra(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error al estimar altura", e)
+            Log.e(TAG, "Error al estimar altura: ${e.message}", e)
             30f
         }
     }
@@ -290,6 +300,36 @@ class PDFLabelPrinterZebra(private val context: Context) {
                         .setMarginLeft(indentLevel * 10f)
                 )
             }
+            "input" -> {
+                if (element.attributes["type"] == "checkbox") {
+                    val isChecked = element.attributes["checked"] == "checked"
+                    val checkboxText = if (isChecked) "[X]" else "[ ]"
+                    div.add(
+                        Paragraph(checkboxText + " " + element.content)
+                            .setFont(regularFont)
+                            .setFontSize(8f)
+                            .setTextAlignment(TextAlignment.LEFT)
+                            .setMultipliedLeading(1.2f)
+                            .setMarginBottom(5f)
+                            .setMarginLeft(indentLevel * 10f)
+                    )
+                    Log.d(TAG, "Checkbox procesado: ${element.attributes["id"]} = $checkboxText")
+                }
+            }
+            "table" -> {
+                // Procesar celdas de la tabla como párrafos
+                element.children.forEach { tr ->
+                    if (tr.tag == "tr") {
+                        tr.children.forEach { td ->
+                            if (td.tag == "td") {
+                                td.children.forEach { child ->
+                                    processElement(child, div, regularFont, boldItalicFont, indentLevel + 1)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             "ul" -> {
                 element.children.forEachIndexed { index, li ->
                     if (li.tag == "li") {
@@ -313,6 +353,9 @@ class PDFLabelPrinterZebra(private val context: Context) {
                         }
                     }
                 }
+            }
+            else -> {
+                Log.w(TAG, "Elemento no soportado: ${element.tag}")
             }
         }
     }

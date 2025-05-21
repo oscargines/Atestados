@@ -47,7 +47,10 @@ import java.util.Locale
 
 val Context.dataStorePer by preferencesDataStore(name = "PERSONA_PREFERENCES_Nme")
 private const val TAG = "PersonaScreen"
-
+/**
+ * Pantalla principal para la gestión de datos personales.
+ * Permite la entrada manual de datos, lectura mediante NFC y escaneo de QR.
+ */
 @Composable
 fun PersonaScreen(
     navigateToScreen: (String) -> Unit,
@@ -298,8 +301,19 @@ fun PersonaScreen(
                     }
                 },
                 confirmButton = {
-                    Button(onClick = { qrResult = null }) {
-                        Text("Aceptar")
+                    Button(onClick = {
+                        if (result.numeroDocumento != null) {
+                            personaViewModel.updateFromDniData(result)
+                            Toast.makeText(context, "Datos del QR cargados en el formulario", Toast.LENGTH_SHORT).show()
+                        }
+                        qrResult = null
+                    }) {
+                        Text("Cargar datos")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { qrResult = null }) {
+                        Text("Cancelar")
                     }
                 }
             )
@@ -330,7 +344,12 @@ fun ReadingNfcDialog() {
         modifier = Modifier
     )
 }
-
+/**
+ * Diálogo para introducir el código CAN del DNIe.
+ *
+ * @param onConfirm Callback que se ejecuta cuando se confirma el código CAN.
+ * @param onDismiss Callback que se ejecuta cuando se cancela el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CanDialog(
@@ -374,7 +393,15 @@ fun CanDialog(
         }
     )
 }
-
+/**
+ * Contenido principal de la pantalla de persona.
+ *
+ * @param navigateToScreen Función para navegar a otras pantallas.
+ * @param personaViewModel ViewModel que maneja los datos personales.
+ * @param onCameraButtonClicked Callback para el botón de cámara/QR.
+ * @param onNfcButtonClicked Callback para el botón de NFC.
+ * @param onTextFieldChanged Callback para cambios en los campos de texto.
+ */
 @Composable
 fun PersonaScreenContent(
     navigateToScreen: (String) -> Unit,
@@ -401,7 +428,12 @@ fun PersonaScreenContent(
     }
 }
 
-// Resto del código sin cambios (ToolbarPersona, BottomAppBarPersona, PersonaContent, etc.)
+/**
+ * Barra de herramientas superior con botones de acción.
+ *
+ * @param onCameraButtonClicked Callback para el botón de cámara/QR.
+ * @param onNFCClicked Callback para el botón de NFC.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToolbarPersona(
@@ -442,7 +474,12 @@ fun ToolbarPersona(
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
     )
 }
-
+/**
+ * Barra de herramientas inferior con botones de acción.
+ *
+ * @param personaViewModel ViewModel que maneja los datos personales.
+ * @param navigateToScreen Función para navegar a otras pantallas.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomAppBarPersona(
@@ -451,6 +488,7 @@ fun BottomAppBarPersona(
 ) {
     val context = LocalContext.current
     val plainTooltipState = rememberTooltipState()
+    val numeroDocumento by personaViewModel.numeroDocumento.observeAsState(initial = "")
 
     Surface(
         modifier = Modifier
@@ -472,8 +510,12 @@ fun BottomAppBarPersona(
             ) {
                 Button(
                     onClick = {
-                        personaViewModel.saveData(context)
-                        navigateToScreen("MainScreen")
+                        if (numeroDocumento.isNullOrEmpty()) {
+                            Toast.makeText(context, "Por favor, ingrese un número de documento válido", Toast.LENGTH_LONG).show()
+                        } else {
+                            personaViewModel.saveData(context)
+                            navigateToScreen("MainScreen")
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -517,7 +559,13 @@ fun BottomAppBarPersona(
         }
     }
 }
-
+/**
+ * Contenido del formulario de datos personales.
+ *
+ * @param modifier Modificador para personalizar el diseño.
+ * @param onTextFieldChanged Callback para cambios en los campos de texto.
+ * @param personaViewModel ViewModel que maneja los datos personales.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonaContent(
@@ -704,7 +752,12 @@ fun PersonaContent(
         )
     }
 }
-
+/**
+ * Selector de fecha personalizado.
+ *
+ * @param onDateSelected Callback que se ejecuta cuando se selecciona una fecha.
+ * @param onDismiss Callback que se ejecuta cuando se cancela el diálogo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun getDateDialog(
@@ -738,7 +791,11 @@ fun getDateDialog(
         DatePicker(state = state)
     }
 }
-
+/**
+ * Campo desplegable para seleccionar el género.
+ *
+ * @param personaViewModel ViewModel que maneja los datos personales.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownSexo(personaViewModel: PersonaViewModel) {
@@ -774,7 +831,12 @@ fun DropDownSexo(personaViewModel: PersonaViewModel) {
         }
     }
 }
-
+/**
+ * Campo desplegable para seleccionar la nacionalidad.
+ *
+ * @param personaViewModel ViewModel que maneja los datos personales.
+ * @param paises Lista de países disponibles para selección.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownNacionalidad(
@@ -811,7 +873,12 @@ fun DropDownNacionalidad(
         }
     }
 }
-
+/**
+ * Campo desplegable para seleccionar el tipo de documento.
+ *
+ * @param personaViewModel ViewModel que maneja los datos personales.
+ * @param onTextFieldChanged Callback para cambios en el campo de texto del documento.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (String) -> Unit) {
@@ -872,7 +939,12 @@ fun DropDownDocumento(personaViewModel: PersonaViewModel, onTextFieldChanged: (S
         )
     }
 }
-
+/**
+ * Obtiene la lista de países desde la base de datos.
+ *
+ * @param context Contexto de la aplicación.
+ * @return Lista de nombres de países.
+ */
 fun getPaises(context: Context): List<String> {
     val myDB = AccesoBaseDatos(context, "paises.db")
     return myDB.query("SELECT nombre FROM paises").map { it["nombre"] as String }

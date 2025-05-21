@@ -248,6 +248,8 @@ fun NavGraphBuilder.appNavigation(
      */
     composable("CitacionScreen") {
         val citacionViewModel: CitacionViewModel = viewModel()
+        val guardiasViewModel: GuardiasViewModel = viewModel()
+        val alcoholemiaDosViewModel: AlcoholemiaDosViewModel = viewModel()
         val bluetoothViewModel: BluetoothViewModel = viewModel()
         val factory = ImpresoraViewModelFactory(
             bluetoothViewModel = bluetoothViewModel,
@@ -259,6 +261,9 @@ fun NavGraphBuilder.appNavigation(
                 navController.navigate(route)
             },
             citacionViewModel = citacionViewModel,
+            personaViewModel = personaViewModel, // Usar el parámetro de appNavigation
+            guardiasViewModel = guardiasViewModel,
+            alcoholemiaDosViewModel = alcoholemiaDosViewModel,
             impresoraViewModel = impresoraViewModel
         )
     }

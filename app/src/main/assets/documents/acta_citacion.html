@@ -7,13 +7,13 @@
 <body>
     <h1>DILIGENCIA DE CITACIÓN PARA JUICIO RÁPIDO POR DELITO</h1>
 
-    <p>En <span class="underline" id="lugar"></span>, término municipal de <span class="underline" id="termino_municipal"></span> y Partido Judicial de <span class="underline" id="partido_judicial"></span>, siendo las <span class="underline" id="hora_diligencia"></span> horas del día <span class="underline" id="fecha_diligencia"></span>.</p>
+    <p>En <span class="underline" id="lugar"></span>, término municipal de <span class="underline" id="termino_municipal"></span> y Partido Judicial de <span class="underline" id="partido_judicial"></span>, siendo las <span class="underline" id="hora_diligencia"></span> horas del día <span class="underline" id="fecha_diligencia"></span>, por los componentes del Cuerpo de la Guardia Civil con las Tarjetas de Identidad Profesional <span class="underline" id="tip_instructor"></span> y <span class="underline" id="tip_secretario"></span>, se procede a comunicar por PERSONALMENTE a D./Dña. <span class="underline" id="nombre_completo"></span>, con documento nacional de identidad <span class="underline" id="num_documento"></span>, en calidad de INVESTIGADO en el atestado de la referencia instruido por el personal del <span class="underline" id="unidad"></span>, la obligación de personarse a las <span class="underline" id="hora_juicio"></span> horas del día <span id="dia_juicio"></span> en el <span id="datos_juzgado"></span>.</p>
 
     <h2>DERECHOS:</h2>
     <p>Se le informa de su derecho de comparecer en dicho Juzgado asistido de Abogado.</p>
     <p><strong>Denunciado:</strong></p>
-    <p><span class="checkbox">□</span> Designa al Abogado D./Dña. <span class="underline" id="abogado"></span>, con número de colegiado <span class="underline" id="num_colegiado"></span> del Ilustre Colegio de Abogados de <span class="underline" id="colegio_abogados"></span>.</p>
-    <p></p><span class="checkbox">□</span> No designa Letrado, por lo que se ha solicitado la asistencia de un Abogado de Oficio al Ilustre Colegio de Abogados Asturias en comunicación registrada con el número <span class="underline" id="telefonema"></span>.</p>
+    <p><input type="checkbox" id="op_1_checkbox" #op_1_checkbox#> Designa al Abogado D./Dña. <span class="underline" id="abogado"></span>, con número de colegiado <span class="underline" id="num_colegiado"></span> del Ilustre Colegio de Abogados de <span class="underline" id="colegio_abogados"></span>.</p>
+    <p><input type="checkbox" id="op_2_checkbox" #op_2_checkbox#> No designa Letrado, por lo que se ha solicitado la asistencia de un Abogado de Oficio al Ilustre Colegio de Abogados Asturias en comunicación registrada con el número <span class="underline" id="telefonema"></span>.</p>
 
     <p>Se le comunica que tiene derecho a instar el nombramiento de Abogado de Oficio (cuyos honorarios serán de su cargo salvo que le sea reconocido el derecho de asistencia jurídica gratuita según la Ley 1/1996, de 10 de enero, de Asistencia Jurídica Gratuita y el Real Decreto 141/2021, 9 de marzo, por el que se aprueba el Reglamento de Asistencia Jurídica Gratuita).</p>
 
@@ -25,17 +25,20 @@
     <div class="signature">
         <table>
             <tr>
-                <td><img src="" alt=""></td>
-                <td><img src="" alt=""></td>
+                <td><img id="firma_instructor" src="" alt=""></td>
+                <td><img id="firma_secretario" src="" alt=""></td>
             </tr>
             <tr>
-                <td>TIP Núm.: <span class="underline" id="tip_instructor">_____________________</span></td>
-                <td>TIP Núm.: <span class="underline" id="tip_secretario">_____________________</span></td>
+                <td>TIP Núm.: <span class="underline" id="tip_instructor"></span></td>
+                <td>TIP Núm.: <span class="underline" id="tip_secretario"></span></td>
             </tr>
         </table>
         <table>
             <tr>
-                <td><p><strong>ENTERADO:</strong></p><img src="" alt=""></td>
+                <td><img id="firma_instructor" src="" alt=""></td>
+            </tr>
+            <tr>
+                <td><p><strong>ENTERADO:</strong></p><img id="num_documento" src="" alt=""></td>
                 <td><p>Por la presente quedo enterado de mis derechos y obligaciones.</p></td>
             </tr>
         </table>
