@@ -32,12 +32,11 @@ object HtmlUtils {
     /**
      * Extrae elementos HTML relevantes de una cadena HTML dada.
      *
-     * Procesa los siguientes elementos: h1, h2, h3, p, ul, li.
+     * Procesa los siguientes elementos: h1, h2, h3, p, ul, li, span.
      * Ignora otros elementos como scripts.
      *
      * @param html La cadena HTML a procesar.
-     * @return Lista de [HtmlElement] extraídos. Si no se encuentran elementos,
-     *         retorna un único elemento con tag "p" y contenido "SIN CONTENIDO".
+     * @return Lista de [HtmlElement] extraídos.
      */
     fun extractHtmlElements(html: String): List<HtmlElement> {
         Log.d(TAG, "Iniciando extracción de elementos HTML")
@@ -60,22 +59,32 @@ object HtmlUtils {
                 Log.v(TAG, "Procesando elemento: $tagName, padre: $parentTag")
 
                 return when (tagName) {
-                    "h1", "h2", "h3", "p" -> {
+                    "h1", "h2", "h3", "p", "div" -> {
                         val textContent = element.text().trim()
-                        Log.d(TAG, "Elemento de texto encontrado: $tagName, contenido: '${textContent.take(50)}...'")
+                        val children = element.children().mapNotNull { child ->
+                            if (child.tagName() in listOf("ul", "span")) {
+                                processElement(child, tagName)
+                            } else null
+                        }
+                        Log.d(
+                            TAG,
+                            "Elemento de texto encontrado: $tagName, contenido: '${
+                                textContent.take(50)
+                            }...'"
+                        )
                         HtmlElement(
                             tag = tagName,
                             content = textContent,
-                            attributes = element.attributes().associate { it.key to it.value }
+                            attributes = element.attributes().associate { it.key to it.value },
+                            children = children
                         )
                     }
+
                     "ul" -> {
                         Log.d(TAG, "Lista no ordenada encontrada")
                         val children = element.children().mapNotNull { child ->
                             if (child.tagName() == "li") {
-                                processElement(child, "ul")?.also {
-                                    Log.v(TAG, "Elemento li procesado para lista ul")
-                                }
+                                processElement(child, "ul")
                             } else null
                         }
                         HtmlElement(
@@ -85,25 +94,39 @@ object HtmlUtils {
                             children = children
                         )
                     }
+
                     "li" -> {
-                        val ownText = element.ownText().trim()
-                        Log.d(TAG, "Elemento de lista encontrado, texto: '${ownText.take(50)}...'")
+                        val textContent = element.text().trim() // Incluye texto de hijos
                         val subChildren = element.children().mapNotNull { child ->
-                            if (child.tagName() == "ul") {
-                                processElement(child)?.also {
-                                    Log.v(TAG, "Sub-lista ul encontrada dentro de li")
-                                }
+                            if (child.tagName() in listOf("ul", "span")) {
+                                processElement(child, "li")
                             } else null
                         }
+                        Log.d(
+                            TAG,
+                            "Elemento de lista encontrado, texto: '${textContent.take(50)}...'"
+                        )
                         HtmlElement(
                             tag = "li",
-                            content = ownText,
+                            content = textContent,
+                            attributes = element.attributes().associate { it.key to it.value },
                             children = subChildren
                         )
                     }
+
+                    "span" -> {
+                        val textContent = element.text().trim()
+                        Log.d(TAG, "Span encontrado, texto: '${textContent.take(50)}...'")
+                        HtmlElement(
+                            tag = "span",
+                            content = textContent,
+                            attributes = element.attributes().associate { it.key to it.value }
+                        )
+                    }
+
                     else -> {
                         Log.v(TAG, "Elemento ignorado: $tagName")
-                        null // Ignorar otros tags como script
+                        null
                     }
                 }
             }

@@ -1,47 +1,110 @@
 <!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Diligencia de Citación para Juicio Rápido por Delito</title>
-</head>
-<body>
+<html>
+  <body>
     <h1>DILIGENCIA DE CITACIÓN PARA JUICIO RÁPIDO POR DELITO</h1>
 
-    <p>En <span class="underline" id="lugar"></span>, término municipal de <span class="underline" id="termino_municipal"></span> y Partido Judicial de <span class="underline" id="partido_judicial"></span>, siendo las <span class="underline" id="hora_diligencia"></span> horas del día <span class="underline" id="fecha_diligencia"></span>, por los componentes del Cuerpo de la Guardia Civil con las Tarjetas de Identidad Profesional <span class="underline" id="tip_instructor"></span> y <span class="underline" id="tip_secretario"></span>, se procede a comunicar por PERSONALMENTE a D./Dña. <span class="underline" id="nombre_completo"></span>, con documento nacional de identidad <span class="underline" id="num_documento"></span>, en calidad de INVESTIGADO en el atestado de la referencia instruido por el personal del <span class="underline" id="unidad"></span>, la obligación de personarse a las <span class="underline" id="hora_juicio"></span> horas del día <span id="dia_juicio"></span> en el <span id="datos_juzgado"></span>.</p>
+    <p>
+      En <span id="lugar">{{lugar}}</span>, término municipal de
+      <span id="termino_municipal">{{termino_municipal}}</span> y Partido
+      Judicial de <span id="partido_judicial">{{partido_judicial}}</span>,
+      siendo las <span id="hora_diligencia">{{hora_diligencia}}</span> horas del
+      día <span id="fecha_diligencia">{{fecha_diligencia}}</span>, por los
+      componentes del Cuerpo de la Guardia Civil con las Tarjetas de Identidad
+      Profesional <span id="tip_instructor">{{tip_instructor}}</span> y
+      <span id="tip_secretario">{{tip_secretario}}</span>, se procede a
+      comunicar por PERSONALMENTE a D./Dña.
+      <span id="nombre_completo">{{nombre_completo}}</span>, con documento
+      nacional de identidad <span id="num_documento">{{num_documento}}</span>,
+      en calidad de INVESTIGADO en el atestado de la referencia instruido por el
+      personal del <span id="unidad">{{unidad}}</span>, la obligación de
+      personarse a las <span id="hora_juicio">{{hora_juicio}}</span> horas del
+      día <span id="dia_juicio">{{dia_juicio}}</span> en el
+      <span id="datos_juzgado">{{datos_juzgado}}</span>.
+    </p>
 
     <h2>DERECHOS:</h2>
-    <p>Se le informa de su derecho de comparecer en dicho Juzgado asistido de Abogado.</p>
-    <p><strong>Denunciado:</strong></p>
-    <p><input type="checkbox" id="op_1_checkbox" #op_1_checkbox#> Designa al Abogado D./Dña. <span class="underline" id="abogado"></span>, con número de colegiado <span class="underline" id="num_colegiado"></span> del Ilustre Colegio de Abogados de <span class="underline" id="colegio_abogados"></span>.</p>
-    <p><input type="checkbox" id="op_2_checkbox" #op_2_checkbox#> No designa Letrado, por lo que se ha solicitado la asistencia de un Abogado de Oficio al Ilustre Colegio de Abogados Asturias en comunicación registrada con el número <span class="underline" id="telefonema"></span>.</p>
+    <p>
+      Se le informa de su derecho de comparecer en dicho Juzgado asistido de
+      Abogado.
+    </p>
 
-    <p>Se le comunica que tiene derecho a instar el nombramiento de Abogado de Oficio (cuyos honorarios serán de su cargo salvo que le sea reconocido el derecho de asistencia jurídica gratuita según la Ley 1/1996, de 10 de enero, de Asistencia Jurídica Gratuita y el Real Decreto 141/2021, 9 de marzo, por el que se aprueba el Reglamento de Asistencia Jurídica Gratuita).</p>
+    <p>Denunciado:</p>
+    <p>
+      <span id="op_1_checkbox" data-checked="{{op_1_checked}}"></span> Designa
+      al Abogado D./Dña. <span id="abogado">{{abogado}}</span>, con número de
+      colegiado <span id="num_colegiado">{{num_colegiado}}</span> del Ilustre
+      Colegio de Abogados de
+      <span id="colegio_abogados">{{colegio_abogados}}</span>.
+    </p>
+    <p>
+      <span id="op_2_checkbox" data-checked="{{op_2_checked}}"></span> No
+      designa Letrado, por lo que se ha solicitado la asistencia de un Abogado
+      de Oficio al Ilustre Colegio de Abogados Asturias en comunicación
+      registrada con el número <span id="telefonema">{{telefonema}}</span>.
+    </p>
+
+    <p>
+      Se le comunica que tiene derecho a instar el nombramiento de Abogado de
+      Oficio (cuyos honorarios serán de su cargo salvo que le sea reconocido el
+      derecho de asistencia jurídica gratuita según la Ley 1/1996, de 10 de
+      enero, de Asistencia Jurídica Gratuita y el Real Decreto 141/2021, 9 de
+      marzo, por el que se aprueba el Reglamento de Asistencia Jurídica
+      Gratuita).
+    </p>
 
     <h2>APERCIBIMIENTO:</h2>
-    <p><strong>Denunciado.</strong> Se le informa que en caso de incomparecencia en el Juzgado en el día y hora señalados, la orden de comparecencia podrá convertirse en orden de detención (art. 487 de la Ley de Enjuiciamiento Criminal); de la misma forma se le recuerda la obligación de presentar en dicha comparecencia su Permiso de Conducción; así como el Permiso de Circulación, Tarjeta de Inspección Técnica y Póliza Seguro obligatorio del vehículo implicado en los hechos.</p>
+    <p>
+      Denunciado. Se le informa que en caso de incomparecencia en el Juzgado en
+      el día y hora señalados, la orden de comparecencia podrá convertirse en
+      orden de detención (art. 487 de la Ley de Enjuiciamiento Criminal); de la
+      misma forma se le recuerda la obligación de presentar en dicha
+      comparecencia su Permiso de Conducción; así como el Permiso de
+      Circulación, Tarjeta de Inspección Técnica y Póliza Seguro obligatorio del
+      vehículo implicado en los hechos.
+    </p>
 
-    <p>Y para que conste, se extiende la presente diligencia que es firmada por el Instructor y el Secretario, y se entrega una copia de la misma al citado.</p>
+    <p>
+      Y para que conste, se extiende la presente diligencia que es firmada por
+      el Instructor y el Secretario, y se entrega una copia de la misma al
+      citado.
+    </p>
 
-    <div class="signature">
-        <table>
-            <tr>
-                <td><img id="firma_instructor" src="" alt=""></td>
-                <td><img id="firma_secretario" src="" alt=""></td>
-            </tr>
-            <tr>
-                <td>TIP Núm.: <span class="underline" id="tip_instructor"></span></td>
-                <td>TIP Núm.: <span class="underline" id="tip_secretario"></span></td>
-            </tr>
-        </table>
-        <table>
-            <tr>
-                <td><img id="firma_instructor" src="" alt=""></td>
-            </tr>
-            <tr>
-                <td><p><strong>ENTERADO:</strong></p><img id="num_documento" src="" alt=""></td>
-                <td><p>Por la presente quedo enterado de mis derechos y obligaciones.</p></td>
-            </tr>
-        </table>
-    </div>
-</body>
+    <table>
+      <tr>
+        <td>TIP Núm.: <span id="tip_instructor">{{tip_instructor}}</span></td>
+        <td>TIP Núm.: <span id="tip_secretario">{{tip_secretario}}</span></td>
+      </tr>
+    </table>
+
+    <p>ENTERADO: <span id="num_documento">{{num_documento}}</span></p>
+    <p>Por la presente quedo enterado de mis derechos y obligaciones.</p>
+
+    <p>
+      <img
+        id="firma_instructor"
+        src="{{firma_instructor}}"
+        alt="Firma Instructor"
+        width="100"
+        height="50"
+      />
+    </p>
+    <p>
+      <img
+        id="firma_secretario"
+        src="{{firma_secretario}}"
+        alt="Firma Secretario"
+        width="100"
+        height="50"
+      />
+    </p>
+    <p>
+      <img
+        id="firma_investigado"
+        src="{{firma_investigado}}"
+        alt="Firma Investigado"
+        width="100"
+        height="50"
+      />
+    </p>
+  </body>
 </html>

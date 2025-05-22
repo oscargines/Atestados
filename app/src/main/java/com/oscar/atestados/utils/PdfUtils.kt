@@ -1,19 +1,32 @@
-package com.tuapp.utils
+package com.oscar.atestados.utils
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import com.oscar.atestados.utils.PDFA4Printer
+import android.widget.Toast
+import androidx.core.net.toUri
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
 object PdfUtils {
     private const val TAG = "PdfUtils"
 
+    /**
+     * Escribe un PDF en el almacenamiento, sobrescribiendo cualquier archivo existente con el mismo nombre.
+     *
+     * @param content Contenido HTML para el PDF.
+     * @param fileName Nombre del archivo PDF (por ejemplo, "acta_citacion_a4.pdf").
+     * @param pdfA4Printer Instancia de PDFA4Printer para generar el PDF.
+     * @param context Contexto de Android.
+     * @return Archivo generado o null si falla.
+     */
     suspend fun writePdfToStorage(
         content: String,
         fileName: String,
@@ -23,109 +36,187 @@ object PdfUtils {
         return withContext(Dispatchers.IO) {
             Log.d(TAG, "writePdfToStorage: Iniciando escritura de PDF, fileName: $fileName")
             try {
-                val documentsDir =
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-                if (!documentsDir.exists()) {
-                    documentsDir.mkdirs()
-                }
-                val atestadosDir = File(documentsDir, "Atestados")
-                if (!atestadosDir.exists()) {
-                    atestadosDir.mkdirs()
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: Directorio Atestados creado en ${atestadosDir.absolutePath}"
-                    )
-                }
-                val outputFile = File(atestadosDir, fileName)
-                pdfA4Printer.generarDocumentoA4(htmlContent = content, outputFile = outputFile)
-                Log.d(TAG, "writePdfToStorage: PDF generado en ${outputFile.absolutePath}")
+                val contentResolver = context.contentResolver
+                val relativePath = "${Environment.DIRECTORY_DOCUMENTS}/Atestados"
 
-                if (!outputFile.exists() || outputFile.length() == 0L) {
-                    Log.e(
-                        TAG,
-                        "writePdfToStorage: El archivo PDF no se creó correctamente o está vacío"
-                    )
+                // Eliminar archivo existente si existe
+                val queryUri = MediaStore.Files.getContentUri("external")
+                val projection = arrayOf(MediaStore.Files.FileColumns._ID)
+                val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} = ?"
+                val selectionArgs = arrayOf(fileName, relativePath)
+
+                contentResolver.query(queryUri, projection, selection, selectionArgs, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+                        val id = cursor.getLong(idColumn)
+                        val deleteUri = ContentUris.withAppendedId(queryUri, id)
+                        contentResolver.delete(deleteUri, null, null)
+                        Log.d(TAG, "writePdfToStorage: Archivo existente $fileName eliminado de MediaStore")
+                    }
+                }
+
+                // Crear nueva entrada en MediaStore
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Files.FileColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.Files.FileColumns.MIME_TYPE, "application/pdf")
+                    put(MediaStore.Files.FileColumns.RELATIVE_PATH, relativePath)
+                    put(MediaStore.Files.FileColumns.DATE_MODIFIED, System.currentTimeMillis() / 1000)
+                    put(MediaStore.Files.FileColumns.IS_PENDING, 1)
+                }
+
+                val uri = contentResolver.insert(queryUri, contentValues) ?: run {
+                    Log.e(TAG, "writePdfToStorage: No se pudo crear URI en MediaStore")
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(
-                            context,
-                            "Error: El archivo PDF no se creó correctamente",
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(context, "Error al crear archivo en almacenamiento", Toast.LENGTH_SHORT).show()
                     }
                     return@withContext null
                 }
 
+                // Crear archivo temporal y garantizar su eliminación
+                val tempFile = File.createTempFile("temp_pdf", ".pdf", context.cacheDir)
                 try {
-                    outputFile.setReadable(true, false)
-                    outputFile.setWritable(true, false)
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: Permisos establecidos para ${outputFile.absolutePath}"
-                    )
-                } catch (e: SecurityException) {
-                    Log.w(
-                        TAG,
-                        "writePdfToStorage: No se pudieron establecer permisos: ${e.message}"
-                    )
-                }
-
-                try {
-                    val contentUri = MediaStore.Files.getContentUri("external")
-                    val values = ContentValues().apply {
-                        put(MediaStore.Files.FileColumns.DATA, outputFile.absolutePath)
-                        put(MediaStore.Files.FileColumns.DISPLAY_NAME, fileName)
-                        put(MediaStore.Files.FileColumns.MIME_TYPE, "application/pdf")
-                        put(
-                            MediaStore.Files.FileColumns.DATE_MODIFIED,
-                            System.currentTimeMillis() / 1000
-                        )
+                    contentResolver.openOutputStream(uri).use { outputStream ->
+                        if (outputStream == null) {
+                            Log.e(TAG, "writePdfToStorage: No se pudo abrir OutputStream para URI $uri")
+                            return@use
+                        }
+                        pdfA4Printer.generarDocumentoA4(htmlContent = content, outputFile = tempFile)
+                        if (!tempFile.exists() || tempFile.length() == 0L) {
+                            Log.e(TAG, "writePdfToStorage: El archivo PDF temporal no se creó correctamente")
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "Error: El archivo PDF no se creó correctamente", Toast.LENGTH_SHORT).show()
+                            }
+                            return@use
+                        }
+                        tempFile.inputStream().use { inputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
                     }
-                    context.contentResolver.insert(contentUri, values)
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: Archivo indexado en MediaStore: ${outputFile.absolutePath}"
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "writePdfToStorage: Error al indexar en MediaStore: ${e.message}")
-                }
 
-                try {
-                    MediaScannerConnection.scanFile(
-                        context,
-                        arrayOf(outputFile.absolutePath),
-                        arrayOf("application/pdf")
-                    ) { path, uri ->
-                        Log.d(
-                            TAG,
-                            "writePdfToStorage: MediaScanner completado para $path, URI: $uri"
-                        )
+                    contentValues.clear()
+                    contentValues.put(MediaStore.Files.FileColumns.IS_PENDING, 0)
+                    contentResolver.update(uri, contentValues, null, null)
+
+                    Log.d(TAG, "writePdfToStorage: PDF guardado en MediaStore con URI: $uri")
+                    Log.d(TAG, "writePdfToStorage: PDF creado en $relativePath/$fileName")
+
+                    // Obtener la ruta física para MediaScanner
+                    val filePath = contentResolver.query(
+                        uri,
+                        arrayOf(MediaStore.Files.FileColumns.DATA),
+                        null,
+                        null,
+                        null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA))
+                        } else {
+                            null
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "writePdfToStorage: Error al escanear archivo: ${e.message}")
-                }
 
-                outputFile
-            } catch (e: SecurityException) {
-                Log.e(TAG, "writePdfToStorage: Error de permisos al escribir PDF: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(
-                        context,
-                        "Error de permisos al guardar PDF",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    if (filePath != null) {
+                        MediaScannerConnection.scanFile(
+                            context,
+                            arrayOf(filePath),
+                            arrayOf("application/pdf")
+                        ) { path, scannedUri ->
+                            Log.d(TAG, "writePdfToStorage: MediaScanner completado para $path, URI: $scannedUri")
+                            // Verificar si el archivo aparece en MediaStore después del escaneo
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val files = listAtestadosFiles(context)
+                                Log.d(TAG, "writePdfToStorage: Archivos en MediaStore después de escanear $path: $files")
+                            }
+                        }
+                    } else {
+                        Log.w(TAG, "writePdfToStorage: No se pudo obtener la ruta del archivo para escanear")
+                        // Forzar escaneo de la carpeta como fallback
+                        val atestadosDir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+                            "Atestados"
+                        )
+                        MediaScannerConnection.scanFile(
+                            context,
+                            arrayOf(atestadosDir.absolutePath),
+                            null
+                        ) { path, scannedUri ->
+                            Log.d(TAG, "writePdfToStorage: Escaneo de carpeta completado para $path, URI: $scannedUri")
+                        }
+                    }
+
+                    // Obtener el archivo final
+                    contentResolver.query(
+                        uri,
+                        arrayOf(MediaStore.Files.FileColumns.DATA),
+                        null,
+                        null,
+                        null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val path = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA))
+                            val file = File(path)
+                            if (file.exists()) {
+                                file.setReadable(true, false)
+                                file.setWritable(true, false)
+                                Log.d(TAG, "writePdfToStorage: Permisos establecidos para ${file.absolutePath}, size: ${file.length()}")
+                                return@withContext file
+                            }
+                        }
+                    }
+                    Log.w(TAG, "writePdfToStorage: No se pudo obtener el archivo desde el URI")
+                    null
+                } finally {
+                    if (tempFile.exists()) {
+                        if (tempFile.delete()) {
+                            Log.d(TAG, "writePdfToStorage: Archivo temporal ${tempFile.absolutePath} eliminado")
+                        } else {
+                            Log.w(TAG, "writePdfToStorage: No se pudo eliminar archivo temporal ${tempFile.absolutePath}")
+                        }
+                    }
                 }
-                null
             } catch (e: Exception) {
                 Log.e(TAG, "writePdfToStorage: Error al escribir PDF: ${e.message}", e)
                 withContext(Dispatchers.Main) {
-                    android.widget.Toast.makeText(
-                        context,
-                        "Error al guardar PDF: ${e.message}",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(context, "Error al guardar PDF: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
                 null
             }
+        }
+    }
+
+    /**
+     * Lista los archivos PDF en la carpeta Atestados de MediaStore.
+     *
+     * @param context Contexto de Android.
+     * @return Lista de nombres de archivos PDF.
+     */
+    suspend fun listAtestadosFiles(context: Context): List<String> {
+        return withContext(Dispatchers.IO) {
+            val files = mutableListOf<String>()
+            val contentResolver = context.contentResolver
+            val queryUri = MediaStore.Files.getContentUri("external")
+            val projection = arrayOf(
+                MediaStore.Files.FileColumns.DISPLAY_NAME,
+                MediaStore.Files.FileColumns.DATA,
+                MediaStore.Files.FileColumns._ID
+            )
+            val selection = "${MediaStore.Files.FileColumns.RELATIVE_PATH} = ? AND ${MediaStore.Files.FileColumns.MIME_TYPE} = ?"
+            val selectionArgs = arrayOf("${Environment.DIRECTORY_DOCUMENTS}/Atestados/", "application/pdf")
+            try {
+                contentResolver.query(queryUri, projection, selection, selectionArgs, null)?.use { cursor ->
+                    Log.d(TAG, "listAtestadosFiles: Encontrados ${cursor.count} archivos en MediaStore")
+                    while (cursor.moveToNext()) {
+                        val name = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME))
+                        val path = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA))
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
+                        files.add(name)
+                        Log.d(TAG, "listAtestadosFiles: Encontrado $name, path=$path, id=$id")
+                    }
+                } ?: Log.w(TAG, "listAtestadosFiles: Cursor nulo al consultar MediaStore")
+            } catch (e: Exception) {
+                Log.e(TAG, "listAtestadosFiles: Error al consultar MediaStore: ${e.message}", e)
+            }
+            files
         }
     }
 }

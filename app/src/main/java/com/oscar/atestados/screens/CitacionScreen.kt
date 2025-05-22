@@ -1,6 +1,5 @@
 package com.oscar.atestados.screens
 
-import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -38,6 +37,7 @@ import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.data.CitacionDataProvider
 import com.oscar.atestados.ui.theme.*
+import com.oscar.atestados.utils.PdfUtils
 import com.oscar.atestados.utils.HtmlParser
 import com.oscar.atestados.utils.PDFA4Printer
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
@@ -50,8 +50,6 @@ import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.ui.composables.MissingFieldsDialog
 import com.oscar.atestados.ui.composables.FullScreenProgressIndicator
 import com.oscar.atestados.ui.composables.BitmapPreviewDialog
-import com.oscar.atestados.utils.PdfToBitmapConverter
-import com.tuapp.utils.PdfUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,18 +61,6 @@ import java.util.*
 
 private const val TAG = "CitacionScreen"
 
-/**
- * Pantalla principal para gestionar la diligencia de citación.
- * Permite al usuario introducir datos de la citación, como fecha, hora, juzgado y detalles del abogado,
- * y generar un documento PDF para impresión en formato Zebra y A4.
- *
- * @param navigateToScreen Función de navegación para cambiar a otras pantallas.
- * @param citacionViewModel ViewModel que gestiona los datos específicos de la citación.
- * @param personaViewModel ViewModel que proporciona los datos del denunciado (nombre y DNI).
- * @param guardiasViewModel ViewModel que proporciona los datos de los guardias intervinientes (TIPs y unidad).
- * @param alcoholemiaDosViewModel ViewModel que proporciona datos contextuales como fecha y hora de notificación.
- * @param impresoraViewModel ViewModel que gestiona la configuración de la impresora.
- */
 @Composable
 fun CitacionScreen(
     navigateToScreen: (String) -> Unit,
@@ -85,18 +71,13 @@ fun CitacionScreen(
     impresoraViewModel: ImpresoraViewModel
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var isPrintingActa by remember { mutableStateOf(false) }
-    var showPreviewDialog by remember { mutableStateOf(false) }
-    var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var currentPrintStatus by remember { mutableStateOf("") }
-    var showMissingFieldsDialog by remember { mutableStateOf(false) }
-    var missingFieldsToShow by remember { mutableStateOf<List<String>>(emptyList()) }
+    val printStatus by citacionViewModel.printStatus.collectAsState()
+    val showPreviewDialog by citacionViewModel.showPreviewDialog.collectAsState()
+    val previewBitmap by citacionViewModel.previewBitmap.collectAsState()
+    val missingFields by citacionViewModel.missingFields.collectAsState()
     var isDataLoaded by remember { mutableStateOf(false) }
-    var isPrintingZebra by remember { mutableStateOf(false) }
     val htmlParser = remember { HtmlParser(context) }
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
-    val pdfA4Printer = remember { PDFA4Printer(context) }
     val db = remember { AccesoBaseDatos(context, "juzgados.db") }
     val juzgado by citacionViewModel.juzgado.observeAsState("")
     val juzgadoInfo by remember(juzgado) { mutableStateOf(getJuzgadoInfo(db, juzgado)) }
@@ -118,8 +99,9 @@ fun CitacionScreen(
         )
     }
     val numeroDocumento by personaViewModel.numeroDocumento.observeAsState("")
+    val scope = rememberCoroutineScope()
 
-    // Carga inicial de datos y validación de numeroDocumento
+    // Cargar datos iniciales
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
@@ -127,257 +109,60 @@ fun CitacionScreen(
                 personaViewModel.loadData(context)
                 guardiasViewModel.loadData(context)
                 alcoholemiaDosViewModel.loadSavedData()
-                Log.d("CitacionScreen", "Datos cargados exitosamente")
+                isDataLoaded = true
             } catch (e: Exception) {
-                Log.e("CitacionScreen", "Error cargando datos: ${e.message}", e)
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Error cargando datos", Toast.LENGTH_SHORT).show()
                 }
-            } finally {
-                isDataLoaded = true
             }
         }
     }
 
-    // Validar numeroDocumento solo después de que los datos estén cargados
-    LaunchedEffect(isDataLoaded, numeroDocumento) {
-        if (isDataLoaded) {
-            Log.d("CitacionScreen", "Validando numeroDocumento: $numeroDocumento")
-            if (numeroDocumento.isNullOrEmpty()) {
-                Log.w("CitacionScreen", "numeroDocumento está vacío, redirigiendo a PersonaScreen")
-                navigateToScreen("PersonaScreen")
-                Toast.makeText(context, "Por favor, ingrese el número de documento", Toast.LENGTH_SHORT).show()
-            } else {
-                Log.d("CitacionScreen", "numeroDocumento válido: $numeroDocumento")
-            }
+    // Validar numeroDocumento
+    LaunchedEffect(isDataLoaded, numeroDocumento, printStatus) {
+        if (isDataLoaded && numeroDocumento.isNullOrEmpty() && printStatus.isEmpty()) {
+            navigateToScreen("PersonaScreen")
+            Toast.makeText(context, "Por favor, ingrese el número de documento", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // Mostrar indicador de progreso mientras los datos se cargan
-    if (!isDataLoaded) {
-        FullScreenProgressIndicator(text = "Cargando datos...")
-        return
-    }
-
-    // Manejar la impresión del acta
-    LaunchedEffect(isPrintingActa) {
-        if (isPrintingActa) {
-            try {
-                val macAddress = impresoraViewModel.getSelectedPrinterMac()
-                if (macAddress.isNullOrEmpty()) {
-                    currentPrintStatus = "No hay impresora seleccionada"
-                    Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
-                    isPrintingActa = false
-                    return@LaunchedEffect
-                }
-
-                // Guardar datos de todos los ViewModels antes de validar
-                citacionViewModel.guardarDatos(context)
-                personaViewModel.saveData(context)
-                guardiasViewModel.saveData(context)
-                alcoholemiaDosViewModel.guardarDatos(context)
-                Log.d("CitacionScreen", "Datos guardados antes de validar, numeroDocumento: ${personaViewModel.numeroDocumento.value}")
-
-                val (isValid, missingFields) = dataProvider.validateData()
-                if (!isValid) {
-                    missingFieldsToShow = missingFields
-                    showMissingFieldsDialog = true
-                    currentPrintStatus = "Datos incompletos"
-                    isPrintingActa = false
-                    Log.w("CitacionScreen", "Validación fallida, campos faltantes: $missingFields")
-                    return@LaunchedEffect
-                }
-
-                currentPrintStatus = "Preparando documento..."
-                val tempHtmlFilePath = withContext(Dispatchers.IO) {
-                    htmlParser.generateHtmlFile(
-                        templateAssetPath = "documents/acta_citacion.html",
-                        dataProvider = dataProvider
-                    )
-                }
-                val htmlContent = withContext(Dispatchers.IO) {
-                    File(tempHtmlFilePath).readText(Charsets.UTF_8)
-                }
-
-                // Generar el PDF para Zebra para previsualización
-                currentPrintStatus = "Generando PDF para impresora Zebra..."
-                val zebraPrinter = PDFLabelPrinterZebra(context)
-                val previewFile = File.createTempFile("citacion_zebra_preview", ".pdf", context.cacheDir)
-                zebraPrinter.generarEtiquetaPdf(htmlContent, previewFile)
-
-                if (!previewFile.exists() || previewFile.length() == 0L) {
-                    currentPrintStatus = "Error al generar PDF para Zebra"
-                    Toast.makeText(context, "Error al generar PDF para Zebra", Toast.LENGTH_LONG).show()
-                    isPrintingActa = false
-                    withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
-                    return@LaunchedEffect
-                }
-
-                // Generar PDF A4 para almacenamiento usando PdfUtils
-                currentPrintStatus = "Generando PDF A4..."
-                val outputFile = PdfUtils.writePdfToStorage(htmlContent, "acta_citacion_a4.pdf", pdfA4Printer, context)
-                if (outputFile == null) {
-                    currentPrintStatus = "Error al generar PDF A4"
-                    Toast.makeText(context, "Error al generar PDF A4", Toast.LENGTH_LONG).show()
-                    isPrintingActa = false
-                    withContext(Dispatchers.IO) {
-                        File(tempHtmlFilePath).delete()
-                        previewFile.delete()
-                    }
-                    return@LaunchedEffect
-                }
-
-                // Abrir el PDF A4 usando FileProvider
-                withContext(Dispatchers.Main) {
-                    try {
-                        val contentUri = FileProvider.getUriForFile(
-                            context,
-                            "com.oscar.atestados.fileprovider",
-                            outputFile as File
-                        )
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(contentUri, "application/pdf")
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        context.startActivity(
-                            Intent.createChooser(intent, "Seleccionar aplicación para abrir PDF")
-                        )
-                        currentPrintStatus = "PDF A4 abierto"
-                        Log.d("CitacionScreen", "PDF intent lanzado para abrir: $contentUri")
-                    } catch (e: ActivityNotFoundException) {
-                        currentPrintStatus = "No hay aplicación para abrir PDFs"
-                        Log.w("CitacionScreen", "No se encontró aplicación para abrir PDFs", e)
-                    }
-                }
-
-                // Previsualizar el PDF de Zebra
-                if (!isValidPdf(previewFile)) {
-                    currentPrintStatus = "Error: El archivo PDF no es válido"
-                    Toast.makeText(context, "Error: El archivo PDF no es válido", Toast.LENGTH_LONG).show()
-                    withContext(Dispatchers.IO) {
-                        File(tempHtmlFilePath).delete()
-                        previewFile.delete()
-                    }
-                    isPrintingActa = false
-                } else {
-                    val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(previewFile)
-                    if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
-                        previewBitmap = bitmaps[0]
-                        showPreviewDialog = true
-                        currentPrintStatus = "Mostrando previsualización"
-                    } else {
-                        currentPrintStatus = "Error al generar previsualización"
-                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
-                        withContext(Dispatchers.IO) {
-                            File(tempHtmlFilePath).delete()
-                            previewFile.delete()
-                        }
-                        isPrintingActa = false
-                    }
-                }
-            } catch (e: Exception) {
-                currentPrintStatus = "Error al generar documentos: ${e.message}"
-                Toast.makeText(context, "Error al generar documentos: ${e.message}", Toast.LENGTH_LONG).show()
-                Log.e("CitacionScreen", "Error en generación de documentos: ${e.message}", e)
-                isPrintingActa = false
-            }
-        }
-    }
-
-    // Lógica para manejar la confirmación de la previsualización e impresión
-    LaunchedEffect(showPreviewDialog, isPrintingActa, previewBitmap) {
-        if (!showPreviewDialog && isPrintingActa && previewBitmap != null) {
-            isPrintingZebra = true // Activar indicador de impresión
-            try {
-                val macAddress = impresoraViewModel.getSelectedPrinterMac()
-                    ?: throw Exception("No hay impresora seleccionada")
-                val tempHtmlFilePath = withContext(Dispatchers.IO) {
-                    htmlParser.generateHtmlFile(
-                        templateAssetPath = "documents/acta_citacion.html",
-                        dataProvider = dataProvider
-                    )
-                }
-                val htmlContent = withContext(Dispatchers.IO) {
-                    File(tempHtmlFilePath).readText(Charsets.UTF_8)
-                }
-
-                // Verificar si el HTML contiene datos críticos
-                if (!htmlContent.contains("OSCAR ISRAEL GINES RIVALLO") || htmlContent.contains("<span id=\"nombre_completo\"></span>")) {
-                    throw Exception("El HTML generado está incompleto")
-                }
-
-                currentPrintStatus = "Enviando a imprimir..."
-                val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
-                    htmlAssetPath = "",
-                    macAddress = macAddress,
-                    outputFileName = "acta_citacion_temp.pdf",
-                    htmlContent = htmlContent,
-                    onStatusUpdate = { status ->
-                        scope.launch(Dispatchers.Main) { currentPrintStatus = status }
-                    }
-                )
-
-                when (printResult) {
-                    is PDFToBitmapPrinter.PrintResult.Success -> {
-                        currentPrintStatus = "Impresión enviada"
-                        scope.launch(Dispatchers.Main) {
-                            Toast.makeText(
-                                context,
-                                "Acta de citación enviada a imprimir",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        // Guardar PDF en formato A4
-                        val pdfFileName = "Acta_Citacion_${System.currentTimeMillis()}.pdf"
-                        val savedFile =
-                            writePdfToStorage(htmlContent, pdfFileName, pdfA4Printer, context)
-                        if (savedFile != null && isValidPdf(savedFile)) {
-                            scope.launch(Dispatchers.Main) {
-                                Toast.makeText(
-                                    context,
-                                    "PDF guardado en Documents/Atestados/$pdfFileName",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }
-
-                    is PDFToBitmapPrinter.PrintResult.Error -> {
-                        currentPrintStatus = "Error: ${printResult.message}"
-                        scope.launch(Dispatchers.Main) {
-                            Toast.makeText(
-                                context,
-                                "Error al imprimir: ${printResult.message}",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                }
-
-                withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
-            } catch (e: Exception) {
-                currentPrintStatus = "Error al imprimir: ${e.message}"
-                scope.launch(Dispatchers.Main) {
-                    Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_SHORT)
-                        .show()
-                }
-                Log.e(TAG, "Error en impresión: ${e.message}", e)
-            } finally {
-                previewBitmap?.recycle()
-                previewBitmap = null
-                isPrintingActa = false
-                isPrintingZebra = false // Desactivar indicador de impresión
-            }
-        }
-    }
-
-    // Diálogo para campos faltantes
-    if (showMissingFieldsDialog) {
+    // Mostrar diálogo de campos faltantes
+    if (missingFields.isNotEmpty()) {
         MissingFieldsDialog(
-            missingFields = missingFieldsToShow,
-            onDismiss = { showMissingFieldsDialog = false },
+            missingFields = missingFields,
+            onDismiss = { citacionViewModel.updateMissingFields(emptyList()) },
             navigateToScreen = navigateToScreen
+        )
+    }
+
+    // Mostrar indicador de progreso
+    if (printStatus.isNotEmpty() && !showPreviewDialog) {
+        FullScreenProgressIndicator(text = printStatus)
+    }
+
+    // Mostrar diálogo de previsualización
+    if (showPreviewDialog && previewBitmap != null) {
+        BitmapPreviewDialog(
+            bitmap = previewBitmap,
+            onConfirm = {
+                citacionViewModel.confirmPrint(
+                    context = context,
+                    htmlParser = htmlParser,
+                    dataProvider = dataProvider,
+                    pdfToBitmapPrinter = pdfToBitmapPrinter,
+                    impresoraViewModel = impresoraViewModel
+                )
+            },
+            onDismiss = {
+                scope.launch {
+                    citacionViewModel.updateShowPreviewDialog(false)
+                    citacionViewModel.updatePreviewBitmap(null)
+                    citacionViewModel.updatePrintStatus("Impresión cancelada")
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Impresión cancelada", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         )
     }
 
@@ -392,132 +177,23 @@ fun CitacionScreen(
             modifier = Modifier.padding(paddingValues),
             citacionViewModel = citacionViewModel,
             navigateToScreen = navigateToScreen,
-            isPrintingActa = isPrintingActa,
+            isPrintingActa = printStatus.isNotEmpty(),
             onPrintActaTrigger = {
-                Log.d(TAG, "Botón 'IMPRIMIR ACTA' presionado")
-                // Log para depurar numeroDocumento antes de printActa
-                Log.d("CitacionScreen", "numeroDocumento antes de printActa: ${personaViewModel.numeroDocumento.value ?: "NULO"}")
-                isPrintingActa = true
-                currentPrintStatus = "Preparando documento..."
-                citacionViewModel.printActa(
+                citacionViewModel.generateAndPrintActa(
                     context = context,
                     htmlParser = htmlParser,
                     dataProvider = dataProvider,
                     zebraPrinter = PDFLabelPrinterZebra(context),
                     impresoraViewModel = impresoraViewModel,
-                    personaViewModel = personaViewModel, // Añadido
-                    guardiasViewModel = guardiasViewModel, // Añadido
-                    alcoholemiaDosViewModel = alcoholemiaDosViewModel, // Añadido
-                    onStatusUpdate = { status ->
-                        Log.d("CitacionScreen", "Estado de impresión: $status")
-                        currentPrintStatus = status
-                        if (status == "Previsualización lista") {
-                            showPreviewDialog = true
-                        }
-                    },
-                    onError = { error ->
-                        Log.e("CitacionScreen", "Error en printActa: $error")
-                        currentPrintStatus = error
-                        missingFieldsToShow = if (error.contains("Datos incompletos")) {
-                            error.substringAfter("Datos incompletos: ").split(", ")
-                        } else {
-                            emptyList()
-                        }
-                        showMissingFieldsDialog = missingFieldsToShow.isNotEmpty()
-                        scope.launch(Dispatchers.Main) {
-                            Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-                        }
-                        isPrintingActa = false
-                        previewBitmap?.recycle()
-                        previewBitmap = null
-                    },
-                    onComplete = {
-                        scope.launch(Dispatchers.IO) {
-                            val tempPdfFile =
-                                File(context.cacheDir, "acta_citacion_zebra_preview.pdf")
-                            if (tempPdfFile.exists() && isValidPdf(tempPdfFile)) {
-                                val bitmaps =
-                                    com.oscar.atestados.utils.PdfToBitmapConverter.convertAllPagesToBitmaps(
-                                        tempPdfFile
-                                    )
-                                withContext(Dispatchers.Main) {
-                                    previewBitmap = bitmaps.firstOrNull()
-                                    if (previewBitmap != null) {
-                                        Log.d(
-                                            TAG,
-                                            "Previsualización generada: ${bitmaps.size} páginas"
-                                        )
-                                        currentPrintStatus = "Previsualización lista"
-                                        showPreviewDialog = true
-                                    } else {
-                                        currentPrintStatus =
-                                            "Error: No se pudo generar previsualización"
-                                        scope.launch {
-                                            Toast.makeText(
-                                                context,
-                                                "Error al generar previsualización",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                    }
-                                }
-                            } else {
-                                withContext(Dispatchers.Main) {
-                                    currentPrintStatus = "Error: Archivo PDF no válido"
-                                    scope.launch {
-                                        Toast.makeText(
-                                            context,
-                                            "Error: Archivo PDF no válido",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
-                                }
-                            }
-                            isPrintingActa = false
-                        }
-                    }
+                    personaViewModel = personaViewModel,
+                    guardiasViewModel = guardiasViewModel,
+                    alcoholemiaDosViewModel = alcoholemiaDosViewModel
                 )
-            }
-        )
-    }
-
-    // Indicador de progreso para la generación del acta
-    if (isPrintingActa && !showPreviewDialog) {
-        FullScreenProgressIndicator(text = currentPrintStatus)
-    }
-
-    // Indicador de progreso para la impresión Zebra
-    if (isPrintingZebra) {
-        FullScreenProgressIndicator(text = currentPrintStatus)
-    }
-
-    // Diálogo de previsualización
-    if (showPreviewDialog && previewBitmap != null) {
-        BitmapPreviewDialog(
-            bitmap = previewBitmap,
-            onConfirm = {
-                showPreviewDialog = false
-                // isPrintingZebra se activa en el LaunchedEffect
-            },
-            onDismiss = {
-                showPreviewDialog = false
-                previewBitmap?.recycle()
-                previewBitmap = null
-                isPrintingActa = false
-                isPrintingZebra = false
-                currentPrintStatus = "Impresión cancelada"
-                scope.launch {
-                    Toast.makeText(context, "Impresión cancelada", Toast.LENGTH_SHORT).show()
-                }
             }
         )
     }
 }
 
-/**
- * Barra superior de la pantalla de citación.
- * Muestra el título "Citación" y un subtítulo con información adicional.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CitacionTopBar() {
@@ -552,16 +228,6 @@ private fun CitacionTopBar() {
     )
 }
 
-/**
- * Contenido principal de la pantalla de citación.
- * Incluye campos para introducir datos de la citación, como fechas, horas, juzgado y detalles del abogado.
- *
- * @param modifier Modificador para personalizar el diseño.
- * @param citacionViewModel ViewModel que gestiona los datos de la citación.
- * @param navigateToScreen Función de navegación para cambiar a otras pantallas.
- * @param isPrintingActa Indica si se está procesando la impresión del acta.
- * @param onPrintActaTrigger Función para iniciar el proceso de impresión.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CitacionContent(
@@ -602,7 +268,6 @@ private fun CitacionContent(
     val sedes by remember(localidad) { mutableStateOf(getSedes(db, localidad)) }
     val juzgadoInfo by remember(juzgado) { mutableStateOf(getJuzgadoInfo(db, juzgado)) }
 
-    // Diálogo para seleccionar la fecha del juicio
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -630,7 +295,6 @@ private fun CitacionContent(
         }
     }
 
-    // Diálogo para seleccionar la hora del juicio
     if (showTimePicker) {
         TimePickerDialogCitacion(
             onDismissRequest = { showTimePicker = false },
@@ -647,7 +311,6 @@ private fun CitacionContent(
         ) { TimePicker(state = timePickerState) }
     }
 
-    // Diálogo para seleccionar la fecha de notificación
     if (showNotificacionDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showNotificacionDatePicker = false },
@@ -675,7 +338,6 @@ private fun CitacionContent(
         }
     }
 
-    // Diálogo para seleccionar la hora de notificación
     if (showNotificacionTimePicker) {
         TimePickerDialogCitacion(
             onDismissRequest = { showNotificacionTimePicker = false },
@@ -931,7 +593,7 @@ private fun CitacionContent(
                 onCheckedChange = { isChecked ->
                     citacionViewModel.updateAbogadoSelection(
                         designado = isChecked,
-                        oficio = !isChecked && abogadoOficio
+                        oficio = abogadoOficio && !isChecked
                     )
                 }
             )
@@ -979,7 +641,7 @@ private fun CitacionContent(
                 checked = abogadoOficio,
                 onCheckedChange = { isChecked ->
                     citacionViewModel.updateAbogadoSelection(
-                        designado = !isChecked && abogadoDesignado,
+                        designado = abogadoDesignado && !isChecked,
                         oficio = isChecked
                     )
                 }
@@ -1026,14 +688,6 @@ private fun CitacionContent(
     }
 }
 
-/**
- * Barra inferior de la pantalla de citación.
- * Incluye botones para guardar los datos y limpiar el formulario.
- *
- * @param viewModel ViewModel que gestiona los datos de la citación.
- * @param navigateToScreen Función de navegación para cambiar a otras pantallas.
- * @param context Contexto de la aplicación.
- */
 @Composable
 private fun CitacionBottomBar(
     viewModel: CitacionViewModel,
@@ -1077,14 +731,6 @@ private fun CitacionBottomBar(
     }
 }
 
-/**
- * Campo desplegable para seleccionar opciones como provincia, localidad o juzgado.
- *
- * @param value Valor actual seleccionado.
- * @param onValueChange Función para manejar cambios en el valor seleccionado.
- * @param label Etiqueta del campo.
- * @param options Lista de opciones disponibles.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DropdownFieldCitacion(
@@ -1140,14 +786,6 @@ private fun DropdownFieldCitacion(
     }
 }
 
-/**
- * Diálogo para seleccionar una hora utilizando un TimePicker.
- *
- * @param onDismissRequest Función para cerrar el diálogo.
- * @param confirmButton Botón de confirmación.
- * @param modifier Modificador para personalizar el diseño.
- * @param content Contenido del diálogo (TimePicker).
- */
 @Composable
 fun TimePickerDialogCitacion(
     onDismissRequest: () -> Unit,
@@ -1197,14 +835,6 @@ fun TimePickerDialogCitacion(
     }
 }
 
-/**
- * Campo de texto personalizado para entradas de usuario.
- *
- * @param value Valor actual del campo.
- * @param onValueChange Función para manejar cambios en el valor.
- * @param label Etiqueta del campo.
- * @param modifier Modificador para personalizar el diseño.
- */
 @Composable
 fun CustomEditText(
     value: String,
@@ -1225,23 +855,10 @@ fun CustomEditText(
     )
 }
 
-/**
- * Obtiene la lista de provincias desde la base de datos.
- *
- * @param db Instancia de AccesoBaseDatos para consultas.
- * @return Lista de nombres de provincias.
- */
 private fun getProvincias(db: AccesoBaseDatos): List<String> {
     return db.query("SELECT Provincia FROM PROVINCIAS").map { it["Provincia"] as String }
 }
 
-/**
- * Obtiene la lista de municipios para una provincia dada.
- *
- * @param db Instancia de AccesoBaseDatos para consultas.
- * @param provincia Nombre de la provincia.
- * @return Lista de nombres de municipios.
- */
 private fun getMunicipios(db: AccesoBaseDatos, provincia: String): List<String> {
     if (provincia.isEmpty()) return emptyList()
     val query =
@@ -1249,26 +866,12 @@ private fun getMunicipios(db: AccesoBaseDatos, provincia: String): List<String> 
     return db.query(query).map { it["Municipio"] as String }
 }
 
-/**
- * Obtiene la lista de sedes judiciales para un municipio dado.
- *
- * @param db Instancia de AccesoBaseDatos para consultas.
- * @param municipio Nombre del municipio.
- * @return Lista de nombres de sedes.
- */
 private fun getSedes(db: AccesoBaseDatos, municipio: String): List<String> {
     if (municipio.isEmpty()) return emptyList()
     val query = "SELECT nombre FROM SEDES WHERE municipio = '$municipio'"
     return db.query(query).map { it["nombre"] as String }
 }
 
-/**
- * Obtiene la información de un juzgado desde la base de datos.
- *
- * @param db Instancia de AccesoBaseDatos para consultas.
- * @param nombreJuzgado Nombre del juzgado.
- * @return Mapa con los detalles del juzgado o null si no se encuentra.
- */
 private fun getJuzgadoInfo(db: AccesoBaseDatos, nombreJuzgado: String): Map<String, String>? {
     if (nombreJuzgado.isEmpty()) return null
     val query = "SELECT * FROM SEDES WHERE nombre = '$nombreJuzgado'"
@@ -1276,12 +879,6 @@ private fun getJuzgadoInfo(db: AccesoBaseDatos, nombreJuzgado: String): Map<Stri
     return if (result.isNotEmpty()) result[0] as Map<String, String> else null
 }
 
-/**
- * Verifica si un archivo PDF es válido comprobando si tiene páginas.
- *
- * @param file Archivo PDF a verificar.
- * @return True si el PDF es válido, false en caso contrario.
- */
 private fun isValidPdf(file: File): Boolean {
     return try {
         PdfReader(file).use { reader ->
@@ -1292,127 +889,5 @@ private fun isValidPdf(file: File): Boolean {
     } catch (e: Exception) {
         Log.e(TAG, "Invalid PDF file: ${file.absolutePath}, error: ${e.message}", e)
         false
-    }
-}
-
-/**
- * Escribe un archivo PDF en el almacenamiento externo en el directorio Documents/Atestados.
- * También indexa el archivo en MediaStore y ejecuta un escaneo para hacerlo visible en el sistema.
- *
- * @param content Contenido HTML para convertir a PDF.
- * @param fileName Nombre del archivo PDF a generar.
- * @param pdfA4Printer Instancia de PDFA4Printer para generar el documento.
- * @param context Contexto de la aplicación.
- * @return Archivo PDF generado o null si ocurre un error.
- */
-suspend fun writePdfToStorage(
-    content: String,
-    fileName: String,
-    pdfA4Printer: PDFA4Printer,
-    context: Context
-): File? {
-    return withContext(Dispatchers.IO) {
-        Log.d(TAG, "writePdfToStorage: Iniciando escritura de PDF, fileName: $fileName")
-        try {
-            val documentsDir =
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            if (!documentsDir.exists()) {
-                documentsDir.mkdirs()
-            }
-            val atestadosDir = File(documentsDir, "Atestados")
-            if (!atestadosDir.exists()) {
-                atestadosDir.mkdirs()
-                Log.d(
-                    TAG,
-                    "writePdfToStorage: Directorio Atestados creado en ${atestadosDir.absolutePath}"
-                )
-            }
-            val outputFile = File(atestadosDir, fileName)
-            pdfA4Printer.generarDocumentoA4(htmlContent = content, outputFile = outputFile)
-            Log.d(TAG, "writePdfToStorage: PDF generado en ${outputFile.absolutePath}")
-
-            if (!outputFile.exists() || outputFile.length() == 0L) {
-                Log.e(
-                    TAG,
-                    "writePdfToStorage: El archivo PDF no se creó correctamente o está vacío"
-                )
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        context,
-                        "Error: El archivo PDF no se creó correctamente",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-                return@withContext null
-            }
-
-            try {
-                outputFile.setReadable(true, false)
-                outputFile.setWritable(true, false)
-                Log.d(
-                    TAG,
-                    "writePdfToStorage: Permisos establecidos para ${outputFile.absolutePath}"
-                )
-            } catch (e: SecurityException) {
-                Log.w(
-                    TAG,
-                    "writePdfToStorage: No se pudieron establecer permisos: ${e.message}"
-                )
-            }
-
-            try {
-                val contentUri = MediaStore.Files.getContentUri("external")
-                val values = ContentValues().apply {
-                    put(MediaStore.Files.FileColumns.DATA, outputFile.absolutePath)
-                    put(MediaStore.Files.FileColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.Files.FileColumns.MIME_TYPE, "application/pdf")
-                    put(
-                        MediaStore.Files.FileColumns.DATE_MODIFIED,
-                        System.currentTimeMillis() / 1000
-                    )
-                }
-                context.contentResolver.insert(contentUri, values)
-                Log.d(
-                    TAG,
-                    "writePdfToStorage: Archivo indexado en MediaStore: ${outputFile.absolutePath}"
-                )
-            } catch (e: Exception) {
-                Log.w(TAG, "writePdfToStorage: Error al indexar en MediaStore: ${e.message}")
-            }
-
-            try {
-                MediaScannerConnection.scanFile(
-                    context,
-                    arrayOf(outputFile.absolutePath),
-                    arrayOf("application/pdf")
-                ) { path, uri ->
-                    Log.d(
-                        TAG,
-                        "writePdfToStorage: MediaScanner completado para $path, URI: $uri"
-                    )
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "writePdfToStorage: Error al escanear archivo: ${e.message}")
-            }
-
-            outputFile
-        } catch (e: SecurityException) {
-            Log.e(TAG, "writePdfToStorage: Error de permisos al escribir PDF: ${e.message}", e)
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error de permisos al guardar PDF", Toast.LENGTH_SHORT)
-                    .show()
-            }
-            null
-        } catch (e: Exception) {
-            Log.e(TAG, "writePdfToStorage: Error al escribir PDF: ${e.message}", e)
-            withContext(Dispatchers.Main) {
-                Toast.makeText(
-                    context,
-                    "Error al guardar PDF: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-            null
-        }
     }
 }

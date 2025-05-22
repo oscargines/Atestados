@@ -23,6 +23,8 @@ import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PDFToBitmapPrinter
 import com.oscar.atestados.utils.PdfToBitmapConverter
+import com.oscar.atestados.utils.openStorageDirectory
+import com.oscar.atestados.utils.refreshAtestadosFolder
 import com.oscar.atestados.viewModel.BluetoothViewModelFactory
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModelFactory
@@ -52,23 +54,19 @@ fun OtrosDocumentosScreen(
     val scope = rememberCoroutineScope()
     var isPrintingAssistance by remember { mutableStateOf(false) }
     var isPrintingTest by remember { mutableStateOf(false) }
-    var showPreviewDialog by remember { mutableStateOf<String?>(null) } // "assistance" o "test"
+    var showPreviewDialog by remember { mutableStateOf<String?>(null) }
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
     val snackbarHostState = remember { SnackbarHostState() }
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
 
     // Manejar la impresión tras confirmar el diálogo
-    LaunchedEffect(showPreviewDialog, isPrintingAssistance, isPrintingTest) {
-        if (showPreviewDialog == null && (isPrintingAssistance || isPrintingTest) && previewBitmap != null) {
+    LaunchedEffect(showPreviewDialog, isPrintingAssistance) {
+        if (showPreviewDialog == null && isPrintingAssistance && previewBitmap != null) {
             try {
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
                 if (!macAddress.isNullOrEmpty()) {
-                    val htmlAssetPath = when {
-                        isPrintingAssistance -> "documents/asistencia_juridica_gratuita_zebra.html"
-                        isPrintingTest -> "documents/test_label.html"
-                        else -> throw IllegalStateException("Estado no reconocido")
-                    }
+                    val htmlAssetPath = "documents/asistencia_juridica_gratuita_zebra.html"
                     currentPrintStatus = "Enviando a imprimir..."
                     val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
                         htmlAssetPath = htmlAssetPath,
@@ -105,8 +103,7 @@ fun OtrosDocumentosScreen(
                 withContext(Dispatchers.Main) {
                     previewBitmap?.recycle()
                     previewBitmap = null
-                    if (isPrintingAssistance) isPrintingAssistance = false
-                    if (isPrintingTest) isPrintingTest = false
+                    isPrintingAssistance = false
                 }
             }
         }
@@ -188,50 +185,16 @@ fun OtrosDocumentosScreen(
                 mensaje = "Pulse aquí para previsualizar e imprimir información de asistencia letrada",
                 enabled = !isPrintingAssistance
             )
-            Spacer(modifier = Modifier.height(20.dp))
+            //Se separa este botón para diferenciarlo visualmente del resto, pero sin perder la estética
+            Spacer(modifier = Modifier.height(70.dp))
             CreaBotonOtrosDoc(
                 onClick = {
-                    if (!isPrintingTest) {
-                        isPrintingTest = true
-                        currentPrintStatus = "Generando previsualización..."
-                        scope.launch(Dispatchers.IO) {
-                            try {
-                                val htmlContent = context.assets.open("documents/test_label.html")
-                                    .use { it.readBytes().toString(Charsets.UTF_8) }
-                                val outputFile = File(context.getExternalFilesDir(null), "etiqueta_prueba_preview.pdf")
-                                if (outputFile.exists()) outputFile.delete()
-                                val pdfLabelPrinter = PDFLabelPrinterZebra(context)
-                                pdfLabelPrinter.generarEtiquetaPdf(htmlContent, outputFile)
-                                currentPrintStatus = "PDF generado para previsualización"
-
-                                val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(outputFile)
-                                if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
-                                    previewBitmap = bitmaps[0]
-                                    showPreviewDialog = "test"
-                                    currentPrintStatus = "Mostrando previsualización"
-                                } else {
-                                    withContext(Dispatchers.Main) {
-                                        currentPrintStatus = "Error al generar previsualización"
-                                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
-                                        isPrintingTest = false
-                                    }
-                                }
-                                // Limpiar archivo temporal
-                                outputFile.delete()
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    currentPrintStatus = "Error: ${e.message}"
-                                    Toast.makeText(context, "Error al generar previsualización: ${e.message}", Toast.LENGTH_LONG).show()
-                                    isPrintingTest = false
-                                    Log.e("OtrosDocumentosScreen", "Error en previsualización: ${e.message}", e)
-                                }
-                            }
-                        }
-                    }
+                    refreshAtestadosFolder(context)
+                    openStorageDirectory(context)
+                    openStorageDirectory(context)
                 },
-                text = if (isPrintingTest) "GENERANDO..." else "PRUEBA IMPRESIÓN",
-                mensaje = "Pulse aquí para previsualizar e imprimir una etiqueta de prueba",
-                enabled = !isPrintingTest
+                text = "ABRIR ALMACENAMIENTO",
+                mensaje = "Pulse aquí para abrir el directorio de almacenamiento Documents/Atestados"
             )
         }
 

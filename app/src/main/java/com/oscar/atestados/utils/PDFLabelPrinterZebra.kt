@@ -55,20 +55,37 @@ class PDFLabelPrinterZebra(private val context: Context) {
                         val htmlElements = HtmlUtils.extractHtmlElements(htmlContent)
                         Log.d(TAG, "Se encontraron ${htmlElements.size} elementos HTML")
 
-                        val titleContent = htmlElements.find { it.tag == "h1" }?.content?.toUpperCase() ?: ""
+                        val titleContent =
+                            htmlElements.find { it.tag == "h1" }?.content?.toUpperCase() ?: ""
                         val contentAreaX = MARGIN_MM
                         val contentAreaY = MARGIN_MM
                         val contentWidth = PAGE_WIDTH - (2 * MARGIN_MM)
                         val contentHeight = PAGE_HEIGHT - (2 * MARGIN_MM) - 60f
-                        Log.d(TAG, "Área de contenido: X=$contentAreaX, Y=$contentAreaY, Ancho=$contentWidth, Alto=$contentHeight")
+                        Log.d(
+                            TAG,
+                            "Área de contenido: X=$contentAreaX, Y=$contentAreaY, Ancho=$contentWidth, Alto=$contentHeight"
+                        )
 
                         val nonH1Elements = htmlElements.filter { it.tag != "h1" }
                         val tempDiv = Div().setWidth(contentWidth).setPadding(0f)
                         nonH1Elements.forEach { element ->
-                            processElement(element, tempDiv, fonts["regular"]!!, fonts["boldItalic"]!!)
+                            processElement(
+                                element,
+                                tempDiv,
+                                fonts["regular"]!!,
+                                fonts["boldItalic"]!!
+                            )
                         }
 
-                        val contentParts = splitContentToFitPage(tempDiv, contentHeight * 0.9f, pdfDocument, document, contentAreaX, contentAreaY, contentWidth)
+                        val contentParts = splitContentToFitPage(
+                            tempDiv,
+                            contentHeight * 0.9f,
+                            pdfDocument,
+                            document,
+                            contentAreaX,
+                            contentAreaY,
+                            contentWidth
+                        )
                         Log.d(TAG, "Contenido dividido en ${contentParts.size} partes/páginas")
 
                         contentParts.forEachIndexed { index, part ->
@@ -192,10 +209,16 @@ class PDFLabelPrinterZebra(private val context: Context) {
 
         tempDiv.children.forEach { element ->
             val elementHeight = estimateElementHeight(element) * 1.1f
-            Log.v(TAG, "Elemento: ${element.javaClass.simpleName}, Altura estimada: $elementHeight, Altura acumulada: $currentHeight")
+            Log.v(
+                TAG,
+                "Elemento: ${element.javaClass.simpleName}, Altura estimada: $elementHeight, Altura acumulada: $currentHeight"
+            )
 
             if (currentHeight + elementHeight > maxHeight && currentPart.isNotEmpty()) {
-                Log.d(TAG, "Límite de página alcanzado. Altura actual: $currentHeight, Máximo: $maxHeight")
+                Log.d(
+                    TAG,
+                    "Límite de página alcanzado. Altura actual: $currentHeight, Máximo: $maxHeight"
+                )
                 parts.add(currentPart)
                 currentPart = mutableListOf()
                 currentHeight = 0f
@@ -223,23 +246,35 @@ class PDFLabelPrinterZebra(private val context: Context) {
         return try {
             when (element) {
                 is Paragraph -> {
-                    val fontSize = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.FONT_SIZE)?.value ?: 10f
+                    val fontSize =
+                        element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.FONT_SIZE)?.value
+                            ?: 10f
                     // Obtener el objeto Leading
-                    val leadingProperty = element.getProperty<com.itextpdf.layout.properties.Leading>(com.itextpdf.layout.properties.Property.LEADING)
+                    val leadingProperty =
+                        element.getProperty<com.itextpdf.layout.properties.Leading>(com.itextpdf.layout.properties.Property.LEADING)
                     // Usar el valor de leading directamente, asumiendo que es un multiplicador
-                    val leading = leadingProperty?.value ?: 1.2f // Valor por defecto si no hay leading
-                    val text = element.children.filterIsInstance<Text>().joinToString("") { it.text }
-                    val avgCharsPerLine = ((PAGE_WIDTH - (2 * MARGIN_MM)) / (fontSize * 0.5f)).toInt()
+                    val leading =
+                        leadingProperty?.value ?: 1.2f // Valor por defecto si no hay leading
+                    val text =
+                        element.children.filterIsInstance<Text>().joinToString("") { it.text }
+                    val avgCharsPerLine =
+                        ((PAGE_WIDTH - (2 * MARGIN_MM)) / (fontSize * 0.5f)).toInt()
                     val estimatedLines = text.length / avgCharsPerLine.coerceAtLeast(1)
                     val actualLines = text.count { it == '\n' } + 1
                     val lineCount = maxOf(estimatedLines, actualLines).coerceAtLeast(1)
                     val height = fontSize * leading * lineCount
                     // Obtener MARGIN_BOTTOM como UnitValue
-                    val marginBottomProperty = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)
-                    val marginBottom = marginBottomProperty?.value ?: 0f // Usar el valor de UnitValue o 0f por defecto
-                    Log.v(TAG, "Paragraph: fontSize=$fontSize, leading=$leading, chars=${text.length}, líneas estimadas=$lineCount, height=$height, marginBottom=$marginBottom")
+                    val marginBottomProperty =
+                        element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)
+                    val marginBottom = marginBottomProperty?.value
+                        ?: 0f // Usar el valor de UnitValue o 0f por defecto
+                    Log.v(
+                        TAG,
+                        "Paragraph: fontSize=$fontSize, leading=$leading, chars=${text.length}, líneas estimadas=$lineCount, height=$height, marginBottom=$marginBottom"
+                    )
                     height + marginBottom + 10f
                 }
+
                 is Div -> {
                     var divHeight = 0f
                     element.children.forEach {
@@ -248,6 +283,7 @@ class PDFLabelPrinterZebra(private val context: Context) {
                     Log.v(TAG, "Div height: $divHeight")
                     divHeight
                 }
+
                 else -> {
                     Log.v(TAG, "Altura por defecto (20f) para ${element.javaClass.simpleName}")
                     20f
@@ -275,10 +311,13 @@ class PDFLabelPrinterZebra(private val context: Context) {
         boldItalicFont: PdfFont,
         indentLevel: Int = 0
     ) {
-        Log.v(TAG, "Procesando elemento ${element.tag} (nivel $indentLevel): ${element.content.take(20)}...")
+        Log.v(
+            TAG,
+            "Procesando elemento ${element.tag} (nivel $indentLevel): ${element.content.take(20)}..."
+        )
 
         when (element.tag) {
-            "h2", "h3" -> {
+            "h1", "h2", "h3" -> {
                 div.add(
                     Paragraph(element.content)
                         .setFont(boldItalicFont)
@@ -289,6 +328,7 @@ class PDFLabelPrinterZebra(private val context: Context) {
                         .setMarginLeft(indentLevel * 10f)
                 )
             }
+
             "p" -> {
                 div.add(
                     Paragraph(element.content)
@@ -300,60 +340,91 @@ class PDFLabelPrinterZebra(private val context: Context) {
                         .setMarginLeft(indentLevel * 10f)
                 )
             }
-            "input" -> {
-                if (element.attributes["type"] == "checkbox") {
-                    val isChecked = element.attributes["checked"] == "checked"
-                    val checkboxText = if (isChecked) "[X]" else "[ ]"
+
+            "div" -> {
+                // Procesar hijos del div (por ejemplo, <ul> dentro de <div id="denunciado">)
+                element.children.forEach { child ->
+                    processElement(child, div, regularFont, boldItalicFont, indentLevel)
+                }
+            }
+
+            "span" -> {
+                if (element.attributes["id"] in listOf("op_1_checkbox", "op_2_checkbox")) {
+                    val isChecked = element.attributes["data-checked"] == "true"
+                    val checkboxSymbol = if (isChecked) "✔" else "☐"
                     div.add(
-                        Paragraph(checkboxText + " " + element.content)
-                            .setFont(regularFont)
-                            .setFontSize(8f)
+                        Paragraph()
+                            .add(Text(checkboxSymbol).setFont(regularFont).setFontSize(8f))
                             .setTextAlignment(TextAlignment.LEFT)
                             .setMultipliedLeading(1.2f)
                             .setMarginBottom(5f)
                             .setMarginLeft(indentLevel * 10f)
                     )
-                    Log.d(TAG, "Checkbox procesado: ${element.attributes["id"]} = $checkboxText")
+                    Log.d(TAG, "Checkbox procesado: ${element.attributes["id"]} = $checkboxSymbol")
                 }
             }
+
             "table" -> {
-                // Procesar celdas de la tabla como párrafos
                 element.children.forEach { tr ->
                     if (tr.tag == "tr") {
                         tr.children.forEach { td ->
                             if (td.tag == "td") {
                                 td.children.forEach { child ->
-                                    processElement(child, div, regularFont, boldItalicFont, indentLevel + 1)
+                                    processElement(
+                                        child,
+                                        div,
+                                        regularFont,
+                                        boldItalicFont,
+                                        indentLevel + 1
+                                    )
                                 }
                             }
                         }
                     }
                 }
             }
+
             "ul" -> {
                 element.children.forEachIndexed { index, li ->
                     if (li.tag == "li") {
-                        val bullet = when {
-                            element.attributes["class"] == "list-letter" -> "• "
-                            element.attributes["class"] == "list-number" -> "${index + 1}. "
-                            else -> "• "
-                        }
-                        Log.v(TAG, "Procesando li #${index + 1} con bullet '$bullet'")
                         val paragraph = Paragraph()
-                        paragraph.add(Text(bullet).setFont(regularFont).setFontSize(8f))
-                        paragraph.add(Text(li.content).setFont(regularFont).setFontSize(8f))
+                        li.children.forEach { child ->
+                            if (child.tag == "span" && child.attributes["id"] in listOf(
+                                    "op_1_checkbox",
+                                    "op_2_checkbox"
+                                )
+                            ) {
+                                val isChecked = child.attributes["data-checked"] == "true"
+                                val checkboxSymbol = if (isChecked) "✔" else "☐"
+                                paragraph.add(
+                                    Text(checkboxSymbol).setFont(regularFont).setFontSize(8f)
+                                )
+                                paragraph.add(Text(" ").setFont(regularFont).setFontSize(8f))
+                            } else {
+                                // Añadir el contenido del <li> directamente
+                                paragraph.add(
+                                    Text(child.content).setFont(regularFont).setFontSize(8f)
+                                )
+                                child.children.forEach { grandChild ->
+                                    processElement(
+                                        grandChild,
+                                        div,
+                                        regularFont,
+                                        boldItalicFont,
+                                        indentLevel + 1
+                                    )
+                                }
+                            }
+                        }
                         paragraph.setMultipliedLeading(1.2f)
                         paragraph.setMarginBottom(5f)
                         paragraph.setTextAlignment(TextAlignment.LEFT)
                         paragraph.setMarginLeft(indentLevel * 10f)
                         div.add(paragraph)
-
-                        li.children.forEach { child ->
-                            processElement(child, div, regularFont, boldItalicFont, indentLevel + 1)
-                        }
                     }
                 }
             }
+
             else -> {
                 Log.w(TAG, "Elemento no soportado: ${element.tag}")
             }

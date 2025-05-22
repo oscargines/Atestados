@@ -14,6 +14,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
+        versionName = "beta 0.1.0"
+        versionCode = 1
         applicationId = "com.oscar.atestados"
         minSdk = 31
         targetSdk = 35
@@ -157,6 +159,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.androidx.documentfile)
+
+    //Control de versiones
+    implementation (libs.okhttp.v4120)
 
 }
 

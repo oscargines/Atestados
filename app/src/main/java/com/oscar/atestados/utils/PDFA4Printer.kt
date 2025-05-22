@@ -288,11 +288,13 @@ class PDFA4Printer(
             "p" -> "paragraph"
             "ul" -> "list"
             "li" -> "item"
-            else -> "paragraph" // Fallback para tags no soportados
+            "span" -> "span"
+            "div" -> "div"
+            else -> "paragraph"
         }
 
         val attributes = when (htmlElement.tag) {
-            "ul" -> htmlElement.attributes + ("type" to "bullet") // Listas con viñetas por defecto
+            "ul" -> htmlElement.attributes + ("type" to "bullet")
             else -> htmlElement.attributes
         }
 
@@ -421,20 +423,50 @@ class PDFA4Printer(
                     )
                     return true
                 }
+                "div" -> {
+                    // Procesar hijos del div (por ejemplo, <list> dentro de <div id="denunciado">)
+                    element.children.forEach { process(it, div, fonts, indentLevel) }
+                    return true
+                }
                 "list" -> {
                     element.children.forEachIndexed { index, child ->
                         if (child.type == "item") {
-                            val bullet = if (element.attributes["type"] == "numbered") "${index + 1}. " else "• "
                             val paragraph = Paragraph()
-                            paragraph.add(Text(bullet).setFont(fonts["regularlus"]!!).setFontSize(10f))
-                            paragraph.add(Text(child.content).setFont(fonts["regular"]!!).setFontSize(10f))
+                            child.children.forEach { grandChild ->
+                                if (grandChild.type == "span" && grandChild.attributes["id"] in listOf("op_1_checkbox", "op_2_checkbox")) {
+                                    val isChecked = grandChild.attributes["data-checked"] == "true"
+                                    val checkboxSymbol = if (isChecked) "✔" else "☐"
+                                    paragraph.add(Text(checkboxSymbol).setFont(fonts["regular"]!!).setFontSize(10f))
+                                    paragraph.add(Text(" ").setFont(fonts["regular"]!!).setFontSize(10f))
+                                } else {
+                                    paragraph.add(Text(grandChild.content).setFont(fonts["regular"]!!).setFontSize(10f))
+                                    grandChild.children.forEach { greatGrandChild ->
+                                        process(greatGrandChild, div, fonts, indentLevel + 1)
+                                    }
+                                }
+                            }
                             paragraph.setMarginBottom(6f)
                             paragraph.setMarginLeft(indentLevel * 10f)
                             div.add(paragraph)
-                            child.children.forEach { process(it, div, fonts, indentLevel + 1) }
                         }
                     }
                     return true
+                }
+                "span" -> {
+                    if (element.attributes["id"] in listOf("op_1_checkbox", "op_2_checkbox")) {
+                        val isChecked = element.attributes["data-checked"] == "true"
+                        val checkboxSymbol = if (isChecked) "✔" else "☐"
+                        div.add(
+                            Paragraph()
+                                .add(Text(checkboxSymbol).setFont(fonts["regular"]!!).setFontSize(10f))
+                                .setTextAlignment(TextAlignment.LEFT)
+                                .setMarginBottom(6f)
+                                .setMarginLeft(indentLevel * 10f)
+                        )
+                        Log.d(TAG, "Checkbox procesado: ${element.attributes["id"]} = $checkboxSymbol")
+                        return true
+                    }
+                    return false
                 }
                 else -> return false
             }

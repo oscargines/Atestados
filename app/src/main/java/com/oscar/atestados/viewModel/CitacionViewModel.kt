@@ -2,9 +2,12 @@ package com.oscar.atestados.viewModel
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -13,23 +16,21 @@ import com.oscar.atestados.data.CitacionDataProvider
 import com.oscar.atestados.utils.HtmlParser
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PdfToBitmapConverter
+import com.oscar.atestados.utils.PDFA4Printer
+import com.oscar.atestados.utils.PDFToBitmapPrinter
+import com.oscar.atestados.utils.PdfUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.lang.ref.WeakReference
 
 private const val TAG = "CitacionViewModel"
 private const val PREFS_NAME = "CitacionPrefs"
 
-/**
- * ViewModel para gestionar los datos de la pantalla de citación.
- * Almacena y actualiza los datos relacionados con la diligencia de citación,
- * como fechas, horas, información del juzgado y detalles del abogado.
- * También maneja la persistencia de datos utilizando SharedPreferences.
- *
- * @param application Aplicación Android necesaria para inicializar el ViewModel.
- */
 class CitacionViewModel(application: Application) : AndroidViewModel(application) {
 
     private val sharedPreferences: SharedPreferences
@@ -78,11 +79,19 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
     private val _abogadoOficio = MutableLiveData<Boolean>(false)
     val abogadoOficio: LiveData<Boolean> get() = _abogadoOficio
 
-    /**
-     * Carga los datos guardados desde SharedPreferences al iniciar el ViewModel.
-     *
-     * @param context Contexto de la aplicación.
-     */
+    // Estados para la UI
+    private val _printStatus = MutableStateFlow("")
+    val printStatus: StateFlow<String> = _printStatus.asStateFlow()
+
+    private val _showPreviewDialog = MutableStateFlow(false)
+    val showPreviewDialog: StateFlow<Boolean> = _showPreviewDialog.asStateFlow()
+
+    private val _previewBitmap = MutableStateFlow<Bitmap?>(null)
+    val previewBitmap: StateFlow<Bitmap?> = _previewBitmap.asStateFlow()
+
+    private val _missingFields = MutableStateFlow<List<String>>(emptyList())
+    val missingFields: StateFlow<List<String>> = _missingFields.asStateFlow()
+
     fun loadData(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             Log.d(TAG, "Cargando datos desde SharedPreferences")
@@ -110,11 +119,6 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Guarda los datos actuales en SharedPreferences.
-     *
-     * @param context Contexto de la aplicación.
-     */
     fun guardarDatos(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             Log.d(TAG, "Guardando datos en SharedPreferences")
@@ -142,11 +146,6 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Limpia todos los datos almacenados en el ViewModel y SharedPreferences.
-     *
-     * @param context Contexto de la aplicación.
-     */
     fun limpiarDatos(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             Log.d(TAG, "Limpiando datos")
@@ -177,7 +176,6 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // Funciones para actualizar los estados
     fun updateProvincia(value: String) {
         _provincia.value = value
     }
@@ -226,16 +224,8 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         _comunicacionNumero.value = value
     }
 
-    /**
-     * Actualiza la selección de abogado (designado o de oficio).
-     * Asegura que solo una opción esté seleccionada a la vez si es necesario.
-     *
-     * @param designado Indica si se selecciona un abogado designado.
-     * @param oficio Indica si se solicita un abogado de oficio.
-     */
     fun updateAbogadoSelection(designado: Boolean, oficio: Boolean) {
         if (designado && oficio) {
-            // Solo uno puede estar seleccionado
             _abogadoDesignado.value = true
             _abogadoOficio.value = false
         } else {
@@ -244,19 +234,24 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * Imprime el acta de citación generando un archivo HTML y PDF.
-     *
-     * @param context Contexto de la aplicación.
-     * @param htmlParser Instancia de HtmlParser para generar el HTML.
-     * @param dataProvider Proveedor de datos para la citación.
-     * @param zebraPrinter Instancia de PDFLabelPrinterZebra para generar el PDF.
-     * @param impresoraViewModel ViewModel para obtener la dirección MAC de la impresora.
-     * @param onStatusUpdate Callback para actualizar el estado de la impresión.
-     * @param onError Callback para manejar errores.
-     * @param onComplete Callback para indicar que la impresión ha finalizado.
-     */
-    fun printActa(
+    // Métodos para actualizar estados de StateFlow
+    fun updateMissingFields(fields: List<String>) {
+        _missingFields.value = fields
+    }
+
+    fun updateShowPreviewDialog(show: Boolean) {
+        _showPreviewDialog.value = show
+    }
+
+    fun updatePreviewBitmap(bitmap: Bitmap?) {
+        _previewBitmap.value = bitmap
+    }
+
+    fun updatePrintStatus(status: String) {
+        _printStatus.value = status
+    }
+
+    fun generateAndPrintActa(
         context: Context,
         htmlParser: HtmlParser,
         dataProvider: CitacionDataProvider,
@@ -264,83 +259,213 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         impresoraViewModel: ImpresoraViewModel,
         personaViewModel: PersonaViewModel,
         guardiasViewModel: GuardiasViewModel,
-        alcoholemiaDosViewModel: AlcoholemiaDosViewModel,
-        onStatusUpdate: (String) -> Unit,
-        onError: (String) -> Unit,
-        onComplete: () -> Unit
+        alcoholemiaDosViewModel: AlcoholemiaDosViewModel
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
+                _printStatus.value = "Preparando documento..."
+
+                // Iniciar temporizador para restablecer printStatus
+                launch {
+                    delay(15_000L) // 15 segundos
+                    if (_printStatus.value.isNotEmpty() && !_showPreviewDialog.value) {
+                        _printStatus.value = ""
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Tiempo de procesamiento agotado", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
-                Log.d("CitacionViewModel", "Obteniendo MAC de impresora seleccionada: $macAddress")
                 if (macAddress.isNullOrEmpty()) {
-                    Log.w("CitacionViewModel", "No hay impresora seleccionada")
+                    _printStatus.value = "No hay impresora seleccionada"
                     withContext(Dispatchers.Main) {
-                        onError("No hay impresora seleccionada")
+                        Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
                     }
                     return@launch
                 }
-                Log.d("CitacionViewModel", "MAC de impresora: $macAddress")
 
-                // Guardar datos de todos los ViewModels de forma síncrona
-                withContext(Dispatchers.IO) {
-                    Log.d("CitacionViewModel", "Guardando datos en SharedPreferences")
-                    guardarDatos(context)
-                    personaViewModel.saveData(context)
-                    guardiasViewModel.saveData(context)
-                    alcoholemiaDosViewModel.guardarDatos(context)
-                }
-
-                Log.d("CitacionViewModel", "Datos guardados antes de validar, numeroDocumento: ${personaViewModel.numeroDocumento.value}")
-                if (personaViewModel.numeroDocumento.value.isNullOrEmpty()) {
-                    Log.w("CitacionViewModel", "numeroDocumento está vacío")
-                    withContext(Dispatchers.Main) {
-                        onError("El número de documento está vacío")
-                    }
-                    return@launch
-                }
-                Log.d("CitacionViewModel", "numeroDocumento válido antes de validar: ${personaViewModel.numeroDocumento.value}")
+                // Guardar datos
+                guardarDatos(context)
+                personaViewModel.saveData(context)
+                guardiasViewModel.saveData(context)
+                alcoholemiaDosViewModel.guardarDatos(context)
 
                 // Validar datos
-                Log.d("CitacionViewModel", "Iniciando validación de datos")
                 val (isValid, missingFields) = dataProvider.validateData()
                 if (!isValid) {
-                    Log.w("CitacionViewModel", "Validación fallida, campos faltantes: $missingFields")
+                    _missingFields.value = missingFields
+                    _printStatus.value = "Datos incompletos"
+                    return@launch
+                }
+
+                // Generar HTML
+                _printStatus.value = "Generando HTML..."
+                val htmlContent = withContext(Dispatchers.IO) {
+                    val tempHtmlFilePath = htmlParser.generateHtmlFile(
+                        templateAssetPath = "documents/acta_citacion.html",
+                        dataProvider = dataProvider
+                    )
+                    val content = File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                    File(tempHtmlFilePath).delete()
+                    content
+                }
+
+                // Generar PDF para Zebra (previsualización)
+                _printStatus.value = "Generando PDF para impresora Zebra..."
+                val previewFile = File.createTempFile("citacion_zebra_preview", ".pdf", context.cacheDir)
+                zebraPrinter.generarEtiquetaPdf(htmlContent, previewFile)
+
+                if (!previewFile.exists() || previewFile.length() == 0L) {
+                    _printStatus.value = "Error al generar PDF para Zebra"
                     withContext(Dispatchers.Main) {
-                        onError("Datos incompletos: ${missingFields.joinToString(", ")}")
+                        Toast.makeText(context, "Error al generar PDF para Zebra", Toast.LENGTH_LONG).show()
                     }
                     return@launch
                 }
-                Log.d("CitacionViewModel", "Validación exitosa")
 
-                withContext(Dispatchers.Main) {
-                    onStatusUpdate("Preparando documento...")
-                }
-
-                val tempHtmlFilePath = htmlParser.generateHtmlFile(
-                    templateAssetPath = "documents/acta_citacion.html",
-                    dataProvider = dataProvider
+                // Generar PDF A4
+                _printStatus.value = "Generando PDF A4..."
+                val outputFile = PdfUtils.writePdfToStorage(
+                    htmlContent,
+                    "acta_citacion_a4.pdf",
+                    PDFA4Printer(context),
+                    context
                 )
-                Log.d("CitacionViewModel", "HTML generado en: $tempHtmlFilePath")
-
-                withContext(Dispatchers.Main) {
-                    onStatusUpdate("Generando PDF para impresora Zebra...")
+                if (outputFile == null) {
+                    _printStatus.value = "Error al generar PDF A4"
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Error al generar PDF A4", Toast.LENGTH_LONG).show()
+                    }
+                    previewFile.delete()
+                    return@launch
                 }
 
-                val previewFile = java.io.File.createTempFile("citacion_zebra_preview", ".pdf", context.cacheDir)
-                zebraPrinter.generarEtiquetaPdf(tempHtmlFilePath, previewFile)
-                Log.d("CitacionViewModel", "PDF Zebra generado en: ${previewFile.absolutePath}")
-
+                // Abrir PDF A4
                 withContext(Dispatchers.Main) {
-                    onStatusUpdate("Previsualización lista")
-                    onComplete()
+                    try {
+                        val contentUri = FileProvider.getUriForFile(
+                            context,
+                            "com.oscar.atestados.fileprovider",
+                            outputFile
+                        )
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(contentUri, "application/pdf")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Seleccionar aplicación para abrir PDF"))
+                        _printStatus.value = "PDF A4 abierto"
+                    } catch (e: Exception) {
+                        _printStatus.value = "No hay aplicación para abrir PDFs"
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "No hay aplicación para abrir PDFs", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
+                // Generar previsualización
+                if (isValidPdf(previewFile)) {
+                    val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(previewFile)
+                    if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
+                        _previewBitmap.value = bitmaps[0]
+                        _showPreviewDialog.value = true
+                        _printStatus.value = "Mostrando previsualización"
+                    } else {
+                        _printStatus.value = "Error al generar previsualización"
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT).show()
+                        }
+                        previewFile.delete()
+                    }
+                } else {
+                    _printStatus.value = "Error: El archivo PDF no es válido"
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Error: El archivo PDF no es válido", Toast.LENGTH_LONG).show()
+                    }
+                    previewFile.delete()
                 }
             } catch (e: Exception) {
-                Log.e("CitacionViewModel", "Error en printActa: ${e.message}", e)
+                _printStatus.value = "Error al generar documentos: ${e.message}"
                 withContext(Dispatchers.Main) {
-                    onError("Error al generar el documento: ${e.message}")
+                    Toast.makeText(context, "Error al generar documentos: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    fun confirmPrint(
+        context: Context,
+        htmlParser: HtmlParser,
+        dataProvider: CitacionDataProvider,
+        pdfToBitmapPrinter: PDFToBitmapPrinter,
+        impresoraViewModel: ImpresoraViewModel
+    ) {
+        viewModelScope.launch {
+            try {
+                val macAddress = impresoraViewModel.getSelectedPrinterMac() ?: throw Exception("No hay impresora seleccionada")
+                val htmlContent = withContext(Dispatchers.IO) {
+                    val tempHtmlFilePath = htmlParser.generateHtmlFile(
+                        templateAssetPath = "documents/acta_citacion.html",
+                        dataProvider = dataProvider
+                    )
+                    val content = File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                    File(tempHtmlFilePath).delete()
+                    content
+                }
+
+                _printStatus.value = "Enviando a imprimir..."
+                val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
+                    htmlAssetPath = "",
+                    macAddress = macAddress,
+                    outputFileName = "acta_citacion_temp.pdf",
+                    htmlContent = htmlContent,
+                    onStatusUpdate = { status -> _printStatus.value = status }
+                )
+
+                when (printResult) {
+                    is PDFToBitmapPrinter.PrintResult.Success -> {
+                        _printStatus.value = "Impresión enviada"
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Acta de citación enviada a imprimir", Toast.LENGTH_SHORT).show()
+                        }
+                        val pdfFileName = "Acta_Citacion_${System.currentTimeMillis()}.pdf"
+                        val savedFile = PdfUtils.writePdfToStorage(
+                            htmlContent,
+                            pdfFileName,
+                            PDFA4Printer(context),
+                            context
+                        )
+                        if (savedFile != null && isValidPdf(savedFile)) {
+                            withContext(Dispatchers.Main) {
+                                Toast.makeText(context, "PDF guardado en Documents/Atestados/$pdfFileName", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    is PDFToBitmapPrinter.PrintResult.Error -> {
+                        _printStatus.value = "Error: ${printResult.message}"
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _printStatus.value = "Error al imprimir: ${e.message}"
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            } finally {
+                _previewBitmap.value = null
+                _showPreviewDialog.value = false
+            }
+        }
+    }
+
+    private fun isValidPdf(file: File): Boolean {
+        return try {
+            PdfToBitmapConverter.convertAllPagesToBitmaps(file).isNotEmpty()
+        } catch (e: Exception) {
+            false
         }
     }
 }

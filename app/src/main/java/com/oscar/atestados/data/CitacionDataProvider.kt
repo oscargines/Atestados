@@ -110,8 +110,8 @@ class CitacionDataProvider(
         val numColegiado: String
         val colegioAbogados: String
         val telefonema: String
-        val op1Checkbox: String
-        val op2Checkbox: String
+        val op1Checked: String
+        val op2Checked: String
 
         // Obtener firmas
         val firmaInstructor = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInstructor.value ?: "")
@@ -124,8 +124,8 @@ class CitacionDataProvider(
 
         when {
             abogadoDesignado -> {
-                op1Checkbox = "checked"
-                op2Checkbox = ""
+                op1Checked = "true"
+                op2Checked = "false"
                 abogado = citacionViewModel.abogadoNombre.value ?: ""
                 numColegiado = citacionViewModel.abogadoColegiado.value ?: ""
                 colegioAbogados = citacionViewModel.abogadoColegio.value ?: ""
@@ -133,8 +133,8 @@ class CitacionDataProvider(
                 Log.d(TAG, "op_1 seleccionado - Nombre abogado: $abogado, Número colegiado: $numColegiado, Colegio abogados: $colegioAbogados, Número comunicación: $telefonema")
             }
             abogadoOficio -> {
-                op1Checkbox = ""
-                op2Checkbox = "checked"
+                op1Checked = "false"
+                op2Checked = "true"
                 abogado = ""
                 numColegiado = ""
                 colegioAbogados = ""
@@ -142,8 +142,8 @@ class CitacionDataProvider(
                 Log.d(TAG, "op_2 seleccionado - Nombre abogado: $abogado, Número colegiado: $numColegiado, Colegio abogados: $colegioAbogados, Número comunicación: $telefonema")
             }
             else -> {
-                op1Checkbox = ""
-                op2Checkbox = ""
+                op1Checked = "false"
+                op2Checked = "false"
                 abogado = ""
                 numColegiado = ""
                 colegioAbogados = ""
@@ -170,8 +170,8 @@ class CitacionDataProvider(
             "num_colegiado" to numColegiado,
             "colegio_abogados" to colegioAbogados,
             "telefonema" to telefonema,
-            "op_1_checkbox" to op1Checkbox,
-            "op_2_checkbox" to op2Checkbox,
+            "op_1_checked" to op1Checked,
+            "op_2_checked" to op2Checked,
             "firma_instructor" to firmaInstructor,
             "firma_secretario" to firmaSecretario,
             "firma_investigado" to firmaInvestigado // Corregido: clave correcta

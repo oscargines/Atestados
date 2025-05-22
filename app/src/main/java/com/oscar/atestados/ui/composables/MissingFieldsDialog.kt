@@ -75,15 +75,18 @@ fun FullScreenProgressIndicator(text: String) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f)),
+            .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = BotonesNormales)
+            CircularProgressIndicator(
+                color = BotonesNormales,
+                strokeWidth = 4.dp
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = text,
-                color = Color.White,
+                color = Color.Gray,
                 style = MaterialTheme.typography.bodyLarge
             )
         }

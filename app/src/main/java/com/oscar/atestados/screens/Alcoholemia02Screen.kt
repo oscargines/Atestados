@@ -66,7 +66,7 @@ import java.util.*
 import kotlin.text.Regex
 import com.itextpdf.kernel.pdf.PdfReader
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
-import com.tuapp.utils.PdfUtils
+import com.oscar.atestados.utils.PdfUtils
 
 private const val TAG = "Alcoholemia02Screen"
 
