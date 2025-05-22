@@ -160,9 +160,6 @@ dependencies {
 
     implementation(libs.androidx.documentfile)
 
-    //Control de versiones
-    implementation (libs.okhttp.v4120)
-
 }
 
 // Forzar versión 1.78 para BouncyCastle
