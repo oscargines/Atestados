@@ -306,7 +306,11 @@ private fun TomaDerechosContent(
         // Campo de texto para "Otros" (siempre visible)
         CustomTextField(
             value = textoMostrado,
-            onValueChange = { textoOtros = it },
+            onValueChange = { newText ->
+                if (selectedOption == "Otros") {
+                    tomaDerechosViewModel.setTextoElementosEsenciales(newText) // Actualiza el ViewModel
+                }
+            },
             modifier = Modifier.height(200.dp),
             label = if (selectedOption == "Otros") "Especifique otros detalles" else "Elementos esenciales",
             singleLine = false,
@@ -329,7 +333,7 @@ private fun TomaDerechosContent(
 private fun LecturaDerechosDosBottomBar(
     viewModel: TomaDerechosViewModel,
     navigateToScreen: (String) -> Unit,
-    context: android.content.Context
+    context: Context
 ) {
     Row(
         modifier = Modifier
