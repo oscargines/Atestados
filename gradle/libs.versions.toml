@@ -1,9 +1,9 @@
 [versions]
 # Android Gradle Plugin y Kotlin
 agp = "8.10.0"                   # Última versión estable
-barcodeScanning = "17.2.0"
+appcompat = "1.7.0"
+barcodeScanning = "17.3.0"
 core = "3.5.3"
-datastorePreferencesVersion = "1.0.0"
 documentfile = "1.1.0"
 html2pdf = "6.1.0"
 json = "20230227"
@@ -16,23 +16,22 @@ lifecycleRuntimeKtx = "2.8.7"   # Última versión estable
 
 # Jetpack Compose
 activityCompose = "1.10.1"      # Última versión estable
-composeBom = "2025.04.01"       # Versión reciente y válida
+composeBom = "2025.05.01"       # Versión reciente y válida
 material3 = "1.3.2"             # Última versión estable
-navigationCompose = "2.8.9"     # Última versión estable
-okhttp = "4.11.0"
-okhttpVersion = "4.12.0"
+navigationCompose = "2.9.0"     # Última versión estable
+okhttp = "4.12.0"
 playServicesLocation = "21.3.0"
 repo = "Tag"
-runtimeLivedata = "1.8.0"       # Última versión estable
+runtimeLivedata = "1.8.2"       # Última versión estable
 slf4jSimple = "2.0.13"
-ui = "1.8.0"                    # Última versión estable
+ui = "1.8.2"                    # Última versión estable
 
 # Coroutines y Serialización
 kotlinxCoroutines = "1.7.3"     # Última versión estable
 kotlinxSerialization = "1.7.3"  # Última versión estable
 
 # DataStore
-datastorePreferences = "1.1.1"  # Última versión estable
+datastorePreferences = "1.1.7"  # Última versión estable
 
 # Splashscreen
 coreSplashscreen = "1.0.1"      # Última versión estable
@@ -76,8 +75,8 @@ zxingAndroidEmbedded = "4.3.0"
 
 [libraries]
 # AndroidX Core y Lifecycle
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-datastore-preferences-v100 = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferencesVersion" }
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
@@ -120,9 +119,7 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 
 # ML Kit
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
-okhttp-v4120 = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttpVersion" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
-repo = { module = "com.github.User:Repo", version.ref = "repo" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
 vision-common = { group = "com.google.mlkit", name = "vision-common", version.ref = "visionCommon" }
 play-services-mlkit-text-recognition = { group = "com.google.android.gms", name = "play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
@@ -153,7 +150,6 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "a
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 
 # PDF y Marckdown
-commonmark = { module = "org.commonmark:commonmark", version.ref = "commonmark" }
 itext-core = { module = "com.itextpdf:itext-core", version.ref = "itextCore" }
 layout = { module = "com.itextpdf:layout", version.ref = "itextCore" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }

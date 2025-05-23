@@ -13,9 +13,9 @@ import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -31,12 +31,14 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
-import com.oscar.atestados.navigation.appNavigation
 import com.oscar.atestados.ui.theme.AtestadosTheme
 import com.oscar.atestados.ui.theme.BlueGray700
 import com.oscar.atestados.data.AccesoBaseDatos
+import com.oscar.atestados.navigation.appNavigation
+import com.oscar.atestados.utils.AppConfig
 import com.oscar.atestados.viewModel.NfcViewModel
 import com.oscar.atestados.viewModel.PersonaViewModel
 import kotlinx.coroutines.Dispatchers
@@ -46,21 +48,9 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "MainActivity"
 
-/**
- * Actividad principal de la aplicación Atestados.
- * Maneja la inicialización de la aplicación, permisos, NFC y navegación.
- *
- * @property nfcAdapter Adaptador NFC para interactuar con tags NFC
- * @property personaViewModel ViewModel para manejar datos de personas
- * @property nfcViewModel ViewModel para manejar interacciones NFC
- * @property permissionLauncher Lanzador para solicitar permisos
- * @property requiredPermissions Lista de permisos requeridos por la aplicación
- * @property arePermissionsGranted Indica si todos los permisos fueron concedidos
- * @property isDatabaseLoaded Indica si las bases de datos fueron cargadas
- * @property loadingStatus Mensaje de estado durante la carga de datos
- */
 class MainActivity : ComponentActivity() {
 
+    private lateinit var navController: NavHostController
     private var nfcAdapter: NfcAdapter? = null
     private lateinit var personaViewModel: PersonaViewModel
     private lateinit var nfcViewModel: NfcViewModel
@@ -70,39 +60,65 @@ class MainActivity : ComponentActivity() {
     private var loadingStatus by mutableStateOf("")
     private lateinit var requiredPermissions: Array<String>
 
-    /**
-     * Método llamado al crear la actividad.
-     * Inicializa ViewModels, adaptador NFC y configura la UI.
-     *
-     * @param savedInstanceState Estado guardado de la actividad
-     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Inicialización de ViewModels
         personaViewModel = ViewModelProvider(this)[PersonaViewModel::class.java]
         nfcViewModel = ViewModelProvider(this)[NfcViewModel::class.java]
 
-        nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-        if (nfcAdapter == null) {
-            Toast.makeText(this, "Este dispositivo no soporta NFC", Toast.LENGTH_LONG).show()
-            Log.w(TAG, "NFC no soportado en este dispositivo")
-        }
-
-        configurePermissionLauncher()
-        checkAndRequestPermissions()
-
-        setContent {
-            AtestadosTheme {
-                ContentRouter()
+        // Configuración NFC
+        nfcAdapter = NfcAdapter.getDefaultAdapter(this).also { adapter ->
+            if (adapter == null) {
+                Toast.makeText(this, "Este dispositivo no soporta NFC", Toast.LENGTH_LONG).show()
+                Log.w(TAG, "NFC no soportado en este dispositivo")
             }
         }
 
+        // Configuración de permisos
+        configurePermissionLauncher()
+        checkAndRequestPermissions()
+
+        // Control de versión
+        AppConfig.VERSION_NAME.let { currentVersion ->
+            getVersionFromPreferences()?.let { storedVersion ->
+                if (storedVersion != currentVersion) {
+                    saveVersionToPreferences(currentVersion)
+                    Log.d(TAG, "Versión actualizada a: $currentVersion")
+                } else {
+                    Log.d(TAG, "Versión recuperada: $storedVersion")
+                }
+            } ?: saveVersionToPreferences(currentVersion)
+        }
+
+        // UI inicial
+        setContent {
+            AtestadosTheme {
+                navController = rememberNavController()
+                ContentRouter(navController, getVersionFromPreferences() ?: AppConfig.VERSION_NAME)
+            }
+        }
+
+        // Configurar OnBackPressedDispatcher para manejar retroceso
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val currentDestination = navController.currentBackStackEntry?.destination?.route
+                Log.d(TAG, "onBackPressed: currentDestination=$currentDestination")
+                if (currentDestination?.startsWith("MainScreen") == true && !isFinishing) {
+                    // Mostrar el diálogo de salida navegando con el parámetro
+                    navController.navigate("MainScreen?showExitDialog=true")
+                } else if (!isFinishing) {
+                    Log.d(TAG, "onBackPressed: Navegando a MainScreen")
+                    navController.navigate("MainScreen") {
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = true
+                        }
+                    }
+                }
+            }
+        })
         processNfcIntent(intent)
     }
 
-    /**
-     * Método llamado cuando la actividad se reanuda.
-     * Configura el foreground dispatch para NFC.
-     */
     override fun onResume() {
         super.onResume()
         nfcAdapter?.let { adapter ->
@@ -121,26 +137,13 @@ class MainActivity : ComponentActivity() {
         } ?: Log.d(TAG, "NFC no disponible, omitiendo enableForegroundDispatch")
     }
 
-    /**
-     * Método llamado cuando la actividad se pausa.
-     * Deshabilita el foreground dispatch para NFC.
-     */
     override fun onPause() {
         super.onPause()
-        nfcAdapter?.let { adapter ->
-            if (adapter.isEnabled) {
-                adapter.disableForegroundDispatch(this)
-                Log.d(TAG, "Foreground dispatch deshabilitado")
-            }
+        nfcAdapter?.disableForegroundDispatch(this)?.also {
+            Log.d(TAG, "Foreground dispatch deshabilitado")
         }
     }
 
-    /**
-     * Método llamado cuando llega un nuevo intent.
-     * Procesa intents NFC.
-     *
-     * @param intent Nuevo intent recibido
-     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -148,11 +151,6 @@ class MainActivity : ComponentActivity() {
         processNfcIntent(intent)
     }
 
-    /**
-     * Procesa un intent para detectar tags NFC.
-     *
-     * @param intent Intent a procesar
-     */
     private fun processNfcIntent(intent: Intent?) {
         Log.d(TAG, "Procesando intent: $intent")
         if (intent?.action == NfcAdapter.ACTION_TECH_DISCOVERED) {
@@ -172,13 +170,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Composable que maneja el enrutamiento de contenido principal.
-     * Muestra pantallas de permisos, carga o navegación según el estado.
-     */
     @Composable
-    private fun ContentRouter() {
-        val navController = rememberNavController()
+    private fun ContentRouter(navController: NavHostController, version: String) {
         val context = LocalContext.current
 
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -193,7 +186,8 @@ class MainActivity : ComponentActivity() {
                         appNavigation(
                             navController = navController,
                             personaViewModel = personaViewModel,
-                            nfcViewModel = nfcViewModel
+                            nfcViewModel = nfcViewModel,
+                            version = version
                         )
                     }
                 }
@@ -201,11 +195,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Configura el lanzador para solicitar permisos.
-     */
     private fun configurePermissionLauncher() {
-        permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        permissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
             arePermissionsGranted = permissions.all { it.value }
             if (arePermissionsGranted) {
                 Log.d(TAG, "Todos los permisos concedidos")
@@ -217,9 +210,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Verifica y solicita los permisos necesarios.
-     */
     private fun checkAndRequestPermissions() {
         requiredPermissions = buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -230,11 +220,12 @@ class MainActivity : ComponentActivity() {
                 add(Manifest.permission.BLUETOOTH_ADMIN)
                 add(Manifest.permission.ACCESS_FINE_LOCATION)
             }
-            add(Manifest.permission.CAMERA)
-            add(Manifest.permission.NFC)
-            add(Manifest.permission.ACCESS_FINE_LOCATION)
-            add(Manifest.permission.ACCESS_COARSE_LOCATION)
-
+            addAll(listOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.NFC,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ))
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
                 add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 add(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -255,22 +246,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Verifica si se debe mostrar la explicación racional para los permisos.
-     *
-     * @return true si se debe mostrar la explicación, false en caso contrario
-     */
     private fun shouldShowRationale(): Boolean {
         return requiredPermissions.any { permission ->
             ActivityCompat.shouldShowRequestPermissionRationale(this, permission)
         }
     }
 
-    /**
-     * Muestra un diálogo explicando la necesidad de los permisos.
-     */
     private fun showPermissionRationaleDialog() {
-        AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this)
             .setTitle("Permisos Requeridos")
             .setMessage("La aplicación necesita acceder a estos recursos, incluyendo la ubicación GPS, para funcionar correctamente.")
             .setPositiveButton("Conceder") { _, _ -> permissionLauncher.launch(requiredPermissions) }
@@ -278,34 +261,42 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
-    /**
-     * Abre la configuración de la aplicación.
-     */
+    private fun saveVersionToPreferences(version: String) {
+        getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+            .edit()
+            .putString("app_version", version)
+            .apply()
+    }
+
+    private fun getVersionFromPreferences(): String? {
+        return getSharedPreferences("AppPreferences", Context.MODE_PRIVATE)
+            .getString("app_version", null)
+    }
+
     private fun openAppSettings() {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.fromParts("package", packageName, null)
         })
     }
 
-    /**
-     * Muestra un toast indicando que los permisos fueron denegados.
-     */
     private fun showDeniedToast() {
-        Toast.makeText(this, "Funcionalidad limitada sin permisos, incluyendo ubicación GPS", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            this,
+            "Funcionalidad limitada sin permisos, incluyendo ubicación GPS",
+            Toast.LENGTH_LONG
+        ).show()
         loadDatabases()
     }
 
-    /**
-     * Carga las bases de datos necesarias en segundo plano.
-     */
     private fun loadDatabases() = lifecycleScope.launch(Dispatchers.IO) {
         try {
             listOf("paises.db", "juzgados.db", "dispositivos.db").forEach { dbName ->
                 loadingStatus = "Cargando $dbName..."
                 Log.d(TAG, "Cargando base de datos: $dbName")
 
-                val dbHelper = AccesoBaseDatos(this@MainActivity, dbName)
-                dbHelper.initializeDatabases()
+                AccesoBaseDatos(this@MainActivity, dbName).apply {
+                    initializeDatabases()
+                }
             }
             loadingStatus = "Bases de datos listas"
             Log.d(TAG, "Bases de datos cargadas exitosamente")
@@ -318,15 +309,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Pantalla que se muestra cuando los permisos fueron denegados.
- *
- * @param onRetry Función para reintentar la solicitud de permisos
- * @param onOpenSettings Función para abrir la configuración de la aplicación
- */
 @Composable
 fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
-    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "Se requieren permisos, incluyendo ubicación GPS, para el funcionamiento completo de la aplicación",
@@ -340,11 +328,6 @@ fun PermissionDeniedScreen(onRetry: () -> Unit, onOpenSettings: () -> Unit) {
     }
 }
 
-/**
- * Pantalla de carga inicial de la aplicación.
- *
- * @param loadingStatus Mensaje de estado de la carga
- */
 @Composable
 fun SplashScreen(loadingStatus: String) {
     var showLoadingStatus by remember { mutableStateOf(false) }
@@ -354,7 +337,10 @@ fun SplashScreen(loadingStatus: String) {
         showLoadingStatus = true
     }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Image(
                 painter = painterResource(R.drawable.escudo_bw),
@@ -362,10 +348,17 @@ fun SplashScreen(loadingStatus: String) {
                 modifier = Modifier.size(200.dp)
             )
             Spacer(Modifier.height(24.dp))
-            CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 4.dp
+            )
             if (showLoadingStatus) {
                 Spacer(Modifier.height(16.dp))
-                Text(text = loadingStatus, fontSize = 14.sp, color = BlueGray700)
+                Text(
+                    text = loadingStatus,
+                    fontSize = 14.sp,
+                    color = BlueGray700
+                )
             }
         }
     }

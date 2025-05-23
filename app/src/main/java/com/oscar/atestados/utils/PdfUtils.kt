@@ -8,24 +8,41 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
-import androidx.core.net.toUri
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * Objeto utilitario para manejar operaciones relacionadas con archivos PDF, incluyendo:
+ * - Escritura de PDFs en el almacenamiento usando MediaStore
+ * - Listado de archivos PDF existentes
+ * - Manejo de permisos y actualización de MediaStore
+ */
 object PdfUtils {
     private const val TAG = "PdfUtils"
 
     /**
-     * Escribe un PDF en el almacenamiento, sobrescribiendo cualquier archivo existente con el mismo nombre.
+     * Escribe un PDF en el almacenamiento externo dentro de la carpeta Documents/Atestados,
+     * sobrescribiendo cualquier archivo existente con el mismo nombre.
      *
-     * @param content Contenido HTML para el PDF.
-     * @param fileName Nombre del archivo PDF (por ejemplo, "acta_citacion_a4.pdf").
-     * @param pdfA4Printer Instancia de PDFA4Printer para generar el PDF.
-     * @param context Contexto de Android.
-     * @return Archivo generado o null si falla.
+     * @param content Contenido HTML que será convertido a PDF.
+     * @param fileName Nombre del archivo PDF (ej. "acta_citacion_a4.pdf").
+     * @param pdfA4Printer Instancia de [PDFA4Printer] para generar el PDF a partir del HTML.
+     * @param context Contexto de Android para acceder a ContentResolver y mostrar notificaciones.
+     * @return [File] que representa el archivo PDF creado, o null si ocurrió un error.
+     *
+     * @throws SecurityException Si no se tienen los permisos necesarios para escribir en el almacenamiento.
+     * @throws IOException Si ocurre un error durante la escritura del archivo.
+     *
+     * El método realiza las siguientes operaciones:
+     * 1. Elimina cualquier archivo existente con el mismo nombre
+     * 2. Crea una nueva entrada en MediaStore
+     * 3. Genera el PDF en un archivo temporal
+     * 4. Copia el contenido al destino final
+     * 5. Actualiza MediaStore y ejecuta MediaScanner
+     * 6. Establece los permisos adecuados en el archivo final
      */
     suspend fun writePdfToStorage(
         content: String,
@@ -185,10 +202,17 @@ object PdfUtils {
     }
 
     /**
-     * Lista los archivos PDF en la carpeta Atestados de MediaStore.
+     * Lista los archivos PDF disponibles en la carpeta Documents/Atestados usando MediaStore.
      *
-     * @param context Contexto de Android.
-     * @return Lista de nombres de archivos PDF.
+     * @param context Contexto de Android para acceder al ContentResolver.
+     * @return Lista de nombres de archivos PDF encontrados en la carpeta.
+     *
+     * @throws SecurityException Si no se tienen los permisos necesarios para leer el almacenamiento.
+     *
+     * Notas:
+     * - Solo devuelve archivos con extensión PDF
+     * - La consulta es sensible a la ruta exacta (Documents/Atestados/)
+     * - Los resultados incluyen metadatos como ruta completa e ID en MediaStore
      */
     suspend fun listAtestadosFiles(context: Context): List<String> {
         return withContext(Dispatchers.IO) {

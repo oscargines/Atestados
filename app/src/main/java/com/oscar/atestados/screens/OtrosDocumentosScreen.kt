@@ -23,8 +23,8 @@ import com.oscar.atestados.ui.theme.*
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PDFToBitmapPrinter
 import com.oscar.atestados.utils.PdfToBitmapConverter
-import com.oscar.atestados.utils.openStorageDirectory
-import com.oscar.atestados.utils.refreshAtestadosFolder
+import com.oscar.atestados.utils.StorageUtils.openStorageDirectory
+import com.oscar.atestados.utils.StorageUtils.refreshAtestadosFolder
 import com.oscar.atestados.viewModel.BluetoothViewModelFactory
 import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.ImpresoraViewModelFactory

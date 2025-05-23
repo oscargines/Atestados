@@ -1,26 +1,17 @@
 package com.oscar.atestados.navigation
 
 import android.content.Context
+import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
-import com.oscar.atestados.screens.Alcoholemia01Screen
-import com.oscar.atestados.screens.Alcoholemia02Screen
-import com.oscar.atestados.screens.CarecerScreen
-import com.oscar.atestados.screens.CitacionScreen
-import com.oscar.atestados.screens.GuardiasScreen
-import com.oscar.atestados.screens.ImpresoraScreen
-import com.oscar.atestados.screens.InformacionScreen
-import com.oscar.atestados.screens.LecturaDerechosScreen
-import com.oscar.atestados.screens.MainScreen
-import com.oscar.atestados.screens.OtrosDocumentosScreen
-import com.oscar.atestados.screens.PersonaScreen
-import com.oscar.atestados.screens.TomaDerechosScreen
-import com.oscar.atestados.screens.TomaManifestacionAlcoholScreen
-import com.oscar.atestados.screens.VehiculoScreen
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
+import com.oscar.atestados.screens.*
 import com.oscar.atestados.viewModel.AlcoholemiaDosViewModel
 import com.oscar.atestados.viewModel.AlcoholemiaUnoViewModel
 import com.oscar.atestados.viewModel.BluetoothViewModel
@@ -30,40 +21,56 @@ import com.oscar.atestados.viewModel.ImpresoraViewModel
 import com.oscar.atestados.viewModel.LecturaDerechosViewModel
 import com.oscar.atestados.viewModel.NfcViewModel
 import com.oscar.atestados.viewModel.OtrosDocumentosViewModel
-import com.oscar.atestados.viewModel.OtrosDocumentosViewModelFactory
 import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.viewModel.TomaDerechosViewModel
 import com.oscar.atestados.viewModel.TomaManifestacionAlcoholViewModel
 import com.oscar.atestados.viewModel.VehiculoViewModel
 
-/**
- * Define el grafo de navegación de la aplicación con todas las pantallas disponibles.
- *
- * @param navController Controlador de navegación para manejar transiciones entre pantallas.
- * @param personaViewModel ViewModel para manejar datos de personas.
- * @param nfcViewModel ViewModel para manejar funcionalidad NFC.
- */
+private const val TAG = "AppNavigation"
+
 fun NavGraphBuilder.appNavigation(
     navController: NavHostController,
     personaViewModel: PersonaViewModel,
-    nfcViewModel: NfcViewModel
+    nfcViewModel: NfcViewModel,
+    version: String = "1.0.0"
 ) {
-    /**
-     * Pantalla principal de la aplicación.
-     */
-    composable("MainScreen") {
-        MainScreen { route ->
-            navController.navigate(route)
-        }
+    composable(
+        route = "MainScreen?showExitDialog={showExitDialog}",
+        arguments = listOf(navArgument("showExitDialog") { type = NavType.BoolType; defaultValue = false })
+    ) { backStackEntry ->
+        val showExitDialog = backStackEntry.arguments?.getBoolean("showExitDialog") ?: false
+        MainScreen(
+            navigateToScreen = { route ->
+                Log.d(TAG, "Navegando desde MainScreen a: $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                    launchSingleTop = true
+                }
+            },
+            version = version,
+            showExitDialog = showExitDialog
+        )
     }
 
-    /**
-     * Pantalla para manejar información de personas.
-     */
     composable("PersonaScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en PersonaScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         PersonaScreen(
-            navigateToScreen = { route ->
-                navController.navigate("MainScreen")
+            navigateToScreen = {
+                Log.d(TAG, "navigateToScreen en PersonaScreen: Navegando a MainScreen")
+                navController.navigate("MainScreen") {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             personaViewModel = personaViewModel,
             nfcViewModel = nfcViewModel,
@@ -71,78 +78,127 @@ fun NavGraphBuilder.appNavigation(
         )
     }
 
-    /**
-     * Pantalla para manejar información de vehículos.
-     */
     composable("VehiculoScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en VehiculoScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val vehiculoViewModel: VehiculoViewModel = viewModel()
         VehiculoScreen(
-            navigateToScreen = { route ->
-                navController.navigate("MainScreen")
+            navigateToScreen = {
+                Log.d(TAG, "navigateToScreen en VehiculoScreen: Navegando a MainScreen")
+                navController.navigate("MainScreen") {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             vehiculoViewModel = vehiculoViewModel
         )
     }
 
-    /**
-     * Pantalla para el primer paso del proceso de alcoholemia.
-     */
     composable("Alcoholemia01Screen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en Alcoholemia01Screen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val alcoholemiaUnoViewModel: AlcoholemiaUnoViewModel = viewModel()
         Alcoholemia01Screen(
             navigateToScreen = { route ->
-                navController.navigate(route)
+                Log.d(TAG, "navigateToScreen en Alcoholemia01Screen: Navegando a $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             alcoholemiaUnoViewModel = alcoholemiaUnoViewModel
         )
     }
 
-    /**
-     * Pantalla para el proceso de carecer.
-     */
     composable("CarecerScreen") {
-        CarecerScreen {
+        BackHandler {
+            Log.d(TAG, "BackHandler en CarecerScreen: Navegando a MainScreen")
             navController.navigate("MainScreen") {
-                popUpTo("MainScreen") { inclusive = true }
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
+        CarecerScreen {
+            Log.d(TAG, "navigateToScreen en CarecerScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
             }
         }
     }
 
-    /**
-     * Pantalla para otros documentos.
-     */
     composable("OtrosDocumentosScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en OtrosDocumentosScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val factory = OtrosDocumentosViewModelFactory(context = navController.context)
         val otrosDocumentosViewModel: OtrosDocumentosViewModel = viewModel(factory = factory)
         OtrosDocumentosScreen(
             navigateToScreen = { route ->
+                Log.d(TAG, "navigateToScreen en OtrosDocumentosScreen: Navegando a $route")
                 navController.navigate(route) {
-                    popUpTo("MainScreen") { inclusive = true }
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
                 }
             },
             otrosDocumentosViewModel = otrosDocumentosViewModel
         )
     }
 
-    /**
-     * Pantalla para manejar información de guardias.
-     */
     composable("GuardiasScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en GuardiasScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val guardiasViewModel: GuardiasViewModel = viewModel()
         GuardiasScreen(
             navigateToScreen = {
+                Log.d(TAG, "navigateToScreen en GuardiasScreen: Navegando a MainScreen")
                 navController.navigate("MainScreen") {
-                    popUpTo("MainScreen") { inclusive = true }
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
                 }
             },
             guardiasViewModel = guardiasViewModel
         )
     }
 
-    /**
-     * Pantalla para manejar la funcionalidad de impresión.
-     */
     composable("ImpresoraScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en ImpresoraScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val bluetoothViewModel: BluetoothViewModel = viewModel()
         val factory = ImpresoraViewModelFactory(
             bluetoothViewModel = bluetoothViewModel,
@@ -151,57 +207,95 @@ fun NavGraphBuilder.appNavigation(
         val impresoraViewModel: ImpresoraViewModel = viewModel(factory = factory)
         ImpresoraScreen(
             navigateToScreen = {
+                Log.d(TAG, "navigateToScreen en ImpresoraScreen: Navegando a MainScreen")
                 navController.navigate("MainScreen") {
-                    popUpTo("MainScreen") { inclusive = true }
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
                 }
             },
             impresoraViewModel = impresoraViewModel
         )
     }
 
-    /**
-     * Pantalla para la lectura de derechos.
-     */
     composable("LecturaDerechosScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en LecturaDerechosScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val lecturaDerechosViewModel: LecturaDerechosViewModel = viewModel()
         LecturaDerechosScreen(
             navigateToScreen = { route ->
-                navController.navigate(route)
+                Log.d(TAG, "navigateToScreen en LecturaDerechosScreen: Navegando a $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             lecturaDerechosViewModel = lecturaDerechosViewModel
         )
     }
 
-    /**
-     * Pantalla para la toma de derechos.
-     */
     composable("TomaDerechosScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en TomaDerechosScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val tomaDerechosViewModel: TomaDerechosViewModel = viewModel()
         TomaDerechosScreen(
             navigateToScreen = { route ->
-                navController.navigate(route)
+                Log.d(TAG, "navigateToScreen en TomaDerechosScreen: Navegando a $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             tomaDerechosViewModel = tomaDerechosViewModel
         )
     }
 
-    /**
-     * Pantalla para la toma de manifestación sobre alcohol.
-     */
     composable("TomaManifestacionAlcoholScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en TomaManifestacionAlcoholScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val tomaManifestacionAlcoholViewModel: TomaManifestacionAlcoholViewModel = viewModel()
         TomaManifestacionAlcoholScreen(
             navigateToScreen = { route ->
-                navController.navigate(route)
+                Log.d(TAG, "navigateToScreen en TomaManifestacionAlcoholScreen: Navegando a $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             tomaManifestacionAlcoholViewModel = tomaManifestacionAlcoholViewModel
         )
     }
 
-    /**
-     * Pantalla para el segundo paso del proceso de alcoholemia.
-     */
     composable("Alcoholemia02Screen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en Alcoholemia02Screen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val alcoholemiaDosViewModel: AlcoholemiaDosViewModel = viewModel()
         val alcoholemiaUnoViewModel: AlcoholemiaUnoViewModel = viewModel()
         val vehiculoViewModel: VehiculoViewModel = viewModel()
@@ -218,7 +312,12 @@ fun NavGraphBuilder.appNavigation(
 
         Alcoholemia02Screen(
             navigateToScreen = { route ->
-                navController.navigate(route)
+                Log.d(TAG, "navigateToScreen en Alcoholemia02Screen: Navegando a $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             alcoholemiaDosViewModel = alcoholemiaDosViewModel,
             alcoholemiaUnoViewModel = alcoholemiaUnoViewModel,
@@ -232,21 +331,34 @@ fun NavGraphBuilder.appNavigation(
         )
     }
 
-    /**
-     * Pantalla de información general.
-     */
     composable("InformacionScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en InformacionScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         InformacionScreen { route ->
+            Log.d(TAG, "navigateToScreen en InformacionScreen: Navegando a $route")
             navController.navigate(route) {
-                popUpTo("MainScreen") { inclusive = true }
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
             }
         }
     }
 
-    /**
-     * Pantalla para manejar citaciones.
-     */
     composable("CitacionScreen") {
+        BackHandler {
+            Log.d(TAG, "BackHandler en CitacionScreen: Navegando a MainScreen")
+            navController.navigate("MainScreen") {
+                popUpTo(navController.graph.startDestinationId) {
+                    inclusive = true
+                }
+            }
+        }
         val citacionViewModel: CitacionViewModel = viewModel()
         val guardiasViewModel: GuardiasViewModel = viewModel()
         val alcoholemiaDosViewModel: AlcoholemiaDosViewModel = viewModel()
@@ -258,10 +370,15 @@ fun NavGraphBuilder.appNavigation(
         val impresoraViewModel: ImpresoraViewModel = viewModel(factory = factory)
         CitacionScreen(
             navigateToScreen = { route ->
-                navController.navigate(route)
+                Log.d(TAG, "navigateToScreen en CitacionScreen: Navegando a $route")
+                navController.navigate(route) {
+                    popUpTo(navController.graph.startDestinationId) {
+                        inclusive = true
+                    }
+                }
             },
             citacionViewModel = citacionViewModel,
-            personaViewModel = personaViewModel, // Usar el parámetro de appNavigation
+            personaViewModel = personaViewModel,
             guardiasViewModel = guardiasViewModel,
             alcoholemiaDosViewModel = alcoholemiaDosViewModel,
             impresoraViewModel = impresoraViewModel
@@ -269,23 +386,10 @@ fun NavGraphBuilder.appNavigation(
     }
 }
 
-/**
- * Factory para crear instancias de ImpresoraViewModel con dependencias inyectadas.
- *
- * @property bluetoothViewModel ViewModel para manejar funcionalidad Bluetooth.
- * @property context Contexto de la aplicación.
- */
 class ImpresoraViewModelFactory(
     private val bluetoothViewModel: BluetoothViewModel,
     private val context: Context
 ) : ViewModelProvider.Factory {
-    /**
-     * Crea una nueva instancia del ViewModel solicitado.
-     *
-     * @param modelClass Clase del ViewModel a crear.
-     * @return Una nueva instancia del ViewModel.
-     * @throws IllegalArgumentException si la clase del ViewModel no es reconocida.
-     */
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ImpresoraViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
@@ -295,21 +399,9 @@ class ImpresoraViewModelFactory(
     }
 }
 
-/**
- * Factory para crear instancias de OtrosDocumentosViewModel con dependencias inyectadas.
- *
- * @property context Contexto de la aplicación.
- */
 class OtrosDocumentosViewModelFactory(
     private val context: Context
 ) : ViewModelProvider.Factory {
-    /**
-     * Crea una nueva instancia del ViewModel solicitado.
-     *
-     * @param modelClass Clase del ViewModel a crear.
-     * @return Una nueva instancia del ViewModel.
-     * @throws IllegalArgumentException si la clase del ViewModel no es reconocida.
-     */
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OtrosDocumentosViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")

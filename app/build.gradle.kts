@@ -14,13 +14,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        versionName = "beta 0.1.0"
-        versionCode = 1
         applicationId = "com.oscar.atestados"
         minSdk = 31
         targetSdk = 35
+        versionName = "beta 0.1.0"
         versionCode = 1
-        versionName = "1.0"
         manifestPlaceholders["nfcPermission"] = "android.permission.NFC"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -72,6 +70,7 @@ android {
 dependencies {
     // Core y utilidades
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
 
@@ -98,7 +97,6 @@ dependencies {
     implementation (libs.play.services.location)
     implementation (libs.okhttp)
     implementation (libs.json)
-    implementation (libs.androidx.datastore.preferences.v100)
 
     // Splashscreen
     implementation(libs.androidx.core.splashscreen)
@@ -140,7 +138,6 @@ dependencies {
     // PDF
     implementation(libs.itext.core)
     implementation(libs.layout)
-    implementation(libs.commonmark)  // Parsear Markdown
     implementation(libs.html2pdf)
     implementation (libs.slf4j.simple)
     implementation(libs.androidx.room.ktx)

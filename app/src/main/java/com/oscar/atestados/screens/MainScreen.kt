@@ -3,6 +3,9 @@ package com.oscar.atestados.screens
 import android.R.attr.bottom
 import android.R.attr.end
 import android.R.attr.start
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -37,10 +40,17 @@ import com.oscar.atestados.ui.theme.TextoSecundarios
  * @param navigateToScreen Función lambda que recibe una [String] para navegar a otra pantalla.
  */
 @Composable
-fun MainScreen(navigateToScreen: (String) -> Unit) {
+fun MainScreen(
+    navigateToScreen: (String) -> Unit,
+    version: String,
+    showExitDialog: Boolean = false
+) {
+    var isExitDialogVisible by remember { mutableStateOf(showExitDialog) }
+    val context = LocalContext.current
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = { ToolbarMain(navigateToScreen) },
+        topBar = { ToolbarMain(navigateToScreen, version) },
         bottomBar = { BottomAppBar(navigateToScreen) }
     ) { paddingValues ->
         Content(
@@ -53,6 +63,36 @@ fun MainScreen(navigateToScreen: (String) -> Unit) {
             onNavigate = navigateToScreen
         )
     }
+    // Diálogo de confirmación de salida
+    if (isExitDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { isExitDialogVisible = false },
+            title = { Text("Salir de la aplicación") },
+            text = { Text("¿Estás seguro de que quieres salir?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    isExitDialogVisible = false
+                    context.findActivity()?.finish() // Usar el Context almacenado
+                }) {
+                    Text("Sí")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isExitDialogVisible = false }) {
+                    Text("No")
+                }
+            }
+        )
+    }
+}
+// Utilidad para obtener la actividad desde el contexto
+fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
 }
 
 /**
@@ -65,7 +105,11 @@ fun MainScreen(navigateToScreen: (String) -> Unit) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ToolbarMain(onNavigate: (String) -> Unit) {
+fun ToolbarMain(
+    onNavigate: (String) -> Unit,
+    version: String
+) {
+
     var isDialogVisible by remember { mutableStateOf(false) }
     val plainTooltipState = rememberTooltipState()
 
@@ -127,7 +171,7 @@ fun ToolbarMain(onNavigate: (String) -> Unit) {
                 // Botón de versión
                 TextButton(onClick = { isDialogVisible = true }) {
                     Text(
-                        text = "Versión 1.0",
+                        text = "Versión $version",
                         fontSize = 8.sp,
                         color = TextoSecundarios,
                         textAlign = TextAlign.Center
