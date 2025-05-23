@@ -188,7 +188,12 @@ fun ToolbarMain(
         showDialog = isDialogVisible,
         onDismiss = { isDialogVisible = false },
         title = "Información",
-        message = "Para informar de errores o mandar sugerencias, mande un correo electrónico a oscargines@guardiacivil.es.\nPor favor, tenga paciencia en la contestación."
+        message = "Esta app se encuentra en versión $version." +
+                "\n\nEste es un proyecto realizado para el módilo de Proyecto de " +
+                "desarrollo de aplicaciones multiplataforma, para el Ciclo Formativo de " +
+                "Grado Superior de Desarrollo de Aplicaciones Multiplataforma."
+                +"\nProyecto presentado en junio de 2025 en el IES San Andrés de Villabalter, León." +
+                "\n\nTutorado por Marta Garrido Vega y Raquel Barreales Quintanilla"
     )
 }
 
