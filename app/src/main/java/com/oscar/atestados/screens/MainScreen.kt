@@ -189,7 +189,7 @@ fun ToolbarMain(
         onDismiss = { isDialogVisible = false },
         title = "Información",
         message = "Esta app se encuentra en versión $version." +
-                "\n\nEste es un proyecto realizado para el módilo de Proyecto de " +
+                "\n\nEste es un proyecto realizado para el módulo de Proyecto de " +
                 "desarrollo de aplicaciones multiplataforma, para el Ciclo Formativo de " +
                 "Grado Superior de Desarrollo de Aplicaciones Multiplataforma."
                 +"\nProyecto presentado en junio de 2025 en el IES San Andrés de Villabalter, León." +
