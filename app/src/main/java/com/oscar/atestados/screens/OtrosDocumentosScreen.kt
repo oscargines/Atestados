@@ -2,6 +2,7 @@ package com.oscar.atestados.screens
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -254,7 +255,13 @@ fun CustomBitmapPreviewDialog(
                 }
             },
             dismissButton = {
-                Button(onClick = onDismiss) {
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BlueGray300,
+                        contentColor = Black
+                    )
+                ) {
                     Text("Cancelar")
                 }
             }

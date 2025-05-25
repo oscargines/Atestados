@@ -201,9 +201,9 @@ class CitacionDataProvider(
             requiredFields["colegio_abogados"] = "Colegio de abogados"
         }
 
-        if (citacionViewModel.abogadoOficio.value == true) {
+        /*if (citacionViewModel.abogadoOficio.value == true) {
             requiredFields["telefonema"] = "Número de comunicación"
-        }
+        }*/
 
         val missingFields = requiredFields.keys.filter { field ->
             val value = data[field]

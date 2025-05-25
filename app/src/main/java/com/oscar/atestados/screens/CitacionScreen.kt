@@ -379,7 +379,7 @@ private fun CitacionContent(
                 modifier = Modifier
                     .weight(2f)
                     .padding(end = 8.dp),
-                trailingIcon = {
+                leadingIcon = {
                     IconButton(onClick = { showNotificacionDatePicker = true }) {
                         Icon(
                             painter = painterResource(id = R.drawable.calendar_ico),
@@ -439,7 +439,7 @@ private fun CitacionContent(
                 modifier = Modifier
                     .weight(2f)
                     .padding(end = 8.dp),
-                trailingIcon = {
+                leadingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(
                             painter = painterResource(id = R.drawable.calendar_ico),

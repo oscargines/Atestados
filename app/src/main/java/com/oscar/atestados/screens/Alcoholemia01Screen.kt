@@ -275,8 +275,8 @@ private fun AlcoholemiaContent(
         ) {
             listOf(
                 "Nuevo",
-                "Mas de un año",
-                "Habiendo sido reparado"
+                "Mas de\nun año",
+                "Habiendo\nsido\nreparado"
             ).forEach { opcion ->
                 RadioOptionHorizontal(
                     text = opcion,
