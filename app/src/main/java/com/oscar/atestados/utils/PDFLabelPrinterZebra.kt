@@ -2,17 +2,25 @@ package com.oscar.atestados.utils
 
 import android.content.Context
 import android.util.Log
+import com.itextpdf.kernel.colors.ColorConstants
 import com.itextpdf.kernel.font.PdfFont
 import com.itextpdf.kernel.font.PdfFontFactory
 import com.itextpdf.kernel.geom.PageSize
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
+import java.util.Base64
 import com.itextpdf.layout.Document
+import com.itextpdf.layout.borders.SolidBorder
+import com.itextpdf.layout.element.Cell
 import com.itextpdf.layout.element.Div
+import com.itextpdf.layout.element.List as PdfList
+import com.itextpdf.layout.element.ListItem
 import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.Table
 import com.itextpdf.layout.element.Text
 import com.itextpdf.layout.properties.TextAlignment
 import com.itextpdf.layout.properties.UnitValue
+import com.itextpdf.layout.properties.VerticalAlignment
 import java.io.File
 import java.io.FileOutputStream
 
@@ -79,12 +87,13 @@ class PDFLabelPrinterZebra(private val context: Context) {
 
                         val contentParts = splitContentToFitPage(
                             tempDiv,
-                            contentHeight * 0.9f,
+                            contentHeight,
                             pdfDocument,
                             document,
                             contentAreaX,
                             contentAreaY,
-                            contentWidth
+                            contentWidth,
+                            fonts["regular"]!!
                         )
                         Log.d(TAG, "Contenido dividido en ${contentParts.size} partes/páginas")
 
@@ -128,6 +137,7 @@ class PDFLabelPrinterZebra(private val context: Context) {
             throw e
         }
     }
+
 
     /**
      * Carga las fuentes necesarias desde los assets de la aplicación.
@@ -201,29 +211,21 @@ class PDFLabelPrinterZebra(private val context: Context) {
         document: Document,
         contentAreaX: Float,
         contentAreaY: Float,
-        contentWidth: Float
+        contentWidth: Float,
+        regularFont: PdfFont
     ): List<List<com.itextpdf.layout.element.IElement>> {
         val parts = mutableListOf<MutableList<com.itextpdf.layout.element.IElement>>()
         var currentPart = mutableListOf<com.itextpdf.layout.element.IElement>()
         var currentHeight = 0f
 
         tempDiv.children.forEach { element ->
-            val elementHeight = estimateElementHeight(element) * 1.1f
-            Log.v(
-                TAG,
-                "Elemento: ${element.javaClass.simpleName}, Altura estimada: $elementHeight, Altura acumulada: $currentHeight"
-            )
-
+            val elementHeight = estimateElementHeight(element)
+            Log.v(TAG, "Elemento: ${element.javaClass.simpleName}, Altura: $elementHeight, Total: $currentHeight")
             if (currentHeight + elementHeight > maxHeight && currentPart.isNotEmpty()) {
-                Log.d(
-                    TAG,
-                    "Límite de página alcanzado. Altura actual: $currentHeight, Máximo: $maxHeight"
-                )
                 parts.add(currentPart)
                 currentPart = mutableListOf()
                 currentHeight = 0f
             }
-
             currentPart.add(element)
             currentHeight += elementHeight
         }
@@ -248,31 +250,34 @@ class PDFLabelPrinterZebra(private val context: Context) {
                 is Paragraph -> {
                     val fontSize =
                         element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.FONT_SIZE)?.value
-                            ?: 10f
-                    // Obtener el objeto Leading
+                            ?: 8f
                     val leadingProperty =
                         element.getProperty<com.itextpdf.layout.properties.Leading>(com.itextpdf.layout.properties.Property.LEADING)
-                    // Usar el valor de leading directamente, asumiendo que es un multiplicador
-                    val leading =
-                        leadingProperty?.value ?: 1.2f // Valor por defecto si no hay leading
+                    val leading = leadingProperty?.value ?: 1.2f
                     val text =
                         element.children.filterIsInstance<Text>().joinToString("") { it.text }
                     val avgCharsPerLine =
-                        ((PAGE_WIDTH - (2 * MARGIN_MM)) / (fontSize * 0.5f)).toInt()
-                    val estimatedLines = text.length / avgCharsPerLine.coerceAtLeast(1)
+                        ((PAGE_WIDTH - (2 * MARGIN_MM)) / (fontSize * 0.45f)).toInt().coerceAtLeast(1)
+                    val estimatedLines = (text.length / avgCharsPerLine).coerceAtLeast(1)
                     val actualLines = text.count { it == '\n' } + 1
-                    val lineCount = maxOf(estimatedLines, actualLines).coerceAtLeast(1)
+                    val lineCount = maxOf(estimatedLines, actualLines)
                     val height = fontSize * leading * lineCount
-                    // Obtener MARGIN_BOTTOM como UnitValue
                     val marginBottomProperty =
                         element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)
-                    val marginBottom = marginBottomProperty?.value
-                        ?: 0f // Usar el valor de UnitValue o 0f por defecto
+                    val marginBottom = marginBottomProperty?.value ?: 0f
                     Log.v(
                         TAG,
                         "Paragraph: fontSize=$fontSize, leading=$leading, chars=${text.length}, líneas estimadas=$lineCount, height=$height, marginBottom=$marginBottom"
                     )
-                    height + marginBottom + 10f
+                    height + marginBottom + 5f
+                }
+
+                is PdfList -> {
+                    val listHeight = element.children.sumOf {
+                        estimateElementHeight(it).toDouble()
+                    }.toFloat() + (element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)?.value ?: 0f) + 5f
+                    Log.v(TAG, "List height: $listHeight")
+                    listHeight
                 }
 
                 is Div -> {
@@ -285,13 +290,13 @@ class PDFLabelPrinterZebra(private val context: Context) {
                 }
 
                 else -> {
-                    Log.v(TAG, "Altura por defecto (20f) para ${element.javaClass.simpleName}")
-                    20f
+                    Log.v(TAG, "Altura por defecto (15f) para ${element.javaClass.simpleName}")
+                    15f
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error al estimar altura: ${e.message}", e)
-            30f
+            15f
         }
     }
 
@@ -317,6 +322,29 @@ class PDFLabelPrinterZebra(private val context: Context) {
         )
 
         when (element.tag) {
+            "img" -> {
+                if (element.attributes["id"]?.startsWith("firma_") == true) {
+                    val src = element.attributes["src"] ?: ""
+                    if (src.startsWith("data:image/png;base64,")) {
+                        try {
+                            val base64Data = src.removePrefix("data:image/png;base64,")
+                            val imageData = Base64.getDecoder().decode(base64Data)
+                            val imgData = com.itextpdf.io.image.ImageDataFactory.create(imageData)
+                            val image = com.itextpdf.layout.element.Image(imgData)
+                            image.setProperty(com.itextpdf.layout.properties.Property.WIDTH, UnitValue.createPointValue(80f))
+                            image.setProperty(com.itextpdf.layout.properties.Property.HEIGHT, UnitValue.createPointValue(40f))
+                            image.setProperty(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM, 5f)
+                            image.setProperty(com.itextpdf.layout.properties.Property.MARGIN_LEFT, indentLevel * 8f)
+                            div.add(image)
+                            Log.d(TAG, "Imagen de firma añadida: ${element.attributes["id"]}")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error al procesar imagen Base64: ${e.message}", e)
+                        }
+                    } else {
+                        Log.w(TAG, "Fuente de imagen no válida para ${element.attributes["id"]}: $src")
+                    }
+                }
+            }
             "h1", "h2", "h3" -> {
                 div.add(
                     Paragraph(element.content)
@@ -325,24 +353,22 @@ class PDFLabelPrinterZebra(private val context: Context) {
                         .setTextAlignment(TextAlignment.LEFT)
                         .setMultipliedLeading(1.2f)
                         .setMarginBottom(5f)
-                        .setMarginLeft(indentLevel * 10f)
+                        .setMarginLeft(indentLevel * 8f)
                 )
             }
 
             "p" -> {
-                div.add(
-                    Paragraph(element.content)
-                        .setFont(regularFont)
-                        .setFontSize(8f)
-                        .setTextAlignment(TextAlignment.LEFT)
-                        .setMultipliedLeading(1.2f)
-                        .setMarginBottom(5f)
-                        .setMarginLeft(indentLevel * 10f)
-                )
+                val paragraph = Paragraph(element.content)
+                    .setFont(regularFont)
+                    .setFontSize(8f)
+                    .setTextAlignment(TextAlignment.LEFT)
+                    .setMultipliedLeading(1.2f)
+                    .setMarginBottom(5f)
+                    .setMarginLeft(indentLevel * 8f)
+                div.add(paragraph)
             }
 
             "div" -> {
-                // Procesar hijos del div (por ejemplo, <ul> dentro de <div id="denunciado">)
                 element.children.forEach { child ->
                     processElement(child, div, regularFont, boldItalicFont, indentLevel)
                 }
@@ -358,71 +384,152 @@ class PDFLabelPrinterZebra(private val context: Context) {
                             .setTextAlignment(TextAlignment.LEFT)
                             .setMultipliedLeading(1.2f)
                             .setMarginBottom(5f)
-                            .setMarginLeft(indentLevel * 10f)
+                            .setMarginLeft(indentLevel * 8f)
                     )
                     Log.d(TAG, "Checkbox procesado: ${element.attributes["id"]} = $checkboxSymbol")
                 }
             }
 
             "table" -> {
+                val table = Table(UnitValue.createPercentArray(3)) // 3 columnas para la tabla
+                    .useAllAvailableWidth()
+                    .setKeepTogether(true)
+                    .setBorder(SolidBorder(ColorConstants.WHITE, 0f)) // Borde blanco para toda la tabla
+
                 element.children.forEach { tr ->
                     if (tr.tag == "tr") {
                         tr.children.forEach { td ->
                             if (td.tag == "td") {
-                                td.children.forEach { child ->
-                                    processElement(
-                                        child,
-                                        div,
-                                        regularFont,
-                                        boldItalicFont,
-                                        indentLevel + 1
+                                val cell = Cell()
+                                    .setBorder(SolidBorder(ColorConstants.WHITE, 0f)) // Borde blanco para la celda
+                                    .setTextAlignment(TextAlignment.CENTER) // Contenido centrado horizontalmente
+                                    .setVerticalAlignment(VerticalAlignment.MIDDLE) // Contenido centrado verticalmente
+
+                                if (td.content.isNotBlank()) {
+                                    cell.add(
+                                        Paragraph(td.content)
+                                            .setFont(regularFont)
+                                            .setFontSize(8f)
+                                            .setTextAlignment(TextAlignment.CENTER)
                                     )
                                 }
+
+                                td.children.forEach { child ->
+                                    when (child.tag) {
+                                        "img" -> {
+                                            val src = child.attributes["src"]
+                                            if (src != null) {
+                                                try {
+                                                    if (src.startsWith("data:image/png;base64,")) {
+                                                        val base64Data = src.removePrefix("data:image/png;base64,")
+                                                        val imageData = Base64.getDecoder().decode(base64Data)
+                                                        val imgData = com.itextpdf.io.image.ImageDataFactory.create(imageData)
+                                                        val image = com.itextpdf.layout.element.Image(imgData)
+                                                        image.setWidth(UnitValue.createPointValue(80f))
+                                                        image.setHeight(UnitValue.createPointValue(40f))
+                                                        image.setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER) // Centrar horizontalmente
+                                                        cell.add(image)
+                                                    } else {
+                                                        Log.w(TAG, "Fuente de imagen no válida: $src")
+                                                    }
+                                                } catch (e: Exception) {
+                                                    Log.e(TAG, "Error al procesar imagen: ${e.message}", e)
+                                                    cell.add(
+                                                        Paragraph("Error al cargar imagen")
+                                                            .setFont(regularFont)
+                                                            .setFontSize(6f)
+                                                            .setTextAlignment(TextAlignment.CENTER)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        "span" -> {
+                                            if (child.content.isNotBlank()) {
+                                                cell.add(
+                                                    Paragraph(child.content)
+                                                        .setFont(regularFont)
+                                                        .setFontSize(6f)
+                                                        .setTextAlignment(TextAlignment.CENTER)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                table.addCell(cell)
                             }
                         }
                     }
                 }
+                div.add(table)
             }
 
             "ul" -> {
-                element.children.forEachIndexed { index, li ->
+                Log.d(TAG, "Procesando lista con ${element.children.size} elementos")
+                val list = PdfList()
+                    .setMarginBottom(5f)
+                    .setMarginLeft(maxOf(0f, indentLevel * 8f))
+                    .setPadding(1f)
+                    .setFont(regularFont)
+                    .setFontSize(8f)
+                    .setListSymbol("\u2022")
+                    .setSymbolIndent(6f)
+                    .setKeepTogether(true)
+
+                element.children.forEach { li ->
                     if (li.tag == "li") {
-                        val paragraph = Paragraph()
+                        Log.d(TAG, "Añadiendo listItem con contenido: ${li.content.take(50)}...")
+                        val listItem = ListItem()
+                        if (li.content.isNotBlank()) {
+                            listItem.add(
+                                Paragraph(Text(li.content))
+                                    .setFont(regularFont)
+                                    .setFontSize(8f)
+                                    .setMultipliedLeading(1.2f)
+                            )
+                        }
                         li.children.forEach { child ->
-                            if (child.tag == "span" && child.attributes["id"] in listOf(
-                                    "op_1_checkbox",
-                                    "op_2_checkbox"
-                                )
-                            ) {
+                            if (child.tag == "span" && child.attributes["id"] in listOf("op_1_checkbox", "op_2_checkbox")) {
                                 val isChecked = child.attributes["data-checked"] == "true"
                                 val checkboxSymbol = if (isChecked) "✔" else "☐"
-                                paragraph.add(
-                                    Text(checkboxSymbol).setFont(regularFont).setFontSize(8f)
+                                listItem.add(
+                                    Paragraph(Text(checkboxSymbol))
+                                        .setFont(regularFont)
+                                        .setFontSize(8f)
+                                        .setMultipliedLeading(1.2f)
                                 )
-                                paragraph.add(Text(" ").setFont(regularFont).setFontSize(8f))
+                                listItem.add(
+                                    Paragraph(Text(" "))
+                                        .setFont(regularFont)
+                                        .setFontSize(8f)
+                                        .setMultipliedLeading(1.2f)
+                                )
                             } else {
-                                // Añadir el contenido del <li> directamente
-                                paragraph.add(
-                                    Text(child.content).setFont(regularFont).setFontSize(8f)
-                                )
+                                if (child.content.isNotBlank()) {
+                                    listItem.add(
+                                        Paragraph(Text(child.content))
+                                            .setFont(regularFont)
+                                            .setFontSize(8f)
+                                            .setMultipliedLeading(1.2f)
+                                    )
+                                }
+                                val tempDiv = Div()
                                 child.children.forEach { grandChild ->
                                     processElement(
                                         grandChild,
-                                        div,
+                                        tempDiv,
                                         regularFont,
                                         boldItalicFont,
                                         indentLevel + 1
                                     )
                                 }
+                                tempDiv.children.forEach { listItem.add(it as com.itextpdf.layout.element.IBlockElement) }
                             }
                         }
-                        paragraph.setMultipliedLeading(1.2f)
-                        paragraph.setMarginBottom(5f)
-                        paragraph.setTextAlignment(TextAlignment.LEFT)
-                        paragraph.setMarginLeft(indentLevel * 10f)
-                        div.add(paragraph)
+                        list.add(listItem)
                     }
                 }
+                div.add(list)
+                Log.d(TAG, "Lista añadida al div")
             }
 
             else -> {

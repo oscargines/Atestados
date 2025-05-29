@@ -13,6 +13,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Objeto utilitario para manejar operaciones relacionadas con archivos PDF, incluyendo:
@@ -25,24 +28,16 @@ object PdfUtils {
 
     /**
      * Escribe un PDF en el almacenamiento externo dentro de la carpeta Documents/Atestados,
-     * sobrescribiendo cualquier archivo existente con el mismo nombre.
+     * sobrescribiendo cualquier archivo existente con el mismo nombre base.
      *
      * @param content Contenido HTML que será convertido a PDF.
-     * @param fileName Nombre del archivo PDF (ej. "acta_citacion_a4.pdf").
+     * @param fileName Nombre del archivo PDF (ej. "atestado_a4.pdf"). Se añadirá una marca de tiempo para unicidad.
      * @param pdfA4Printer Instancia de [PDFA4Printer] para generar el PDF a partir del HTML.
      * @param context Contexto de Android para acceder a ContentResolver y mostrar notificaciones.
      * @return [File] que representa el archivo PDF creado, o null si ocurrió un error.
      *
      * @throws SecurityException Si no se tienen los permisos necesarios para escribir en el almacenamiento.
      * @throws IOException Si ocurre un error durante la escritura del archivo.
-     *
-     * El método realiza las siguientes operaciones:
-     * 1. Elimina cualquier archivo existente con el mismo nombre
-     * 2. Crea una nueva entrada en MediaStore
-     * 3. Genera el PDF en un archivo temporal
-     * 4. Copia el contenido al destino final
-     * 5. Actualiza MediaStore y ejecuta MediaScanner
-     * 6. Establece los permisos adecuados en el archivo final
      */
     suspend fun writePdfToStorage(
         content: String,
@@ -55,26 +50,37 @@ object PdfUtils {
             try {
                 val contentResolver = context.contentResolver
                 val relativePath = "${Environment.DIRECTORY_DOCUMENTS}/Atestados"
-
-                // Eliminar archivo existente si existe
                 val queryUri = MediaStore.Files.getContentUri("external")
-                val projection = arrayOf(MediaStore.Files.FileColumns._ID)
-                val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} = ? AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} = ?"
-                val selectionArgs = arrayOf(fileName, relativePath)
+
+                // Generar nombre único con marca de tiempo
+                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val baseName = fileName.substringBeforeLast(".pdf")
+                val uniqueFileName = "${baseName}_${timestamp}.pdf"
+                Log.d(TAG, "Nombre único generado: $uniqueFileName")
+
+                // Eliminar archivos existentes con el mismo nombre base
+                val projection = arrayOf(
+                    MediaStore.Files.FileColumns._ID,
+                    MediaStore.Files.FileColumns.DISPLAY_NAME,
+                    MediaStore.Files.FileColumns.IS_PENDING
+                )
+                val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ? AND ${MediaStore.Files.FileColumns.RELATIVE_PATH} = ?"
+                val selectionArgs = arrayOf("$baseName%.pdf", relativePath)
 
                 contentResolver.query(queryUri, projection, selection, selectionArgs, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
-                        val id = cursor.getLong(idColumn)
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID))
+                        val displayName = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME))
+                        val isPending = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.IS_PENDING)) == 1
                         val deleteUri = ContentUris.withAppendedId(queryUri, id)
                         contentResolver.delete(deleteUri, null, null)
-                        Log.d(TAG, "writePdfToStorage: Archivo existente $fileName eliminado de MediaStore")
+                        Log.d(TAG, "writePdfToStorage: Eliminado archivo existente $displayName (ID: $id, isPending: $isPending)")
                     }
-                }
+                } ?: Log.w(TAG, "writePdfToStorage: Cursor nulo al consultar archivos existentes")
 
                 // Crear nueva entrada en MediaStore
                 val contentValues = ContentValues().apply {
-                    put(MediaStore.Files.FileColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.Files.FileColumns.DISPLAY_NAME, uniqueFileName)
                     put(MediaStore.Files.FileColumns.MIME_TYPE, "application/pdf")
                     put(MediaStore.Files.FileColumns.RELATIVE_PATH, relativePath)
                     put(MediaStore.Files.FileColumns.DATE_MODIFIED, System.currentTimeMillis() / 1000)
@@ -90,7 +96,7 @@ object PdfUtils {
                 }
 
                 // Crear archivo temporal y garantizar su eliminación
-                val tempFile = File.createTempFile("temp_pdf", ".pdf", context.cacheDir)
+                val tempFile = File.createTempFile("temp_pdf_", ".pdf", context.cacheDir)
                 try {
                     contentResolver.openOutputStream(uri).use { outputStream ->
                         if (outputStream == null) {
@@ -110,14 +116,22 @@ object PdfUtils {
                         }
                     }
 
+                    // Finalizar escritura en MediaStore
                     contentValues.clear()
                     contentValues.put(MediaStore.Files.FileColumns.IS_PENDING, 0)
-                    contentResolver.update(uri, contentValues, null, null)
+                    val updatedRows = contentResolver.update(uri, contentValues, null, null)
+                    if (updatedRows == 0) {
+                        Log.e(TAG, "writePdfToStorage: No se pudo actualizar IS_PENDING=0 para URI $uri")
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Error al finalizar la escritura del archivo", Toast.LENGTH_SHORT).show()
+                        }
+                        return@withContext null
+                    }
 
                     Log.d(TAG, "writePdfToStorage: PDF guardado en MediaStore con URI: $uri")
-                    Log.d(TAG, "writePdfToStorage: PDF creado en $relativePath/$fileName")
+                    Log.d(TAG, "writePdfToStorage: PDF creado en $relativePath/$uniqueFileName")
 
-                    // Obtener la ruta física para MediaScanner
+                    // Escanear el archivo para asegurar visibilidad
                     val filePath = contentResolver.query(
                         uri,
                         arrayOf(MediaStore.Files.FileColumns.DATA),
@@ -139,7 +153,6 @@ object PdfUtils {
                             arrayOf("application/pdf")
                         ) { path, scannedUri ->
                             Log.d(TAG, "writePdfToStorage: MediaScanner completado para $path, URI: $scannedUri")
-                            // Verificar si el archivo aparece en MediaStore después del escaneo
                             CoroutineScope(Dispatchers.IO).launch {
                                 val files = listAtestadosFiles(context)
                                 Log.d(TAG, "writePdfToStorage: Archivos en MediaStore después de escanear $path: $files")
@@ -147,7 +160,6 @@ object PdfUtils {
                         }
                     } else {
                         Log.w(TAG, "writePdfToStorage: No se pudo obtener la ruta del archivo para escanear")
-                        // Forzar escaneo de la carpeta como fallback
                         val atestadosDir = File(
                             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
                             "Atestados"
@@ -203,16 +215,6 @@ object PdfUtils {
 
     /**
      * Lista los archivos PDF disponibles en la carpeta Documents/Atestados usando MediaStore.
-     *
-     * @param context Contexto de Android para acceder al ContentResolver.
-     * @return Lista de nombres de archivos PDF encontrados en la carpeta.
-     *
-     * @throws SecurityException Si no se tienen los permisos necesarios para leer el almacenamiento.
-     *
-     * Notas:
-     * - Solo devuelve archivos con extensión PDF
-     * - La consulta es sensible a la ruta exacta (Documents/Atestados/)
-     * - Los resultados incluyen metadatos como ruta completa e ID en MediaStore
      */
     suspend fun listAtestadosFiles(context: Context): List<String> {
         return withContext(Dispatchers.IO) {

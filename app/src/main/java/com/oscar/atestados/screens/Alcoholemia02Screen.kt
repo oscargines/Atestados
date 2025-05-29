@@ -112,15 +112,16 @@ fun Alcoholemia02Screen(
     val pdfToBitmapPrinter = remember { PDFToBitmapPrinter(context) }
     val dataProvider = remember {
         AlcoholemiaDataProvider(
-            alcoholemiaDosViewModel,
-            alcoholemiaUnoViewModel,
-            personaViewModel,
-            vehiculoViewModel,
-            tomaDerechosViewModel,
-            tomaManifestacionViewModel,
-            lecturaDerechosViewModel,
-            guardiasViewModel,
-            db
+            alcoholemiaDosViewModel = alcoholemiaDosViewModel,
+            alcoholemiaUnoViewModel = alcoholemiaUnoViewModel,
+            personaViewModel = personaViewModel,
+            vehiculoViewModel = vehiculoViewModel,
+            tomaDerechosViewModel = tomaDerechosViewModel,
+            tomaManifestacionViewModel = tomaManifestacionViewModel,
+            lecturaDerechosViewModel = lecturaDerechosViewModel,
+            guardiasViewModel = guardiasViewModel,
+            db = db,
+            context = context // Añadir el contexto
         )
     }
     var showMissingFieldsDialog by remember { mutableStateOf(false) }
@@ -750,6 +751,18 @@ private fun Alcoholemia02Content(
     var signatureType by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
+    // Actualizar firmaInvestigado cuando cambia deseaFirmar
+    LaunchedEffect(deseaFirmar) {
+        if (!deseaFirmar) {
+            alcoholemiaDosViewModel.updateFirmaInvestigado("NO DESEA FIRMAR")
+            Log.d("Alcoholemia02Screen", "deseaFirmar es false, configurando firmaInvestigado como 'NO DESEA FIRMAR'")
+        } else {
+            alcoholemiaDosViewModel.updateFirmaInvestigado(null)
+            Log.d("Alcoholemia02Screen", "deseaFirmar es true, limpiando firmaInvestigado")
+        }
+    }
+
+
     // Log para cambios en lugarCoincide
     LaunchedEffect(lugarCoincide, lugarInvestigacion) {
         if (lugarCoincide && lugarInvestigacion.isNotBlank()) {
@@ -971,12 +984,26 @@ private fun Alcoholemia02Content(
 
         if (showSignatureDialog) {
             SignatureCaptureScreen(
+                signatureType = signatureType, // Pasar signatureType
                 onSignatureCaptured = { filePath ->
                     when (signatureType) {
-                        "investigado" -> alcoholemiaDosViewModel.updateFirmaInvestigado(filePath)
-                        "segundo_conductor" -> alcoholemiaDosViewModel.updateFirmaSegundoConductor(filePath)
-                        "instructor" -> alcoholemiaDosViewModel.updateFirmaInstructor(filePath)
-                        "secretario" -> alcoholemiaDosViewModel.updateFirmaSecretario(filePath)
+                        "investigado" -> {
+                            alcoholemiaDosViewModel.updateFirmaInvestigado(filePath)
+                            Log.d("Alcoholemia02Screen", "Firma investigado capturada: $filePath")
+                        }
+                        "segundo_conductor" -> {
+                            alcoholemiaDosViewModel.updateFirmaSegundoConductor(filePath)
+                            Log.d("Alcoholemia02Screen", "Firma segundo conductor capturada: $filePath")
+                        }
+                        "instructor" -> {
+                            alcoholemiaDosViewModel.updateFirmaInstructor(filePath)
+                            Log.d("Alcoholemia02Screen", "Firma instructor capturada: $filePath")
+                        }
+                        "secretario" -> {
+                            alcoholemiaDosViewModel.updateFirmaSecretario(filePath)
+                            Log.d("Alcoholemia02Screen", "Firma secretario capturada: $filePath")
+                        }
+                        else -> Log.w("Alcoholemia02Screen", "Tipo de firma desconocido: $signatureType")
                     }
                     showSignatureDialog = false
                 },
@@ -1012,6 +1039,14 @@ private fun Alcoholemia02Content(
                 }
             } else {
                 Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "NO DESEA FIRMAR",
+                    color = Color.Black,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(8.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(8.dp))

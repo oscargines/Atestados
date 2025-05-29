@@ -12,13 +12,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.oscar.atestados.data.DataStoreManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-
-/**
- * Configuración de DataStore para almacenar preferencias relacionadas con la toma de derechos.
- */
-val Context.dataStoreTomaDerechos: DataStore<Preferences> by preferencesDataStore(name = "toma_derechos_settings")
 
 /**
  * ViewModel para gestionar los datos relacionados con la toma de derechos del investigado.
@@ -103,6 +99,10 @@ class TomaDerechosViewModel(application: Application) : AndroidViewModel(applica
      */
     init {
         loadSavedData()
+    }
+    fun syncWithCitacion(abogadoDesignado: Boolean, nombreLetrado: String) {
+        _asistenciaLetradoParticular.value = abogadoDesignado
+        _nombreLetrado.value = if (abogadoDesignado) nombreLetrado else ""
     }
 
     // Funciones para actualizar los estados
@@ -200,7 +200,7 @@ class TomaDerechosViewModel(application: Application) : AndroidViewModel(applica
      */
     fun guardarDatos(context: Context) {
         viewModelScope.launch {
-            getApplication<Application>().dataStoreTomaDerechos.edit { preferences ->
+            DataStoreManager.getTomaDerechosDataStore(context).edit { preferences ->
                 _prestarDeclaracion.value?.let { preferences[PreferencesKeys.PRESTAR_DECLARACION] = it }
                 _renunciaAsistenciaLetrada.value?.let { preferences[PreferencesKeys.RENUNCIA_ASISTENCIA_LETRADA] = it }
                 _asistenciaLetradoParticular.value?.let { preferences[PreferencesKeys.ASISTENCIA_LETRADO_PARTICULAR] = it }
@@ -217,9 +217,9 @@ class TomaDerechosViewModel(application: Application) : AndroidViewModel(applica
     /**
      * Limpia todos los datos almacenados en DataStore y restablece los valores por defecto en el ViewModel.
      */
-    fun limpiarDatos() {
+    fun limpiarDatos(context: Context) {
         viewModelScope.launch {
-            getApplication<Application>().dataStoreTomaDerechos.edit { preferences ->
+            DataStoreManager.getTomaDerechosDataStore(context).edit { preferences ->
                 preferences.clear()
             }
 
@@ -241,7 +241,7 @@ class TomaDerechosViewModel(application: Application) : AndroidViewModel(applica
      */
     private fun loadSavedData() {
         viewModelScope.launch {
-            val preferences = getApplication<Application>().dataStoreTomaDerechos.data.first()
+            val preferences = DataStoreManager.getTomaDerechosDataStore(getApplication<Application>().applicationContext).data.first()
 
             _prestarDeclaracion.value = preferences[PreferencesKeys.PRESTAR_DECLARACION] ?: true
             _renunciaAsistenciaLetrada.value = preferences[PreferencesKeys.RENUNCIA_ASISTENCIA_LETRADA] ?: true

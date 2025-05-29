@@ -363,6 +363,7 @@ fun NavGraphBuilder.appNavigation(
         val guardiasViewModel: GuardiasViewModel = viewModel()
         val alcoholemiaDosViewModel: AlcoholemiaDosViewModel = viewModel()
         val bluetoothViewModel: BluetoothViewModel = viewModel()
+        val tomaDerechosViewModel: TomaDerechosViewModel = viewModel()
         val factory = ImpresoraViewModelFactory(
             bluetoothViewModel = bluetoothViewModel,
             context = navController.context
@@ -381,7 +382,8 @@ fun NavGraphBuilder.appNavigation(
             personaViewModel = personaViewModel,
             guardiasViewModel = guardiasViewModel,
             alcoholemiaDosViewModel = alcoholemiaDosViewModel,
-            impresoraViewModel = impresoraViewModel
+            impresoraViewModel = impresoraViewModel,
+            tomaDerechosViewModel = tomaDerechosViewModel
         )
     }
 }

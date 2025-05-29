@@ -68,7 +68,7 @@ espressoCore = "3.6.1"          # Última versión estable
 
 # PDF y Marckdown
 commonmark = "0.18.2"
-itextCore = "9.1.0"
+itextCore = "9.2.0"
 roomKtx = "2.7.1"
 playServicesMlkitBarcodeScanning = "18.3.1"
 zxingAndroidEmbedded = "4.3.0"

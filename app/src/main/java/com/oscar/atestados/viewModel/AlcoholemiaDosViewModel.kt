@@ -139,7 +139,6 @@ class AlcoholemiaDosViewModel(application: Application) : AndroidViewModel(appli
         if (value.isNotEmpty()) _municipio.value = value
     }
 
-    // Métodos actualizados para manejar rutas de archivo
     fun updateFirmaInvestigado(filePath: String?) {
         _firmaInvestigado.value = filePath
         Log.d("AlcoholemiaDosViewModel", "Firma investigado actualizada: $filePath")

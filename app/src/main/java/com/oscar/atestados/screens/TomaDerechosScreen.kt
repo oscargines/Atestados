@@ -359,7 +359,7 @@ private fun LecturaDerechosDosBottomBar(
         Spacer(modifier = Modifier.width(16.dp))
 
         Button(
-            onClick = { viewModel.limpiarDatos() },
+            onClick = { viewModel.limpiarDatos(context) },
             colors = ButtonDefaults.buttonColors(
                 containerColor = BotonesNormales,
                 contentColor = TextoBotonesNormales

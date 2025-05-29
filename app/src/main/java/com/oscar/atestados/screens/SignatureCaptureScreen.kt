@@ -9,7 +9,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -33,6 +38,7 @@ import java.io.FileOutputStream
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SignatureCaptureScreen(
+    signatureType: String, // Tipo de firma: investigado, segundo_conductor, instructor, secretario
     onSignatureCaptured: (String) -> Unit, // Devuelve la ruta con prefijo file://
     onDismiss: () -> Unit
 ) {
@@ -44,6 +50,11 @@ fun SignatureCaptureScreen(
     var lastX by remember { mutableStateOf(0f) }
     var lastY by remember { mutableStateOf(0f) }
     val context = LocalContext.current
+
+    // Validar signatureType
+    if (signatureType !in listOf("investigado", "segundo_conductor", "instructor", "secretario")) {
+        Log.e("SignatureScreen", "Tipo de firma inválido: $signatureType")
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -151,33 +162,49 @@ fun SignatureCaptureScreen(
                     Button(
                         onClick = {
                             coroutineScope.launch {
-                                val bitmapWidth = with(density) { canvasSize.width.roundToPx() }
-                                val bitmapHeight = with(density) { canvasSize.height.roundToPx() }
-                                val bitmap = Bitmap.createBitmap(
-                                    bitmapWidth,
-                                    bitmapHeight,
-                                    Bitmap.Config.ARGB_8888
-                                )
-                                val canvas = android.graphics.Canvas(bitmap)
-                                canvas.drawColor(android.graphics.Color.parseColor("#ECEFF1"))
-                                canvas.drawPath(
-                                    path.asAndroidPath(),
-                                    android.graphics.Paint().apply {
-                                        color = android.graphics.Color.parseColor("#1A237E")
-                                        strokeWidth = 4f
-                                        style = android.graphics.Paint.Style.STROKE
+                                try {
+                                    val bitmapWidth = with(density) { canvasSize.width.roundToPx() }
+                                    val bitmapHeight = with(density) { canvasSize.height.roundToPx() }
+                                    val bitmap = Bitmap.createBitmap(
+                                        bitmapWidth,
+                                        bitmapHeight,
+                                        Bitmap.Config.ARGB_8888
+                                    )
+                                    val canvas = android.graphics.Canvas(bitmap)
+
+                                    canvas.drawPath(
+                                        path.asAndroidPath(),
+                                        android.graphics.Paint().apply {
+                                            color = android.graphics.Color.parseColor("#1A237E")
+                                            strokeWidth = 4f
+                                            style = android.graphics.Paint.Style.STROKE
+                                        }
+                                    )
+                                    // Generar nombre del archivo basado en signatureType
+                                    val fileName = when (signatureType) {
+                                        "investigado" -> "signature_investigado.png"
+                                        "segundo_conductor" -> "signature_segundo_conductor.png"
+                                        "instructor" -> "signature_instructor.png"
+                                        "secretario" -> "signature_secretario.png"
+                                        else -> {
+                                            Log.w("SignatureScreen", "Usando nombre por defecto debido a signatureType inválido: $signatureType")
+                                            "signature_default.png"
+                                        }
                                     }
-                                )
-                                // Guardar el bitmap como archivo PNG
-                                val signatureFile = File(context.cacheDir, "signature_${System.currentTimeMillis()}.png")
-                                FileOutputStream(signatureFile).use { outputStream ->
-                                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                                    // Guardar el bitmap como archivo PNG
+                                    val signatureFile = File(context.cacheDir, fileName)
+                                    FileOutputStream(signatureFile).use { outputStream ->
+                                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                                    }
+                                    bitmap.recycle() // Liberar memoria
+                                    val fileUri = "file://${signatureFile.absolutePath}"
+                                    Log.d("SignatureScreen", "Firma guardada en: $fileUri para tipo: $signatureType")
+                                    onSignatureCaptured(fileUri)
+                                    onDismiss()
+                                } catch (e: Exception) {
+                                    Log.e("SignatureScreen", "Error al guardar firma: ${e.message}", e)
+                                    onDismiss()
                                 }
-                                bitmap.recycle() // Liberar memoria
-                                val fileUri = "file://${signatureFile.absolutePath}"
-                                Log.d("SignatureScreen", "Firma guardada en: $fileUri")
-                                onSignatureCaptured(fileUri)
-                                onDismiss()
                             }
                         },
                         modifier = Modifier.weight(1f),

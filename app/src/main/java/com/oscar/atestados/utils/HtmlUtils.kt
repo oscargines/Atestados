@@ -32,7 +32,7 @@ object HtmlUtils {
     /**
      * Extrae elementos HTML relevantes de una cadena HTML dada.
      *
-     * Procesa los siguientes elementos: h1, h2, h3, p, ul, li, span.
+     * Procesa los siguientes elementos: h1, h2, h3, p, ul, li, span, table, tbody, tr, td, img.
      * Ignora otros elementos como scripts.
      *
      * @param html La cadena HTML a procesar.
@@ -47,31 +47,19 @@ object HtmlUtils {
             val body = doc.body()
             val elements = mutableListOf<HtmlElement>()
 
-            /**
-             * Función interna para procesar recursivamente un elemento HTML.
-             *
-             * @param element El elemento actual a procesar.
-             * @param parentTag El tag del elemento padre (usado para contexto).
-             * @return El [HtmlElement] procesado o null si el tag no es relevante.
-             */
             fun processElement(element: Element, parentTag: String? = null): HtmlElement? {
-                val tagName = element.tagName()
+                val tagName = element.tagName().lowercase() // Normaliza a minúsculas
                 Log.v(TAG, "Procesando elemento: $tagName, padre: $parentTag")
 
                 return when (tagName) {
-                    "h1", "h2", "h3", "p", "div" -> {
+                    "h1", "h2", "h3", "div" -> {
                         val textContent = element.text().trim()
                         val children = element.children().mapNotNull { child ->
-                            if (child.tagName() in listOf("ul", "span")) {
+                            if (child.tagName().lowercase() in listOf("ul", "span", "img", "table")) {
                                 processElement(child, tagName)
                             } else null
                         }
-                        Log.d(
-                            TAG,
-                            "Elemento de texto encontrado: $tagName, contenido: '${
-                                textContent.take(50)
-                            }...'"
-                        )
+                        Log.d(TAG, "Elemento de texto encontrado: $tagName, contenido: '${textContent.take(50)}...'")
                         HtmlElement(
                             tag = tagName,
                             content = textContent,
@@ -79,11 +67,25 @@ object HtmlUtils {
                             children = children
                         )
                     }
-
+                    "p" -> {
+                        val textContent = element.text().trim()
+                        val children = element.children().mapNotNull { child ->
+                            if (child.tagName().lowercase() in listOf("ul", "span", "img", "table")) {
+                                processElement(child, tagName)
+                            } else null
+                        }
+                        Log.d(TAG, "Elemento de texto encontrado: $tagName, contenido: '${textContent.take(50)}...'")
+                        HtmlElement(
+                            tag = tagName,
+                            content = textContent,
+                            attributes = element.attributes().associate { it.key to it.value },
+                            children = children
+                        )
+                    }
                     "ul" -> {
                         Log.d(TAG, "Lista no ordenada encontrada")
                         val children = element.children().mapNotNull { child ->
-                            if (child.tagName() == "li") {
+                            if (child.tagName().lowercase() == "li") {
                                 processElement(child, "ul")
                             } else null
                         }
@@ -94,18 +96,14 @@ object HtmlUtils {
                             children = children
                         )
                     }
-
                     "li" -> {
-                        val textContent = element.text().trim() // Incluye texto de hijos
+                        val textContent = element.text().trim()
                         val subChildren = element.children().mapNotNull { child ->
-                            if (child.tagName() in listOf("ul", "span")) {
+                            if (child.tagName().lowercase() in listOf("ul", "span", "img", "table")) {
                                 processElement(child, "li")
                             } else null
                         }
-                        Log.d(
-                            TAG,
-                            "Elemento de lista encontrado, texto: '${textContent.take(50)}...'"
-                        )
+                        Log.d(TAG, "Elemento de lista encontrado, texto: '${textContent.take(50)}...'")
                         HtmlElement(
                             tag = "li",
                             content = textContent,
@@ -113,7 +111,6 @@ object HtmlUtils {
                             children = subChildren
                         )
                     }
-
                     "span" -> {
                         val textContent = element.text().trim()
                         Log.d(TAG, "Span encontrado, texto: '${textContent.take(50)}...'")
@@ -123,7 +120,71 @@ object HtmlUtils {
                             attributes = element.attributes().associate { it.key to it.value }
                         )
                     }
-
+                    "img" -> {
+                        Log.d(TAG, "Imagen encontrada, id: ${element.attr("id")}, src: ${element.attr("src")}")
+                        HtmlElement(
+                            tag = "img",
+                            content = "",
+                            attributes = element.attributes().associate { it.key to it.value }
+                        )
+                    }
+                    "table" -> {
+                        Log.d(TAG, "Tabla encontrada")
+                        val children = element.children().mapNotNull { child ->
+                            if (child.tagName().lowercase() in listOf("tbody", "tr")) {
+                                processElement(child, "table")
+                            } else null
+                        }
+                        HtmlElement(
+                            tag = "table",
+                            content = "",
+                            attributes = element.attributes().associate { it.key to it.value },
+                            children = children
+                        )
+                    }
+                    "tbody" -> {
+                        Log.d(TAG, "Tbody encontrado")
+                        val children = element.children().mapNotNull { child ->
+                            if (child.tagName().lowercase() == "tr") {
+                                processElement(child, "tbody")
+                            } else null
+                        }
+                        HtmlElement(
+                            tag = "tbody",
+                            content = "",
+                            attributes = element.attributes().associate { it.key to it.value },
+                            children = children
+                        )
+                    }
+                    "tr" -> {
+                        Log.d(TAG, "Fila de tabla (tr) encontrada")
+                        val children = element.children().mapNotNull { child ->
+                            if (child.tagName().lowercase() == "td") {
+                                processElement(child, "tr")
+                            } else null
+                        }
+                        HtmlElement(
+                            tag = "tr",
+                            content = "",
+                            attributes = element.attributes().associate { it.key to it.value },
+                            children = children
+                        )
+                    }
+                    "td" -> {
+                        val textContent = element.text().trim()
+                        val children = element.children().mapNotNull { child ->
+                            if (child.tagName().lowercase() in listOf("span", "img")) {
+                                processElement(child, "td")
+                            } else null
+                        }
+                        Log.d(TAG, "Celda (td) encontrada, contenido: '${textContent.take(50)}...'")
+                        HtmlElement(
+                            tag = "td",
+                            content = textContent,
+                            attributes = element.attributes().associate { it.key to it.value },
+                            children = children
+                        )
+                    }
                     else -> {
                         Log.v(TAG, "Elemento ignorado: $tagName")
                         null

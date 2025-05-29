@@ -8,11 +8,17 @@ import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.oscar.atestados.data.CitacionDataProvider
+import com.oscar.atestados.data.DataStoreManager
 import com.oscar.atestados.utils.HtmlParser
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PdfToBitmapConverter
@@ -24,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -32,6 +39,9 @@ private const val TAG = "CitacionViewModel"
 private const val PREFS_NAME = "CitacionPrefs"
 
 class CitacionViewModel(application: Application) : AndroidViewModel(application) {
+
+
+    val Context.dataStoreTomaDerechos: DataStore<Preferences> by preferencesDataStore(name = "toma_derechos_settings")
 
     private val sharedPreferences: SharedPreferences
         get() = getApplication<Application>().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -92,10 +102,11 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
     private val _missingFields = MutableStateFlow<List<String>>(emptyList())
     val missingFields: StateFlow<List<String>> = _missingFields.asStateFlow()
 
-    fun loadData(context: Context) {
+    fun loadData(context: Context, tomaDerechosViewModel: TomaDerechosViewModel? = null) {
         viewModelScope.launch(Dispatchers.IO) {
-            Log.d(TAG, "Cargando datos desde SharedPreferences")
+            Log.d(TAG, "Cargando datos desde SharedPreferences y DataStore")
             try {
+                // Cargar datos de SharedPreferences
                 with(sharedPreferences) {
                     _provincia.postValue(getString("provincia", "") ?: "")
                     _localidad.postValue(getString("localidad", "") ?: "")
@@ -112,6 +123,16 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
                     _abogadoDesignado.postValue(getBoolean("abogadoDesignado", false))
                     _abogadoOficio.postValue(getBoolean("abogadoOficio", false))
                 }
+
+                // Cargar estado de asistenciaLetradoParticular desde DataStore de TomaDerechos
+                val preferences = DataStoreManager.getTomaDerechosDataStore(context).data.first()
+                val asistenciaLetradoParticular = preferences[booleanPreferencesKey("asistencia_letrado_particular")] ?: false
+                val nombreLetrado = preferences[stringPreferencesKey("nombre_letrado")] ?: ""
+                _abogadoDesignado.postValue(asistenciaLetradoParticular)
+                if (asistenciaLetradoParticular) {
+                    _abogadoNombre.postValue(nombreLetrado)
+                }
+
                 Log.d(TAG, "Datos cargados correctamente")
             } catch (e: Exception) {
                 Log.e(TAG, "Error al cargar datos: ${e.message}", e)
@@ -119,7 +140,7 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun guardarDatos(context: Context) {
+    fun guardarDatos(context: Context, tomaDerechosViewModel: TomaDerechosViewModel? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             Log.d(TAG, "Guardando datos en SharedPreferences")
             try {
@@ -139,6 +160,12 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
                     putBoolean("abogadoDesignado", abogadoDesignado.value ?: false)
                     putBoolean("abogadoOficio", abogadoOficio.value ?: false)
                     apply()
+                }
+                // Sincronizar con TomaDerechosViewModel
+                tomaDerechosViewModel?.apply {
+                    setAsistenciaLetradoParticular(abogadoDesignado.value ?: false)
+                    setNombreLetrado(abogadoNombre.value ?: "")
+                    guardarDatos(context)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error al guardar datos: ${e.message}", e)
@@ -224,7 +251,7 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
         _comunicacionNumero.value = value
     }
 
-    fun updateAbogadoSelection(designado: Boolean, oficio: Boolean) {
+    fun updateAbogadoSelection(designado: Boolean, oficio: Boolean, tomaDerechosViewModel: TomaDerechosViewModel? = null) {
         if (designado && oficio) {
             _abogadoDesignado.value = true
             _abogadoOficio.value = false
@@ -232,6 +259,7 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
             _abogadoDesignado.value = designado
             _abogadoOficio.value = oficio
         }
+        tomaDerechosViewModel?.syncWithCitacion(designado, _abogadoNombre.value ?: "")
     }
 
     // Métodos para actualizar estados de StateFlow

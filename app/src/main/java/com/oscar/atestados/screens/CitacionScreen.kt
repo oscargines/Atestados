@@ -1,12 +1,6 @@
 package com.oscar.atestados.screens
 
-import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
-import android.media.MediaScannerConnection
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -30,16 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.FileProvider
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfReader
 import com.oscar.atestados.R
 import com.oscar.atestados.data.AccesoBaseDatos
 import com.oscar.atestados.data.CitacionDataProvider
 import com.oscar.atestados.ui.theme.*
-import com.oscar.atestados.utils.PdfUtils
 import com.oscar.atestados.utils.HtmlParser
-import com.oscar.atestados.utils.PDFA4Printer
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PDFToBitmapPrinter
 import com.oscar.atestados.viewModel.AlcoholemiaDosViewModel
@@ -50,6 +41,7 @@ import com.oscar.atestados.viewModel.PersonaViewModel
 import com.oscar.atestados.ui.composables.MissingFieldsDialog
 import com.oscar.atestados.ui.composables.FullScreenProgressIndicator
 import com.oscar.atestados.ui.composables.BitmapPreviewDialog
+import com.oscar.atestados.viewModel.TomaDerechosViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -68,7 +60,8 @@ fun CitacionScreen(
     personaViewModel: PersonaViewModel,
     guardiasViewModel: GuardiasViewModel,
     alcoholemiaDosViewModel: AlcoholemiaDosViewModel,
-    impresoraViewModel: ImpresoraViewModel
+    impresoraViewModel: ImpresoraViewModel,
+    tomaDerechosViewModel: TomaDerechosViewModel
 ) {
     val context = LocalContext.current
     val printStatus by citacionViewModel.printStatus.collectAsState()
@@ -105,7 +98,7 @@ fun CitacionScreen(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
-                citacionViewModel.loadData(context)
+                citacionViewModel.loadData(context, tomaDerechosViewModel)
                 personaViewModel.loadData(context)
                 guardiasViewModel.loadData(context)
                 alcoholemiaDosViewModel.loadSavedData()
@@ -171,7 +164,13 @@ fun CitacionScreen(
             .fillMaxSize()
             .padding(top = 16.dp),
         topBar = { CitacionTopBar() },
-        bottomBar = { CitacionBottomBar(citacionViewModel, navigateToScreen, context) }
+        bottomBar = {
+            CitacionBottomBar(
+                citacionViewModel,
+                navigateToScreen,
+                context,
+                tomaDerechosViewModel = tomaDerechosViewModel
+            ) }
     ) { paddingValues ->
         CitacionContent(
             modifier = Modifier.padding(paddingValues),
@@ -189,7 +188,8 @@ fun CitacionScreen(
                     guardiasViewModel = guardiasViewModel,
                     alcoholemiaDosViewModel = alcoholemiaDosViewModel
                 )
-            }
+            },
+            tomaDerechosViewModel = tomaDerechosViewModel
         )
     }
 }
@@ -235,7 +235,8 @@ private fun CitacionContent(
     citacionViewModel: CitacionViewModel,
     navigateToScreen: (String) -> Unit,
     isPrintingActa: Boolean,
-    onPrintActaTrigger: () -> Unit
+    onPrintActaTrigger: () -> Unit,
+    tomaDerechosViewModel: TomaDerechosViewModel
 ) {
     val context = LocalContext.current
     val provincia by citacionViewModel.provincia.observeAsState("")
@@ -593,7 +594,8 @@ private fun CitacionContent(
                 onCheckedChange = { isChecked ->
                     citacionViewModel.updateAbogadoSelection(
                         designado = isChecked,
-                        oficio = abogadoOficio && !isChecked
+                        oficio = if (isChecked) false else abogadoOficio,
+                        tomaDerechosViewModel = tomaDerechosViewModel
                     )
                 }
             )
@@ -641,7 +643,7 @@ private fun CitacionContent(
                 checked = abogadoOficio,
                 onCheckedChange = { isChecked ->
                     citacionViewModel.updateAbogadoSelection(
-                        designado = abogadoDesignado && !isChecked,
+                        designado = if (isChecked) false else abogadoDesignado,
                         oficio = isChecked
                     )
                 }
@@ -692,7 +694,8 @@ private fun CitacionContent(
 private fun CitacionBottomBar(
     viewModel: CitacionViewModel,
     navigateToScreen: (String) -> Unit,
-    context: Context
+    context: Context,
+    tomaDerechosViewModel: TomaDerechosViewModel
 ) {
     Row(
         modifier = Modifier
@@ -702,7 +705,7 @@ private fun CitacionBottomBar(
     ) {
         Button(
             onClick = {
-                viewModel.guardarDatos(context)
+                viewModel.guardarDatos(context, tomaDerechosViewModel)
                 navigateToScreen("OtrosDocumentosScreen")
             },
             colors = ButtonDefaults.buttonColors(

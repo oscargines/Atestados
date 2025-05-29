@@ -12,43 +12,33 @@ import com.itextpdf.kernel.pdf.canvas.PdfCanvas
 import com.itextpdf.layout.Document
 import com.itextpdf.layout.borders.SolidBorder
 import com.itextpdf.layout.element.AreaBreak
+import com.itextpdf.layout.element.Cell
 import com.itextpdf.layout.element.Div
 import com.itextpdf.layout.element.IBlockElement
+import com.itextpdf.layout.element.Image
+import com.itextpdf.layout.element.ListItem
 import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.Table
 import com.itextpdf.layout.element.Text
 import com.itextpdf.layout.properties.Leading
+import com.itextpdf.layout.properties.ListNumberingType
 import com.itextpdf.layout.properties.TextAlignment
 import com.itextpdf.layout.properties.UnitValue
 import com.itextpdf.layout.properties.VerticalAlignment
+import com.itextpdf.io.image.ImageDataFactory
 import java.io.File
 import java.io.FileOutputStream
 
 private const val TAG = "PDFA4Printer"
 
-/**
- * Clase para generar documentos PDF en formato A4 a partir de contenido HTML.
- * Utiliza HtmlUtils para parsear HTML y soporta personalización mediante procesadores de elementos.
- *
- * @property context Contexto de Android para acceder a recursos como fuentes.
- * @property config Configuración del documento (márgenes, fuentes, etc.).
- */
 class PDFA4Printer(
     private val context: Context,
     private val config: DocumentConfig = DocumentConfig()
 ) {
     companion object {
-        private const val TAG = "PDFA4Printer"
-        private val PAGE_SIZE = PageSize.A4 // A4: 595 x 842 pt
+        private val PAGE_SIZE = PageSize.A4
     }
 
-    /**
-     * Configuración del documento A4.
-     *
-     * @property marginMm Márgenes en milímetros.
-     * @property fontPaths Rutas de las fuentes en assets (clave: nombre, valor: ruta).
-     * @property titleHeightPt Altura reservada para el título en puntos.
-     * @property shieldSizePt Tamaño de los escudos (letras) en puntos.
-     */
     data class DocumentConfig(
         val marginMm: Float = 20f,
         val fontPaths: Map<String, String> = mapOf(
@@ -60,19 +50,13 @@ class PDFA4Printer(
         val shieldSizePt: Float = 30f
     )
 
-    /**
-     * Representa un elemento del documento con su tipo, contenido, hijos y atributos.
-     */
     data class DocumentElement(
         val type: String,
         val content: String,
-        val children: List<DocumentElement> = emptyList(),
-        val attributes: Map<String, String> = emptyMap()
+        val children: List<DocumentElement>? = emptyList(),
+        val attributes: Map<String?, String?>? = emptyMap()
     )
 
-    /**
-     * Interfaz para procesar elementos del documento en elementos PDF.
-     */
     interface ElementProcessor {
         fun process(
             element: DocumentElement,
@@ -82,14 +66,6 @@ class PDFA4Printer(
         ): Boolean
     }
 
-    /**
-     * Genera un archivo PDF en formato A4 a partir de contenido HTML.
-     *
-     * @param htmlContent Contenido HTML a convertir.
-     * @param outputFile Archivo de destino para el PDF.
-     * @param processor Procesador de elementos personalizado (por defecto usa DefaultElementProcessor).
-     * @throws Exception Si ocurre un error durante la generación del PDF.
-     */
     fun generarDocumentoA4(
         htmlContent: String,
         outputFile: File,
@@ -101,7 +77,10 @@ class PDFA4Printer(
             PdfWriter(FileOutputStream(outputFile)).use { writer ->
                 PdfDocument(writer).use { pdfDocument ->
                     pdfDocument.defaultPageSize = PAGE_SIZE
-                    Log.d(TAG, "Tamaño de página configurado: A4 (${PAGE_SIZE.width}pt x ${PAGE_SIZE.height}pt)")
+                    Log.d(
+                        TAG,
+                        "Tamaño de página configurado: A4 (${PAGE_SIZE.width}pt x ${PAGE_SIZE.height}pt)"
+                    )
 
                     Document(pdfDocument).use { document ->
                         val marginPt = config.marginMm * 2.83465f
@@ -111,37 +90,46 @@ class PDFA4Printer(
                         val fonts = loadFonts()
                         Log.d(TAG, "Fuentes cargadas: ${fonts.keys}")
 
-                        // Parsear HTML usando HtmlUtils y convertir a DocumentElement
                         val htmlElements = HtmlUtils.extractHtmlElements(htmlContent)
+                        Log.d(TAG, "Elementos HTML parseados: ${htmlElements.size}")
+                        htmlElements.forEachIndexed { index, element ->
+                            Log.v(TAG, "Elemento HTML #$index: tag=${element.tag}, content=${element.content.take(50)}..., attributes=${element.attributes}, children=${element.children.size}")
+                        }
+
                         val elements = htmlElements.map { convertHtmlElementToDocumentElement(it) }
-                        Log.d(TAG, "Elementos parseados: ${elements.size}")
+                        Log.d(TAG, "Elementos convertidos a DocumentElement: ${elements.size}")
+                        elements.forEachIndexed { index, element ->
+                            Log.v(TAG, "DocumentElement #$index: type=${element.type}, content=${element.content.take(50)}..., attributes=${element.attributes}, children=${element.children?.size ?: 0}")
+                        }
 
                         val titleElement = elements.find { element: DocumentElement ->
-                            element.type == "section" && element.attributes["class"]?.contains("title") == true
+                            element.type == "section" && element.attributes?.get("class")
+                                ?.contains("title") == true
                         }
                         val contentElements = elements.filterNot { element: DocumentElement ->
                             element === titleElement
                         }
 
-                        // Definir dimensiones y posición de la caja de contenido
-                        val contentAreaX = 20f * 2.83465f // 20 mm
-                        val contentAreaY = 9f * 2.83465f // 9 mm
-                        val contentWidth = PAGE_SIZE.width - 2 * marginPt // Mantener ancho actual
-                        val contentHeight = 272f * 2.83465f // 279 mm
+                        val contentAreaX = 20f * 2.83465f
+                        val contentAreaY = 9f * 2.83465f
+                        val contentWidth = PAGE_SIZE.width - 2 * marginPt
+                        val contentHeight = 272f * 2.83465f
 
-                        val tempDiv = Div().setWidth(UnitValue.createPointValue(contentWidth)).setPadding(0f)
+                        val tempDiv =
+                            Div().setWidth(UnitValue.createPointValue(contentWidth)).setPadding(0f)
                         contentElements.forEach { element: DocumentElement ->
                             processor.process(element, tempDiv, fonts, 0)
                         }
 
                         val contentParts = splitContentToFitPage(
                             tempDiv,
-                            contentHeight * 0.9f,
+                            contentHeight,
                             pdfDocument,
                             document,
                             contentAreaX,
                             contentAreaY,
-                            contentWidth
+                            contentWidth,
+                            fonts
                         )
                         Log.d(TAG, "Contenido dividido en ${contentParts.size} páginas")
 
@@ -151,36 +139,37 @@ class PDFA4Printer(
                                 document.add(AreaBreak())
                             }
 
-                            // Añadir contenido en una "caja" para crear la página
                             val contentDiv = Div()
                                 .setFixedPosition(contentAreaX, contentAreaY, contentWidth)
                                 .setHeight(UnitValue.createPointValue(contentHeight))
-                                .setBorder(SolidBorder(ColorConstants.BLACK, 0f))
-                                .setPadding(2f) // Reducir padding para minimizar espacio
+                                .setBorder(SolidBorder(ColorConstants.WHITE, 0f))
+                                .setPadding(2f)
 
                             part.forEach { element ->
                                 contentDiv.add(element as IBlockElement)
                             }
                             document.add(contentDiv)
 
-                            // Dibujar líneas verticales
                             val pdfPage = pdfDocument.getPage(index + 1)
                             val pdfCanvas = PdfCanvas(pdfPage)
                             pdfCanvas.setLineWidth(1f)
 
-                            // Línea izquierda: a 17 mm del margen izquierdo
                             val lineLeftX = 17f * 2.83465f
-                            pdfCanvas.moveTo(lineLeftX.toDouble(), (PAGE_SIZE.height - (6f * 2.83465f)).toDouble())
+                            pdfCanvas.moveTo(
+                                lineLeftX.toDouble(),
+                                (PAGE_SIZE.height - (6f * 2.83465f)).toDouble()
+                            )
                             pdfCanvas.lineTo(lineLeftX.toDouble(), (15f * 2.83465f).toDouble())
                             pdfCanvas.stroke()
 
-                            // Línea derecha: a 15 mm del margen derecho
                             val lineRightX = PAGE_SIZE.width - (15f * 2.83465f)
-                            pdfCanvas.moveTo(lineRightX.toDouble(), (PAGE_SIZE.height - (6f * 2.83465f)).toDouble())
+                            pdfCanvas.moveTo(
+                                lineRightX.toDouble(),
+                                (PAGE_SIZE.height - (6f * 2.83465f)).toDouble()
+                            )
                             pdfCanvas.lineTo(lineRightX.toDouble(), (15f * 2.83465f).toDouble())
                             pdfCanvas.stroke()
 
-                            // Añadir "escudos" como letras con la fuente escudo.ttf
                             document.add(
                                 Paragraph("A")
                                     .setFont(fonts["shield"]!!)
@@ -207,7 +196,6 @@ class PDFA4Printer(
                                     .setPadding(0f)
                             )
 
-                            // Añadir título con estilo
                             if (titleElement != null && titleElement.content.isNotEmpty()) {
                                 document.add(
                                     Paragraph(titleElement.content.uppercase())
@@ -215,17 +203,19 @@ class PDFA4Printer(
                                         .setFontSize(16f)
                                         .setBackgroundColor(ColorConstants.LIGHT_GRAY)
                                         .setTextAlignment(TextAlignment.CENTER)
-                                        .setFixedPosition(marginPt, PAGE_SIZE.height - marginPt - config.shieldSizePt - 40f, contentWidth)
+                                        .setFixedPosition(
+                                            marginPt,
+                                            PAGE_SIZE.height - marginPt - config.shieldSizePt - 40f,
+                                            contentWidth
+                                        )
                                         .setPadding(5f)
                                 )
                             }
 
-                            // Añadir la caja a 20mm en X, 283mm en Y, con 75mm de ancho y 7mm de alto
-                            // Dentro de la caja añadir texto "ATESTADO NÚMERO:" dentro de box1
-                            val box1X = 20f * 2.83465f // 20 mm
-                            val box1Y = 283f * 2.83465f // 283 mm
-                            val box1Width = 75f * 2.83465f // 75 mm
-                            val box1Height = 7f * 2.83465f // 7 mm
+                            val box1X = 20f * 2.83465f
+                            val box1Y = 283f * 2.83465f
+                            val box1Width = 75f * 2.83465f
+                            val box1Height = 7f * 2.83465f
 
                             val box1 = Div()
                                 .setFixedPosition(box1X, box1Y, box1Width)
@@ -243,12 +233,10 @@ class PDFA4Printer(
                             box1.add(textCaja1)
                             document.add(box1)
 
-                            // Añadir la caja a 167mm en X, 283mm en Y, con 25mm de ancho y 7mm de alto
-                            // Dentro de la caja añadir texto "FOLIO Nº:" dentro de box2
-                            val box2X = 167f * 2.83465f // 167 mm
-                            val box2Y = 283f * 2.83465f // 283 mm
-                            val box2Width = 25f * 2.83465f // 25 mm
-                            val box2Height = 7f * 2.83465f // 7 mm
+                            val box2X = 167f * 2.83465f
+                            val box2Y = 283f * 2.83465f
+                            val box2Width = 25f * 2.83465f
+                            val box2Height = 7f * 2.83465f
 
                             val box2 = Div()
                                 .setFixedPosition(box2X, box2Y, box2Width)
@@ -279,22 +267,40 @@ class PDFA4Printer(
         }
     }
 
-    /**
-     * Convierte un HtmlElement en DocumentElement, mapeando tags HTML a tags compatibles.
-     */
     private fun convertHtmlElementToDocumentElement(htmlElement: HtmlUtils.HtmlElement): DocumentElement {
+        Log.v(TAG, "Convirtiendo HTML tag: ${htmlElement.tag} a DocumentElement")
+        Log.v(TAG, "Contenido original: ${htmlElement.content.take(50)}...")
+        Log.v(TAG, "Atributos originales: ${htmlElement.attributes}")
+
         val type = when (htmlElement.tag) {
             "h1", "h2", "h3" -> "section"
             "p" -> "paragraph"
-            "ul" -> "list"
-            "li" -> "item"
+            "ul", "ol" -> "list"
+            "li" -> "listItem"
             "span" -> "span"
             "div" -> "div"
+            "table" -> "table"
+            "tbody" -> "tbody"
+            "tr" -> "tr"
+            "td" -> "td"
+            "img" -> "img"
             else -> "paragraph"
         }
 
         val attributes = when (htmlElement.tag) {
             "ul" -> htmlElement.attributes + ("type" to "bullet")
+            "ol" -> {
+                val listType = htmlElement.attributes["type"]?.let {
+                    when (it) {
+                        "A" -> "upper-alpha"
+                        "a" -> "lower-alpha"
+                        "I" -> "upper-roman"
+                        "i" -> "lower-roman"
+                        else -> "decimal"
+                    }
+                } ?: "decimal"
+                htmlElement.attributes + ("ordered" to "true") + ("listType" to listType)
+            }
             else -> htmlElement.attributes
         }
 
@@ -303,16 +309,11 @@ class PDFA4Printer(
         return DocumentElement(
             type = type,
             content = htmlElement.content,
-            attributes = attributes,
+            attributes = attributes as Map<String?, String?>?,
             children = children
         )
     }
 
-    /**
-     * Carga las fuentes especificadas en la configuración.
-     *
-     * @return Mapa de fuentes cargadas.
-     */
     private fun loadFonts(): Map<String, PdfFont> {
         return config.fontPaths.mapValues { (name, path) ->
             try {
@@ -327,9 +328,6 @@ class PDFA4Printer(
         }
     }
 
-    /**
-     * Divide el contenido en partes que caben en una página A4.
-     */
     private fun splitContentToFitPage(
         tempDiv: Div,
         maxHeight: Float,
@@ -337,22 +335,21 @@ class PDFA4Printer(
         document: Document,
         contentAreaX: Float,
         contentAreaY: Float,
-        contentWidth: Float
+        contentWidth: Float,
+        fonts: Map<String, PdfFont>
     ): List<List<com.itextpdf.layout.element.IElement>> {
         val parts = mutableListOf<MutableList<com.itextpdf.layout.element.IElement>>()
         var currentPart = mutableListOf<com.itextpdf.layout.element.IElement>()
         var currentHeight = 0f
 
         tempDiv.children.forEach { element ->
-            val elementHeight = estimateElementHeight(element) * 1.1f
+            val elementHeight = estimateElementHeight(element)
             Log.v(TAG, "Elemento: ${element.javaClass.simpleName}, Altura: $elementHeight, Total: $currentHeight")
-
             if (currentHeight + elementHeight > maxHeight && currentPart.isNotEmpty()) {
                 parts.add(currentPart)
                 currentPart = mutableListOf()
                 currentHeight = 0f
             }
-
             currentPart.add(element)
             currentHeight += elementHeight
         }
@@ -364,33 +361,57 @@ class PDFA4Printer(
         return parts
     }
 
-    /**
-     * Estima la altura de un elemento PDF.
-     */
     private fun estimateElementHeight(element: com.itextpdf.layout.element.IElement): Float {
         return when (element) {
             is Paragraph -> {
-                val fontSize = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.FONT_SIZE)?.getValue() ?: 12f
-                val leading = element.getProperty<Leading>(com.itextpdf.layout.properties.Property.LEADING)?.value ?: 1.2f
+                val fontSize = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.FONT_SIZE)?.getValue() ?: 10f
+                val leading = element.getProperty<Leading>(com.itextpdf.layout.properties.Property.LEADING)?.value ?: 1.4f
                 val textElements = element.children.filterIsInstance<Text>()
                 val text = textElements.joinToString("") { it.text }
-                val avgCharsPerLine = ((PAGE_SIZE.width - (2 * (config.marginMm * 2.83465f))) / (fontSize * 0.5f)).toInt()
-                val estimatedLines = if (avgCharsPerLine > 0) text.length / avgCharsPerLine else 1
+                val contentWidth = PAGE_SIZE.width - (2 * (config.marginMm * 2.83465f))
+                val avgCharsPerLine = (contentWidth / (fontSize * 0.55f)).toInt().coerceAtLeast(1)
+                val estimatedLines = if (avgCharsPerLine > 0) (text.length / avgCharsPerLine).coerceAtLeast(1) else 1
                 val actualLines = text.count { it == '\n' } + 1
-                val lineCount = maxOf(estimatedLines, actualLines).coerceAtLeast(1)
+                val lineCount = maxOf(estimatedLines, actualLines)
                 val height = fontSize * leading * lineCount
                 val marginBottom = element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)?.getValue() ?: 0f
-                height + marginBottom + 10f
+                height + marginBottom
+            }
+            is com.itextpdf.layout.element.List -> {
+                element.children.sumOf { estimateElementHeight(it).toDouble() }
+                    .toFloat() + (element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)?.getValue() ?: 0f)
+            }
+            is Table -> {
+                var totalHeight = 0f
+                for (rowIndex in 0 until element.numberOfRows) {
+                    for (colIndex in 0 until element.numberOfColumns) {
+                        val cell = element.getCell(rowIndex, colIndex)
+                        if (cell != null) {
+                            totalHeight += estimateElementHeight(cell)
+                        }
+                    }
+                }
+                totalHeight + (element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)?.getValue() ?: 0f)
+            }
+            is Cell -> {
+                var totalHeight = element.children.sumOf { estimateElementHeight(it).toDouble() }.toFloat()
+                element.children.filterIsInstance<Image>().forEach { image ->
+                    val height = image.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.HEIGHT)?.getValue() ?: 100f
+                    totalHeight += height
+                }
+                totalHeight + (element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.MARGIN_BOTTOM)?.getValue() ?: 0f)
+            }
+            is Image -> {
+                element.getProperty<UnitValue>(com.itextpdf.layout.properties.Property.HEIGHT)?.getValue() ?: 100f
             }
             is Div -> element.children.sumOf { estimateElementHeight(it).toDouble() }.toFloat()
             else -> 20f
         }
     }
 
-    /**
-     * Procesador de elementos por defecto con formato básico para HTML.
-     */
     inner class DefaultElementProcessor : ElementProcessor {
+        private var currentTable: Table? = null
+
         override fun process(
             element: DocumentElement,
             div: Div,
@@ -398,6 +419,8 @@ class PDFA4Printer(
             indentLevel: Int
         ): Boolean {
             Log.v(TAG, "Procesando ${element.type} (nivel $indentLevel): ${element.content.take(20)}...")
+            Log.v(TAG, "Atributos del elemento: ${element.attributes}")
+            Log.v(TAG, "Número de hijos: ${element.children?.size ?: 0}")
 
             when (element.type) {
                 "section" -> {
@@ -409,65 +432,278 @@ class PDFA4Printer(
                             .setMarginBottom(8f)
                             .setMarginLeft(indentLevel * 10f)
                     )
-                    element.children.forEach { process(it, div, fonts, indentLevel + 1) }
+                    element.children?.forEach { process(it, div, fonts, indentLevel + 1) }
                     return true
                 }
+
                 "paragraph" -> {
-                    div.add(
-                        Paragraph(element.content)
-                            .setFont(fonts["regular"]!!)
-                            .setFontSize(10f)
-                            .setTextAlignment(TextAlignment.LEFT)
-                            .setMarginBottom(6f)
-                            .setMarginLeft(indentLevel * 10f)
-                    )
+                    val paragraph = Paragraph(element.content)
+                        .setFont(fonts["regular"]!!)
+                        .setFontSize(10f)
+                        .setTextAlignment(TextAlignment.LEFT)
+                        .setMultipliedLeading(1.4f)
+                        .setMarginBottom(6f)
+                        .setMarginLeft(indentLevel * 10f)
+                    div.add(paragraph)
                     return true
                 }
+
                 "div" -> {
-                    // Procesar hijos del div (por ejemplo, <list> dentro de <div id="denunciado">)
-                    element.children.forEach { process(it, div, fonts, indentLevel) }
+                    element.children?.forEach { process(it, div, fonts, indentLevel) }
                     return true
                 }
+
                 "list" -> {
-                    element.children.forEachIndexed { index, child ->
-                        if (child.type == "item") {
-                            val paragraph = Paragraph()
-                            child.children.forEach { grandChild ->
-                                if (grandChild.type == "span" && grandChild.attributes["id"] in listOf("op_1_checkbox", "op_2_checkbox")) {
-                                    val isChecked = grandChild.attributes["data-checked"] == "true"
-                                    val checkboxSymbol = if (isChecked) "✔" else "☐"
-                                    paragraph.add(Text(checkboxSymbol).setFont(fonts["regular"]!!).setFontSize(10f))
-                                    paragraph.add(Text(" ").setFont(fonts["regular"]!!).setFontSize(10f))
-                                } else {
-                                    paragraph.add(Text(grandChild.content).setFont(fonts["regular"]!!).setFontSize(10f))
-                                    grandChild.children.forEach { greatGrandChild ->
-                                        process(greatGrandChild, div, fonts, indentLevel + 1)
+                    Log.d(TAG, "Procesando lista con ${element.children?.size} elementos")
+                    Log.d(TAG, "Atributos de lista: ${element.attributes}")
+
+                    val list = com.itextpdf.layout.element.List()
+                        .setMarginBottom(6f)
+                        .setMarginLeft(maxOf(0f, indentLevel * 10f))
+                        .setPadding(2f)
+                        .setFont(fonts["regular"]!!)
+                        .setFontSize(10f)
+                        .setSymbolIndent(10f)
+
+                    if (element.attributes?.get("ordered") == "true") {
+                        val listType = element.attributes?.get("listType") ?: "decimal"
+                        Log.d(TAG, "Lista ordenada detectada")
+                        val numberingType = when (listType) {
+                            "upper-alpha" -> ListNumberingType.ENGLISH_UPPER
+                            "lower-alpha" -> ListNumberingType.ENGLISH_LOWER
+                            "upper-roman" -> ListNumberingType.ROMAN_UPPER
+                            "lower-roman" -> ListNumberingType.ROMAN_LOWER
+                            else -> ListNumberingType.DECIMAL
+                        }
+                        list.setListSymbol(numberingType)
+                    } else {
+                        Log.d(TAG, "Lista no ordenada detectada")
+                        list.setListSymbol("\u2022")
+                    }
+
+                    element.children?.forEach { child ->
+                        if (child.type == "listItem") {
+                            Log.d(TAG, "Procesando listItem: ${child.content.take(50)}...")
+                            Log.d(TAG, "Atributos de listItem: ${child.attributes}")
+                            Log.d(TAG, "Hijos de listItem: ${child.children?.size ?: 0}")
+
+                            val listItem = ListItem()
+                            if (child.content.isNotBlank()) {
+                                Log.d(TAG, "Añadiendo contenido principal del listItem")
+                                listItem.add(
+                                    Paragraph(child.content)
+                                        .setFont(fonts["regular"]!!)
+                                        .setFontSize(10f)
+                                )
+                            }
+
+                            child.children?.forEach { grandChild ->
+                                Log.d(TAG, "Procesando hijo de listItem: ${grandChild.type}")
+                                when (grandChild.type) {
+                                    "span" -> {
+                                        Log.d(TAG, "Procesando span dentro de listItem")
+                                        if (grandChild.attributes?.get("id") in listOf(
+                                                "op_1_checkbox",
+                                                "op_2_checkbox"
+                                            )
+                                        ) {
+                                            val isChecked = grandChild.attributes?.get("data-checked") == "true"
+                                            val checkboxSymbol = if (isChecked) "✔" else "☐"
+                                            Log.d(TAG, "Checkbox procesado: ${grandChild.attributes?.get("id")} = $checkboxSymbol")
+                                            listItem.add(
+                                                Paragraph(checkboxSymbol)
+                                                    .setFont(fonts["regular"]!!)
+                                                    .setFontSize(10f)
+                                            )
+                                        } else if (grandChild.content.isNotBlank()) {
+                                            Log.d(TAG, "Añadiendo contenido de span")
+                                            listItem.add(
+                                                Paragraph(grandChild.content)
+                                                    .setFont(fonts["regular"]!!)
+                                                    .setFontSize(10f)
+                                            )
+                                        }
+                                    }
+                                    "list" -> {
+                                        Log.d(TAG, "Procesando lista anidada")
+                                        val nestedList = com.itextpdf.layout.element.List()
+                                            .setMarginBottom(6f)
+                                            .setMarginLeft((indentLevel + 1) * 10f)
+                                            .setPadding(2f)
+                                            .setFont(fonts["regular"]!!)
+                                            .setFontSize(10f)
+                                            .setSymbolIndent(10f)
+                                        if (grandChild.attributes?.get("ordered") == "true") {
+                                            nestedList.setListSymbol(ListNumberingType.DECIMAL)
+                                        } else {
+                                            nestedList.setListSymbol("\u2022")
+                                        }
+                                        grandChild.children?.forEach { greatGrandChild ->
+                                            if (greatGrandChild.type == "listItem" && greatGrandChild.content.isNotBlank()) {
+                                                Log.d(TAG, "Añadiendo elemento a lista anidada")
+                                                val nestedListItem = ListItem()
+                                                nestedListItem.add(
+                                                    Paragraph(greatGrandChild.content)
+                                                        .setFont(fonts["regular"]!!)
+                                                        .setFontSize(10f)
+                                                )
+                                                nestedList.add(nestedListItem)
+                                            }
+                                        }
+                                        if (!nestedList.isEmpty) {
+                                            listItem.add(nestedList)
+                                        }
                                     }
                                 }
                             }
-                            paragraph.setMarginBottom(6f)
-                            paragraph.setMarginLeft(indentLevel * 10f)
-                            div.add(paragraph)
+
+                            if (!listItem.isEmpty) {
+                                Log.d(TAG, "Añadiendo listItem a la lista")
+                                list.add(listItem)
+                            } else {
+                                Log.d(TAG, "listItem está vacío, no se añade")
+                            }
                         }
+                    }
+
+                    if (!list.isEmpty) {
+                        Log.d(TAG, "Añadiendo lista al div con ${list.children.size} elementos")
+                        div.add(list)
+                    } else {
+                        Log.d(TAG, "La lista está vacía, no se añade")
                     }
                     return true
                 }
+
                 "span" -> {
-                    if (element.attributes["id"] in listOf("op_1_checkbox", "op_2_checkbox")) {
-                        val isChecked = element.attributes["data-checked"] == "true"
+                    if (element.attributes?.get("id") in listOf("op_1_checkbox", "op_2_checkbox")) {
+                        val isChecked = element.attributes?.get("data-checked") == "true"
                         val checkboxSymbol = if (isChecked) "✔" else "☐"
                         div.add(
                             Paragraph()
-                                .add(Text(checkboxSymbol).setFont(fonts["regular"]!!).setFontSize(10f))
+                                .add(
+                                    Text(checkboxSymbol).setFont(fonts["regular"]!!)
+                                        .setFontSize(10f)
+                                )
                                 .setTextAlignment(TextAlignment.LEFT)
                                 .setMarginBottom(6f)
                                 .setMarginLeft(indentLevel * 10f)
                         )
-                        Log.d(TAG, "Checkbox procesado: ${element.attributes["id"]} = $checkboxSymbol")
+                        Log.d(TAG, "Checkbox procesado: ${element.attributes?.get("id")} = $checkboxSymbol")
+                        return true
+                    } else if (element.content.isNotBlank()) {
+                        div.add(
+                            Paragraph(element.content)
+                                .setFont(fonts["regular"]!!)
+                                .setFontSize(10f)
+                                .setTextAlignment(TextAlignment.LEFT)
+                                .setMarginBottom(6f)
+                                .setMarginLeft(indentLevel * 10f)
+                        )
                         return true
                     }
                     return false
                 }
+
+                "table" -> {
+                    currentTable = Table(UnitValue.createPercentArray(3)) // 3 columnas para la tabla
+                        .useAllAvailableWidth()
+                        .setKeepTogether(true)
+                    div.add(currentTable)
+                    element.children?.forEach { process(it, div, fonts, indentLevel) }
+                    currentTable = null // Resetear después de procesar la tabla
+                    return true
+                }
+
+                "tbody" -> {
+                    element.children?.forEach { process(it, div, fonts, indentLevel) }
+                    return true
+                }
+
+                "tr" -> {
+                    element.children?.forEach { process(it, div, fonts, indentLevel) }
+                    return true
+                }
+
+                "td" -> {
+                    val cell = Cell()
+                        .setBorder(SolidBorder(ColorConstants.WHITE, 0f))
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                    if (element.content.isNotBlank()) {
+                        cell.add(
+                            Paragraph(element.content)
+                                .setFont(fonts["regular"]!!)
+                                .setFontSize(8f)
+                                .setTextAlignment(TextAlignment.CENTER)
+                        )
+                    }
+                    element.children?.forEach { child ->
+                        when (child.type) {
+                            "img" -> {
+                                val src = child.attributes?.get("src")
+                                if (src != null) {
+                                    try {
+                                        val imageFile = File(src.replace("file://", ""))
+                                        if (imageFile.exists()) {
+                                            val imageData = ImageDataFactory.create(imageFile.readBytes())
+                                            val image = Image(imageData)
+                                            val width = child.attributes?.get("width")?.toFloatOrNull() ?: 200f
+                                            val height = child.attributes?.get("height")?.toFloatOrNull() ?: 100f
+                                            image.setWidth(UnitValue.createPointValue(width / 2.83465f)) // Convertir px a pt
+                                            image.setHeight(UnitValue.createPointValue(height / 2.83465f))
+                                            image.setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.CENTER) // Centrar horizontalmente
+                                            cell.add(image)
+                                        } else {
+                                            Log.w(TAG, "Imagen no encontrada: $src")
+                                            cell.add(Paragraph("Imagen no disponible").setFont(fonts["regular"]!!).setFontSize(10f))
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Error al cargar imagen: $src", e)
+                                        cell.add(Paragraph("Error al cargar imagen").setFont(fonts["regular"]!!).setFontSize(10f))
+                                    }
+                                }
+                            }
+                            "span" -> {
+                                if (child.content.isNotBlank()) {
+                                    cell.add(
+                                        Paragraph(child.content)
+                                            .setFont(fonts["regular"]!!)
+                                            .setFontSize(10f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    currentTable?.addCell(cell)
+                    return true
+                }
+
+                "img" -> {
+                    val src = element.attributes?.get("src")
+                    if (src != null) {
+                        try {
+                            val imageFile = File(src.replace("file://", ""))
+                            if (imageFile.exists()) {
+                                val imageData = ImageDataFactory.create(imageFile.readBytes())
+                                val image = Image(imageData)
+                                val width = element.attributes?.get("width")?.toFloatOrNull() ?: 200f
+                                val height = element.attributes?.get("height")?.toFloatOrNull() ?: 100f
+                                image.setWidth(UnitValue.createPointValue(width / 2.83465f))
+                                image.setHeight(UnitValue.createPointValue(height / 2.83465f))
+                                div.add(image)
+                            } else {
+                                Log.w(TAG, "Imagen no encontrada: $src")
+                                div.add(Paragraph("Imagen no disponible").setFont(fonts["regular"]!!).setFontSize(10f))
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error al cargar imagen: $src", e)
+                            div.add(Paragraph("Error al cargar imagen").setFont(fonts["regular"]!!).setFontSize(10f))
+                        }
+                    }
+                    return true
+                }
+
                 else -> return false
             }
         }
