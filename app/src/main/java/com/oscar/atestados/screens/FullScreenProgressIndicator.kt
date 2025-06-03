@@ -1,6 +1,7 @@
 // CommonComponents.kt
 package com.oscar.atestados.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun FullScreenProgressIndicator(text: String) {
+    Log.d("ProgressIndicator", "Mostrando con texto: $text")
     Box(
         modifier = Modifier
             .fillMaxSize()
