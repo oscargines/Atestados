@@ -129,7 +129,7 @@ fun CitacionScreen(
     }
 
     // Mostrar indicador de progreso
-    if (printStatus.isNotEmpty() && !showPreviewDialog) {
+    if (printStatus.isNotEmpty()) {
         FullScreenProgressIndicator(text = printStatus)
     }
 
@@ -138,13 +138,21 @@ fun CitacionScreen(
         BitmapPreviewDialog(
             bitmap = previewBitmap,
             onConfirm = {
-                citacionViewModel.confirmPrint(
-                    context = context,
-                    htmlParser = htmlParser,
-                    dataProvider = dataProvider,
-                    pdfToBitmapPrinter = pdfToBitmapPrinter,
-                    impresoraViewModel = impresoraViewModel
-                )
+                scope.launch {
+                    // Actualizar estado para mostrar el indicador de progreso
+                    citacionViewModel.updatePrintStatus("Iniciando impresión...")
+                    // Iniciar el proceso de impresión
+                    citacionViewModel.confirmPrint(
+                        context = context,
+                        htmlParser = htmlParser,
+                        dataProvider = dataProvider,
+                        pdfToBitmapPrinter = pdfToBitmapPrinter,
+                        impresoraViewModel = impresoraViewModel
+                    )
+                    // Cerrar el diálogo de previsualización
+                    citacionViewModel.updateShowPreviewDialog(false)
+                    citacionViewModel.updatePreviewBitmap(null)
+                }
             },
             onDismiss = {
                 scope.launch {

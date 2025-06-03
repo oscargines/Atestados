@@ -68,8 +68,10 @@ import kotlin.text.Regex
 import com.itextpdf.kernel.pdf.PdfReader
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
 import com.oscar.atestados.utils.PdfUtils
+import kotlinx.coroutines.delay
 
 private const val TAG = "Alcoholemia02Screen"
+private const val PRINT_TIMEOUT_MS = 10000L // 10 segundos
 
 /**
  * Pantalla principal para el segundo paso del proceso de alcoholemia.
@@ -127,6 +129,21 @@ fun Alcoholemia02Screen(
     }
     var showMissingFieldsDialog by remember { mutableStateOf(false) }
     var missingFieldsToShow by remember { mutableStateOf<List<String>>(emptyList()) }
+
+    // Temporizador para cerrar diálogo y progreso después de 10 segundos
+    LaunchedEffect(isPrintingAtestado, showPreviewDialog) {
+        if (isPrintingAtestado && !showPreviewDialog) {
+            delay(PRINT_TIMEOUT_MS)
+            if (isPrintingAtestado) {
+                isPrintingAtestado = false
+                showPreviewDialog = false
+                previewBitmaps.forEach { it?.recycle() }
+                previewBitmaps.clear()
+                currentPrintStatus = "Tiempo de espera agotado"
+                Toast.makeText(context, "Tiempo de espera agotado", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     LaunchedEffect(isPrintingAtestado) {
         if (isPrintingAtestado) {
@@ -271,6 +288,9 @@ fun Alcoholemia02Screen(
     LaunchedEffect(showPreviewDialog) {
         if (!showPreviewDialog && isPrintingAtestado && previewBitmaps.isNotEmpty()) {
             try {
+                // Cerrar el diálogo y mostrar el progreso
+                currentPrintStatus = "Preparando impresión..."
+
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
                     ?: throw Exception("No hay impresora seleccionada")
                 val tempHtmlFilePath = withContext(Dispatchers.IO) {
@@ -468,8 +488,11 @@ fun Alcoholemia02Screen(
             FullScreenProgressIndicator(text = "Imprimiendo atestado...")
         }
         BitmapPreviewDialogCompact(
-            bitmaps = previewBitmaps, // Pasar la lista de bitmaps
-            onConfirm = { showPreviewDialog = false },
+            bitmaps = previewBitmaps,
+            onConfirm = {
+                // No establecer isPrintingAtestado aquí, se maneja en onPrintingStarted
+                showPreviewDialog = false
+            },
             onDismiss = {
                 showPreviewDialog = false
                 previewBitmaps.forEach { it?.recycle() }
@@ -479,6 +502,10 @@ fun Alcoholemia02Screen(
                 scope.launch {
                     Toast.makeText(context, "Impresión cancelada", Toast.LENGTH_SHORT).show()
                 }
+            },
+            onPrintingStarted = {
+                isPrintingAtestado = true // Activar el indicador de progreso
+                currentPrintStatus = "Iniciando impresión..."
             }
         )
     }

@@ -117,14 +117,14 @@ class PDFToBitmapPrinter(private val context: Context) {
     }
 
     /**
-     * Envía los bitmaps a la impresora Zebra.
+     * Envía los bitmaps a la impresora Zebra, siempre rotando 180º en CPCL.
      *
      * @param macAddress Dirección MAC de la impresora Bluetooth.
      * @param bitmaps Lista de bitmaps a imprimir.
      * @param onStatusUpdate Callback para actualizaciones de estado.
      * @return [PrintResult] con el resultado de la impresión.
      *
-     * @note Maneja automáticamente la segmentación de imágenes grandes para impresoras RW420.
+     * @note Optimizado para ZQ521 con CPCL, con rotación de 180º y sin segmentación innecesaria.
      */
     private suspend fun printBitmaps(
         macAddress: String,
@@ -148,11 +148,12 @@ class PDFToBitmapPrinter(private val context: Context) {
             val printer: ZebraPrinter = ZebraPrinterFactory.getInstance(connection)
             val printerLanguage = printer.getPrinterControlLanguage()
             onStatusUpdate("Impresora inicializada: $printerLanguage")
+            Log.d(TAG, "Lenguaje de la impresora detectado: $printerLanguage")
 
             // Dimensiones objetivo: 99 mm x 280 mm a 200 DPI
             val targetWidth = PRINT_WIDTH // 99 mm
             val targetHeight = ((280f / 99f) * targetWidth).toInt() // Proporcional a 280 mm
-            val maxHeightRW420 = 1024 // Límite conservador para RW420
+            val maxHeightZQ521 = 4096 // Límite conservador para ZQ521
 
             bitmaps.forEachIndexed { index, bitmap ->
                 // Ajustar el bitmap al ancho objetivo
@@ -162,9 +163,9 @@ class PDFToBitmapPrinter(private val context: Context) {
                     bitmap
                 }
 
-                // Determinar si segmentar (solo para RW420 si excede memoria)
-                val segments = if (scaledBitmap.height > maxHeightRW420 && macAddress.contains("RW", ignoreCase = true)) {
-                    segmentBitmap(scaledBitmap, targetWidth, maxHeightRW420)
+                // Segmentar solo si excede la memoria de la ZQ521
+                val segments = if (scaledBitmap.height > maxHeightZQ521) {
+                    segmentBitmap(scaledBitmap, targetWidth, maxHeightZQ521)
                 } else {
                     listOf(scaledBitmap)
                 }
@@ -174,22 +175,35 @@ class PDFToBitmapPrinter(private val context: Context) {
                     Log.d(TAG, "Segmento $segmentIndex de página $index: ${segmentBitmap.width}x${segmentBitmap.height}")
 
                     if (printerLanguage == PrinterLanguage.CPCL) {
+                        Log.d(TAG, "Ejecutando bloque CPCL con ROTATE 180")
+                        // Asegurar que la impresora esté en modo CPCL
                         connection.write("! U1 setvar \"device.languages\" \"cpcl\"\r\n".toByteArray())
                         delay(500)
 
+                        // Secuencia CPCL robusta con rotación
                         val cpclCommand = """
-                            ! U1 JOURNAL
-                            ! U1 CLR
-                            ! U1 DEL R:TEMP.PCX
+                            ! 0 200 200 ${segmentBitmap.height} 1
+                            JOURNAL
+                            CLR
+                            DEL R:TEMP.PCX
                             PW $targetWidth
+                            ROTATE 180
                             PCX 0 0 R:TEMP.PCX
+                            FORM
                             PRINT
                         """.trimIndent()
 
+                        Log.d(TAG, "Enviando comando CPCL: $cpclCommand")
                         printer.storeImage("R:TEMP.PCX", zebraImage, segmentBitmap.width, segmentBitmap.height)
                         connection.write(cpclCommand.toByteArray())
                     } else {
+                        Log.d(TAG, "Ejecutando bloque ZPL (no esperado para ZQ521 en CPCL)")
+                        // Fallback para ZPL, aunque no debería ejecutarse
+                        connection.write("^XA^POI^XZ".toByteArray())
+                        delay(500)
                         printer.printImage(zebraImage, 0, 0, segmentBitmap.width, segmentBitmap.height, false)
+                        connection.write("^XA^PON^XZ".toByteArray())
+                        delay(500)
                     }
                     delay(2000) // Espera entre segmentos
                 }
@@ -231,7 +245,6 @@ class PDFToBitmapPrinter(private val context: Context) {
             yOffset += segmentHeight
             remainingHeight -= segmentHeight
         }
-
         return segments
     }
 

@@ -23,7 +23,8 @@ import com.oscar.atestados.ui.theme.BlueGray400
 fun BitmapPreviewDialogCompact(
     bitmaps: List<Bitmap?>,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onPrintingStarted: () -> Unit // Nuevo parámetro para notificar inicio de impresión
 ) {
     if (bitmaps.isEmpty() || bitmaps.all { it == null }) return
 
@@ -101,7 +102,10 @@ fun BitmapPreviewDialogCompact(
                     ) {
                         Text("Cancelar")
                     }
-                    Button(onClick = onConfirm) {
+                    Button(onClick = {
+                        onPrintingStarted() // Notificar que la impresión ha comenzado
+                        onConfirm() // Ejecutar la lógica de confirmación
+                    }) {
                         Text("Imprimir")
                     }
                 }
