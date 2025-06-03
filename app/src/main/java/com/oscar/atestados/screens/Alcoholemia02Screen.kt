@@ -762,8 +762,8 @@ private fun Alcoholemia02Content(
                 alcoholemiaDosViewModel.updateFirmaInvestigado(null)
             }
         } else {
-            Log.d(TAG, "deseaFirmar es true, limpiando firmaInvestigado")
-            alcoholemiaDosViewModel.updateFirmaInvestigado(null)
+            // No limpiar firmaInvestigado si deseaFirmar es true
+            Log.d(TAG, "deseaFirmar es true, preservando firmaInvestigado: ${alcoholemiaDosViewModel.firmaInvestigado.value}")
         }
     }
 

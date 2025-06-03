@@ -115,6 +115,7 @@ class AlcoholemiaDataProvider(
             encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInvestigado.value)
         }
 
+        val firmaSegundoConductor = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaSegundoConductor.value)
         val firmaInstructor = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInstructor.value)
         val firmaSecretario = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaSecretario.value)
 
@@ -146,7 +147,9 @@ class AlcoholemiaDataProvider(
             "num_serie_eti" to (alcoholemiaUnoViewModel.serie.value ?: ""),
             "letra_investigacion" to letraInvestigacion,
             "desea_realizar_pruebas" to (alcoholemiaUnoViewModel.opcionDeseaPruebas.value?.uppercase() ?: "NO"),
-            "firma_inestigado" to firmaInvestigado,
+            "nombre_segundo_conductor" to (alcoholemiaDosViewModel.nombreSegundoConductor.value ?: ""),
+            "firma_investigado" to firmaInvestigado,
+            "firma_segundo_conductor" to firmaSegundoConductor,
             "firma_instructor" to firmaInstructor,
             "firma_secretario" to firmaSecretario
         ).also { data ->
@@ -156,7 +159,7 @@ class AlcoholemiaDataProvider(
 
     override fun validateData(): Pair<Boolean, List<String>> {
         val data = getData()
-        val requiredFields = mapOf(
+        val requiredFields = mutableMapOf(
             "nombre_completo_persona" to "Nombre y apellidos",
             "documento" to "Documento de identidad",
             "lugar" to "Lugar de diligencias",
@@ -169,8 +172,14 @@ class AlcoholemiaDataProvider(
             "num_serie_eti" to "Número de serie del etilómetro",
             "letra_investigacion" to "Motivo de la investigación",
             "desea_realizar_pruebas" to "Deseo de realizar pruebas",
-            "firma_inestigado" to "Firma del investigado"
+            "firma_investigado" to "Firma del investigado"
         )
+
+        // Agregar firma del segundo conductor como requerida si haySegundoConductor es true
+        if (alcoholemiaDosViewModel.haySegundoConductor.value == true) {
+            requiredFields["firma_segundo_conductor"] = "Firma del segundo conductor"
+            requiredFields["nombre_segundo_conductor"] = "Nombre del segundo conductor"
+        }
 
         val missingFields = requiredFields.keys.filter { field ->
             val isMissing = data[field]?.isBlank() ?: true

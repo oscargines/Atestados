@@ -166,29 +166,20 @@ fun SignatureCaptureScreen(
                         onClick = {
                             coroutineScope.launch {
                                 try {
-                                    // Dimensiones fijas para el bitmap
-                                    // Dimensiones ajustadas para el bitmap
-                                    val bitmapWidth = 400 // Reducido de 400
-                                    val bitmapHeight = 200 // Reducido de 200
+                                    // Usar dimensiones reales del Canvas en píxeles
+                                    val bitmapWidth = with(density) { canvasSize.width.toPx().toInt() }
+                                    val bitmapHeight = with(density) { canvasSize.height.toPx().toInt() }
                                     val bitmap = Bitmap.createBitmap(
                                         bitmapWidth,
                                         bitmapHeight,
                                         Bitmap.Config.ARGB_8888
                                     )
                                     val canvas = android.graphics.Canvas(bitmap)
-                                    // Fondo transparente
                                     canvas.drawColor(Color.TRANSPARENT)
 
-                                    // Escalar el path al tamaño del bitmap
-                                    val scaleX = bitmapWidth / canvasSize.width.value
-                                    val scaleY = bitmapHeight / canvasSize.height.value
-                                    val scaledPath = android.graphics.Path(path.asAndroidPath())
-                                    scaledPath.transform(android.graphics.Matrix().apply {
-                                        setScale(scaleX, scaleY)
-                                    })
-
+                                    // Dibujar el Path sin escalar
                                     canvas.drawPath(
-                                        scaledPath,
+                                        path.asAndroidPath(),
                                         android.graphics.Paint().apply {
                                             color = android.graphics.Color.parseColor("#1A237E")
                                             strokeWidth = 4f
