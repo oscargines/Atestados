@@ -1,10 +1,11 @@
 [versions]
 # Android Gradle Plugin y Kotlin
-agp = "8.10.0"                   # Última versión estable
+agp = "8.10.1"                   # Última versión estable
 appcompat = "1.7.0"
 barcodeScanning = "17.3.0"
 core = "3.5.3"
 documentfile = "1.1.0"
+foundation = "1.8.2"
 html2pdf = "6.1.0"
 json = "20230227"
 jsoup = "1.19.1"
@@ -78,6 +79,7 @@ zxingAndroidEmbedded = "4.3.0"
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
+androidx-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "foundation" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
 

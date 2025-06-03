@@ -2,10 +2,13 @@ package com.oscar.atestados.screens
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.util.Log
 import android.view.MotionEvent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -18,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -46,14 +48,14 @@ fun SignatureCaptureScreen(
     var forceRedraw by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
-    var canvasSize by remember { mutableStateOf(DpSize(0.dp, 0.dp)) }
+    var canvasSize by remember { mutableStateOf(DpSize(400.dp, 200.dp)) }
     var lastX by remember { mutableStateOf(0f) }
     var lastY by remember { mutableStateOf(0f) }
     val context = LocalContext.current
 
     // Validar signatureType
     if (signatureType !in listOf("investigado", "segundo_conductor", "instructor", "secretario")) {
-        Log.e("SignatureScreen", "Tipo de firma inválido: $signatureType")
+        Log.e(TAG, "Tipo de firma inválido: $signatureType")
     }
 
     Dialog(
@@ -63,7 +65,7 @@ fun SignatureCaptureScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.8f),
+                .padding(horizontal = 16.dp),
             shape = RoundedCornerShape(8.dp),
             color = White
         ) {
@@ -74,15 +76,17 @@ fun SignatureCaptureScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    color = BlueGray50,
-                    shape = RoundedCornerShape(4.dp)
+                        .aspectRatio(2f) // Relación 2:1 para orientación horizontal
+                        .height(200.dp), // Altura fija para consistencia
+                    shape = RoundedCornerShape(4.dp),
+                    color = White,
+                    border = BorderStroke(1.dp, BlueGray300)
                 ) {
                     Box {
                         Text(
                             text = "Firme aquí",
                             fontSize = 12.sp,
-                            color = Color.Gray,
+                            color = BlueGray700,
                             modifier = Modifier
                                 .padding(start = 8.dp, top = 8.dp)
                                 .align(Alignment.TopStart)
@@ -90,13 +94,12 @@ fun SignatureCaptureScreen(
                         Canvas(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(BlueGray50)
                                 .pointerInteropFilter { event ->
                                     val x = event.x
                                     val y = event.y
                                     when (event.action) {
                                         MotionEvent.ACTION_DOWN -> {
-                                            Log.d("SignatureScreen", "Inicio de toque en: ($x, $y)")
+                                            Log.d(TAG, "Inicio de toque en: ($x, $y)")
                                             path.moveTo(x, y)
                                             lastX = x
                                             lastY = y
@@ -104,7 +107,7 @@ fun SignatureCaptureScreen(
                                             true
                                         }
                                         MotionEvent.ACTION_MOVE -> {
-                                            Log.d("SignatureScreen", "Movimiento a: ($x, $y)")
+                                            Log.d(TAG, "Movimiento a: ($x, $y)")
                                             val dx = kotlin.math.abs(x - lastX)
                                             val dy = kotlin.math.abs(y - lastY)
                                             if (dx >= 4f || dy >= 4f) {
@@ -121,7 +124,7 @@ fun SignatureCaptureScreen(
                                             true
                                         }
                                         MotionEvent.ACTION_UP -> {
-                                            Log.d("SignatureScreen", "Fin de toque en: ($x, $y)")
+                                            Log.d(TAG, "Fin de toque en: ($x, $y)")
                                             path.lineTo(lastX, lastY)
                                             forceRedraw++
                                             true
@@ -163,23 +166,37 @@ fun SignatureCaptureScreen(
                         onClick = {
                             coroutineScope.launch {
                                 try {
-                                    val bitmapWidth = with(density) { canvasSize.width.roundToPx() }
-                                    val bitmapHeight = with(density) { canvasSize.height.roundToPx() }
+                                    // Dimensiones fijas para el bitmap
+                                    // Dimensiones ajustadas para el bitmap
+                                    val bitmapWidth = 400 // Reducido de 400
+                                    val bitmapHeight = 200 // Reducido de 200
                                     val bitmap = Bitmap.createBitmap(
                                         bitmapWidth,
                                         bitmapHeight,
                                         Bitmap.Config.ARGB_8888
                                     )
                                     val canvas = android.graphics.Canvas(bitmap)
+                                    // Fondo transparente
+                                    canvas.drawColor(Color.TRANSPARENT)
+
+                                    // Escalar el path al tamaño del bitmap
+                                    val scaleX = bitmapWidth / canvasSize.width.value
+                                    val scaleY = bitmapHeight / canvasSize.height.value
+                                    val scaledPath = android.graphics.Path(path.asAndroidPath())
+                                    scaledPath.transform(android.graphics.Matrix().apply {
+                                        setScale(scaleX, scaleY)
+                                    })
 
                                     canvas.drawPath(
-                                        path.asAndroidPath(),
+                                        scaledPath,
                                         android.graphics.Paint().apply {
                                             color = android.graphics.Color.parseColor("#1A237E")
                                             strokeWidth = 4f
                                             style = android.graphics.Paint.Style.STROKE
+                                            isAntiAlias = true
                                         }
                                     )
+
                                     // Generar nombre del archivo basado en signatureType
                                     val fileName = when (signatureType) {
                                         "investigado" -> "signature_investigado.png"
@@ -187,22 +204,23 @@ fun SignatureCaptureScreen(
                                         "instructor" -> "signature_instructor.png"
                                         "secretario" -> "signature_secretario.png"
                                         else -> {
-                                            Log.w("SignatureScreen", "Usando nombre por defecto debido a signatureType inválido: $signatureType")
+                                            Log.w(TAG, "Usando nombre por defecto debido a signatureType inválido: $signatureType")
                                             "signature_default.png"
                                         }
                                     }
+
                                     // Guardar el bitmap como archivo PNG
                                     val signatureFile = File(context.cacheDir, fileName)
                                     FileOutputStream(signatureFile).use { outputStream ->
                                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
                                     }
-                                    bitmap.recycle() // Liberar memoria
+                                    bitmap.recycle()
                                     val fileUri = "file://${signatureFile.absolutePath}"
-                                    Log.d("SignatureScreen", "Firma guardada en: $fileUri para tipo: $signatureType")
+                                    Log.d(TAG, "Firma guardada en: $fileUri para tipo: $signatureType")
                                     onSignatureCaptured(fileUri)
                                     onDismiss()
                                 } catch (e: Exception) {
-                                    Log.e("SignatureScreen", "Error al guardar firma: ${e.message}", e)
+                                    Log.e(TAG, "Error al guardar firma: ${e.message}", e)
                                     onDismiss()
                                 }
                             }
@@ -218,3 +236,5 @@ fun SignatureCaptureScreen(
         }
     }
 }
+
+private const val TAG = "SignatureScreen"

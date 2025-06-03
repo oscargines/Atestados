@@ -60,6 +60,8 @@
         <!-- Actividades -->
         <activity
             android:name=".MainActivity"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.Atestados">

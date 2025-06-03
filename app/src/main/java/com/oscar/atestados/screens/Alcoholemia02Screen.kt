@@ -2,16 +2,15 @@ package com.oscar.atestados.screens
 
 import android.Manifest
 import android.content.ActivityNotFoundException
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.location.Geocoder
 import android.location.Location
-import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -22,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,6 +59,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -102,7 +103,7 @@ fun Alcoholemia02Screen(
     val scope = rememberCoroutineScope()
     var isPrintingAtestado by remember { mutableStateOf(false) }
     var showPreviewDialog by remember { mutableStateOf(false) }
-    var previewBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var previewBitmaps: SnapshotStateList<Bitmap?> = remember { mutableStateListOf() }
     var currentPrintStatus by remember { mutableStateOf("Iniciando...") }
     var showInvalidLugarInvestigacionDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -121,7 +122,7 @@ fun Alcoholemia02Screen(
             lecturaDerechosViewModel = lecturaDerechosViewModel,
             guardiasViewModel = guardiasViewModel,
             db = db,
-            context = context // Añadir el contexto
+            context = context
         )
     }
     var showMissingFieldsDialog by remember { mutableStateOf(false) }
@@ -133,8 +134,7 @@ fun Alcoholemia02Screen(
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
                 if (macAddress.isNullOrEmpty()) {
                     currentPrintStatus = "No hay impresora seleccionada"
-                    Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT)
-                        .show()
+                    Toast.makeText(context, "No hay impresora seleccionada", Toast.LENGTH_SHORT).show()
                     isPrintingAtestado = false
                     return@LaunchedEffect
                 }
@@ -173,17 +173,12 @@ fun Alcoholemia02Screen(
                 // Generar el PDF para Zebra para previsualización
                 currentPrintStatus = "Generando PDF para impresora Zebra..."
                 val zebraPrinter = PDFLabelPrinterZebra(context)
-                val previewFile =
-                    File.createTempFile("atestado_zebra_preview", ".pdf", context.cacheDir)
+                val previewFile = File.createTempFile("atestado_zebra_preview", ".pdf", context.cacheDir)
                 zebraPrinter.generarEtiquetaPdf(htmlContent, previewFile)
 
                 if (!previewFile.exists() || previewFile.length() == 0L) {
                     currentPrintStatus = "Error al generar PDF para Zebra"
-                    Toast.makeText(
-                        context,
-                        "Error al generar PDF para impresora Zebra",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(context, "Error al generar PDF para Zebra", Toast.LENGTH_LONG).show()
                     isPrintingAtestado = false
                     withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
                     return@LaunchedEffect
@@ -239,8 +234,7 @@ fun Alcoholemia02Screen(
                 // Previsualizar el PDF de Zebra
                 if (!isValidPdf(previewFile)) {
                     currentPrintStatus = "Error: El archivo PDF no es válido"
-                    Toast.makeText(context, "Error: El archivo PDF no es válido", Toast.LENGTH_LONG)
-                        .show()
+                    Toast.makeText(context, "Error: El archivo PDF no es válido", Toast.LENGTH_LONG).show()
                     withContext(Dispatchers.IO) {
                         File(tempHtmlFilePath).delete()
                         previewFile.delete()
@@ -248,14 +242,15 @@ fun Alcoholemia02Screen(
                     isPrintingAtestado = false
                 } else {
                     val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(previewFile)
-                    if (bitmaps.isNotEmpty() && bitmaps[0] != null) {
-                        previewBitmap = bitmaps[0]
+                    if (bitmaps.isNotEmpty() && bitmaps.any { it != null }) {
+                        previewBitmaps.clear()
+                        previewBitmaps.addAll(bitmaps) // Guardar todos los bitmaps
                         showPreviewDialog = true
-                        currentPrintStatus = "Mostrando previsualización"
+                        currentPrintStatus = "Mostrando previsualización de ${bitmaps.size} página(s)"
+                        Log.d(TAG, "Bitmaps generados: ${bitmaps.size} páginas")
                     } else {
                         currentPrintStatus = "Error al generar previsualización"
-                        Toast.makeText(context, "Error al generar la imagen", Toast.LENGTH_SHORT)
-                            .show()
+                        Toast.makeText(context, "Error al generar las imágenes", Toast.LENGTH_SHORT).show()
                         withContext(Dispatchers.IO) {
                             File(tempHtmlFilePath).delete()
                             previewFile.delete()
@@ -265,11 +260,7 @@ fun Alcoholemia02Screen(
                 }
             } catch (e: Exception) {
                 currentPrintStatus = "Error al generar documentos: ${e.message}"
-                Toast.makeText(
-                    context,
-                    "Error al generar documentos: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(context, "Error al generar documentos: ${e.message}", Toast.LENGTH_LONG).show()
                 Log.e(TAG, "Error en generación de documentos: ${e.message}", e)
                 isPrintingAtestado = false
             }
@@ -278,7 +269,7 @@ fun Alcoholemia02Screen(
 
     // Manejar la confirmación de impresión desde el diálogo
     LaunchedEffect(showPreviewDialog) {
-        if (!showPreviewDialog && isPrintingAtestado && previewBitmap != null) {
+        if (!showPreviewDialog && isPrintingAtestado && previewBitmaps.isNotEmpty()) {
             try {
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
                     ?: throw Exception("No hay impresora seleccionada")
@@ -306,17 +297,11 @@ fun Alcoholemia02Screen(
                 when (printResult) {
                     is PDFToBitmapPrinter.PrintResult.Success -> {
                         currentPrintStatus = "Impresión enviada"
-                        Toast.makeText(context, "Atestado enviado a imprimir", Toast.LENGTH_SHORT)
-                            .show()
+                        Toast.makeText(context, "Atestado enviado a imprimir", Toast.LENGTH_SHORT).show()
                     }
-
                     is PDFToBitmapPrinter.PrintResult.Error -> {
                         currentPrintStatus = "Error: ${printResult.message}"
-                        Toast.makeText(
-                            context,
-                            "Error al imprimir: ${printResult.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_LONG).show()
                     }
                 }
 
@@ -326,8 +311,9 @@ fun Alcoholemia02Screen(
                 Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
                 Log.e(TAG, "Error en impresión: ${e.message}", e)
             } finally {
-                previewBitmap?.recycle()
-                previewBitmap = null
+                // Reciclar todos los bitmaps
+                previewBitmaps.forEach { it?.recycle() }
+                previewBitmaps.clear()
                 isPrintingAtestado = false
             }
         }
@@ -351,7 +337,7 @@ fun Alcoholemia02Screen(
             alcoholemiaDosViewModel = alcoholemiaDosViewModel,
             impresoraViewModel = impresoraViewModel,
             lecturaDerechosViewModel = lecturaDerechosViewModel,
-            onDatePickerFechaDiligenciasClicked = { showDatePickerFechaDiligencias = true },
+            onDatePickerClicked = { showDatePickerFechaDiligencias = true },
             showDatePickerFechaDiligencias = showDatePickerFechaDiligencias,
             isPrintingAtestado = isPrintingAtestado,
             onPrintAtestadoTrigger = {
@@ -408,8 +394,8 @@ fun Alcoholemia02Screen(
                         context.packageManager.queryIntentActivities(chosenIntent, 0)
                     if (resolveInfoList.isNotEmpty()) {
                         Log.d(TAG, "Apps que pueden manejar ACTION_GET_CONTENT:")
-                        resolveInfoList.forEach {
-                            Log.d(TAG, "- ${it.activityInfo.packageName}: ${it.activityInfo.name}")
+                        resolveInfoList.forEach { info ->
+                            Log.d(TAG, "- ${info.activityInfo.packageName}: ${info.activityInfo.name}")
                         }
                     } else {
                         Log.w(TAG, "Ninguna app puede manejar ACTION_GET_CONTENT")
@@ -481,13 +467,13 @@ fun Alcoholemia02Screen(
         if (isPrintingAtestado) {
             FullScreenProgressIndicator(text = "Imprimiendo atestado...")
         }
-        BitmapPreviewDialog(
-            bitmap = previewBitmap,
+        BitmapPreviewDialogCompact(
+            bitmaps = previewBitmaps, // Pasar la lista de bitmaps
             onConfirm = { showPreviewDialog = false },
             onDismiss = {
                 showPreviewDialog = false
-                previewBitmap?.recycle()
-                previewBitmap = null
+                previewBitmaps.forEach { it?.recycle() }
+                previewBitmaps.clear()
                 isPrintingAtestado = false
                 currentPrintStatus = "Impresión cancelada"
                 scope.launch {
@@ -633,7 +619,7 @@ fun getLocationData(
 }
 
 /**
- * Normaliza el nombre del municipio para coincidir con los datos en juzgados.db.
+ * Normaliza el nombre del municipio para que coincida con los datos en juzgados.db.
  *
  * @param municipio Nombre del municipio devuelto por Nominatim.
  * @return Municipio normalizado.
@@ -648,6 +634,7 @@ private fun normalizeMunicipio(municipio: String): String {
  * Obtiene el partido judicial a partir del lugar de diligencias consultando juzgados.db.
  *
  * @param lugarDiligencias Cadena con el lugar de diligencias (formato: "carretera, pk, municipio, provincia").
+ * @param context Contexto de la aplicación.
  * @return Nombre del partido judicial o un mensaje por defecto si no se encuentra.
  */
 fun getPartidoJudicial(lugarDiligencias: String, context: Context): String {
@@ -691,7 +678,7 @@ fun getPartidoJudicial(lugarDiligencias: String, context: Context): String {
             return "no disponible"
         }
     } catch (e: Exception) {
-        Log.e(TAG, "Error consultando partido judicial: ${e.message}", e)
+        Log.e(TAG, "Error al consultar partido judicial: ${e.message}", e)
         return "no disponible"
     }
 }
@@ -700,16 +687,6 @@ fun getPartidoJudicial(lugarDiligencias: String, context: Context): String {
  * Contenido principal de la pantalla de alcoholemia (paso 2).
  * Muestra los campos para fecha, hora, ubicación, opciones de firma y vehículo, y botones de acción.
  *
- * @param modifier Modificador para ajustar el diseño.
- * @param alcoholemiaDosViewModel ViewModel que maneja el estado de la pantalla.
- * @param impresoraViewModel ViewModel para gestionar la configuración de la impresora.
- * @param lecturaDerechosViewModel ViewModel con datos de la lectura de derechos.
- * @param onDatePickerFechaDiligenciasClicked Callback cuando se hace clic en el selector de fecha.
- * @param showDatePickerFechaDiligencias Estado que controla si se muestra el selector de fecha.
- * @param isPrintingAtestado Estado que indica si se está imprimiendo el atestado.
- * @param onPrintAtestadoTrigger Callback para disparar la impresión del atestado.
- * @param onInvalidLugarInvestigacion Callback para manejar lugarInvestigacion inválido.
- * @param onOpenStorage Callback para abrir el directorio de almacenamiento.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -718,7 +695,7 @@ private fun Alcoholemia02Content(
     alcoholemiaDosViewModel: AlcoholemiaDosViewModel,
     impresoraViewModel: ImpresoraViewModel,
     lecturaDerechosViewModel: LecturaDerechosViewModel,
-    onDatePickerFechaDiligenciasClicked: () -> Unit,
+    onDatePickerClicked: () -> Unit,
     showDatePickerFechaDiligencias: Boolean,
     isPrintingAtestado: Boolean,
     onPrintAtestadoTrigger: () -> Unit,
@@ -751,17 +728,44 @@ private fun Alcoholemia02Content(
     var signatureType by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    // Actualizar firmaInvestigado cuando cambia deseaFirmar
+    // Manejar cambios en deseaFirmar
     LaunchedEffect(deseaFirmar) {
         if (!deseaFirmar) {
-            alcoholemiaDosViewModel.updateFirmaInvestigado("NO DESEA FIRMAR")
-            Log.d("Alcoholemia02Screen", "deseaFirmar es false, configurando firmaInvestigado como 'NO DESEA FIRMAR'")
+            try {
+                // Cargar la imagen no_desea_firmar.png desde drawable
+                val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.no_desea_firmar)
+                if (bitmap == null) {
+                    Log.e(TAG, "No se pudo cargar no_desea_firmar.png desde drawable")
+                    alcoholemiaDosViewModel.updateFirmaInvestigado(null)
+                    return@LaunchedEffect
+                }
+
+                // Guardar la imagen en cacheDir como signature_investigado.png
+                val signatureFile = File(context.cacheDir, "signature_investigado.png")
+                FileOutputStream(signatureFile).use { outputStream ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                }
+                bitmap.recycle()
+
+                // Verificar que el archivo existe y es legible
+                if (!signatureFile.exists() || !signatureFile.canRead()) {
+                    Log.e(TAG, "Archivo signature_investigado.png no creado o no legible: ${signatureFile.absolutePath}")
+                    alcoholemiaDosViewModel.updateFirmaInvestigado(null)
+                    return@LaunchedEffect
+                }
+
+                val fileUri = "file://${signatureFile.absolutePath}"
+                Log.d(TAG, "Imagen no_desea_firmar.png copiada a: $fileUri")
+                alcoholemiaDosViewModel.updateFirmaInvestigado(fileUri)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al copiar no_desea_firmar.png: ${e.message}", e)
+                alcoholemiaDosViewModel.updateFirmaInvestigado(null)
+            }
         } else {
+            Log.d(TAG, "deseaFirmar es true, limpiando firmaInvestigado")
             alcoholemiaDosViewModel.updateFirmaInvestigado(null)
-            Log.d("Alcoholemia02Screen", "deseaFirmar es true, limpiando firmaInvestigado")
         }
     }
-
 
     // Log para cambios en lugarCoincide
     LaunchedEffect(lugarCoincide, lugarInvestigacion) {
@@ -796,9 +800,7 @@ private fun Alcoholemia02Content(
                 Button(
                     onClick = {
                         alcoholemiaDosViewModel.updateHoraInicio(
-                            "${timePickerState.hour}:${
-                                timePickerState.minute.toString().padStart(2, '0')
-                            }"
+                            "${timePickerState.hour}:${timePickerState.minute.toString().padStart(2, '0')}"
                         )
                         showTimePicker = false
                     }
@@ -839,7 +841,7 @@ private fun Alcoholemia02Content(
                 keyboardType = KeyboardType.Decimal,
                 leadingIcon = {
                     IconButton(
-                        onClick = onDatePickerFechaDiligenciasClicked,
+                        onClick = onDatePickerClicked,
                         modifier = Modifier.size(35.dp)
                     ) {
                         Icon(
@@ -874,7 +876,7 @@ private fun Alcoholemia02Content(
             color = Color.Black,
             modifier = Modifier
                 .padding(vertical = 8.dp)
-                .fillMaxSize(),
+                .fillMaxWidth(),
             textAlign = TextAlign.Center,
             fontSize = 20.sp
         )
@@ -949,7 +951,7 @@ private fun Alcoholemia02Content(
             color = Color.Black,
             modifier = Modifier
                 .padding(vertical = 8.dp)
-                .fillMaxSize(),
+                .fillMaxWidth(),
             textAlign = TextAlign.Center,
             fontSize = 20.sp
         )
@@ -984,26 +986,26 @@ private fun Alcoholemia02Content(
 
         if (showSignatureDialog) {
             SignatureCaptureScreen(
-                signatureType = signatureType, // Pasar signatureType
+                signatureType = signatureType,
                 onSignatureCaptured = { filePath ->
                     when (signatureType) {
                         "investigado" -> {
                             alcoholemiaDosViewModel.updateFirmaInvestigado(filePath)
-                            Log.d("Alcoholemia02Screen", "Firma investigado capturada: $filePath")
+                            Log.d(TAG, "Firma investigado capturada: $filePath")
                         }
                         "segundo_conductor" -> {
                             alcoholemiaDosViewModel.updateFirmaSegundoConductor(filePath)
-                            Log.d("Alcoholemia02Screen", "Firma segundo conductor capturada: $filePath")
+                            Log.d(TAG, "Firma segundo conductor capturada: $filePath")
                         }
                         "instructor" -> {
                             alcoholemiaDosViewModel.updateFirmaInstructor(filePath)
-                            Log.d("Alcoholemia02Screen", "Firma instructor capturada: $filePath")
+                            Log.d(TAG, "Firma instructor capturada: $filePath")
                         }
                         "secretario" -> {
                             alcoholemiaDosViewModel.updateFirmaSecretario(filePath)
-                            Log.d("Alcoholemia02Screen", "Firma secretario capturada: $filePath")
+                            Log.d(TAG, "Firma secretario capturada: $filePath")
                         }
-                        else -> Log.w("Alcoholemia02Screen", "Tipo de firma desconocido: $signatureType")
+                        else -> Log.w(TAG, "Tipo de firma desconocido: $signatureType")
                     }
                     showSignatureDialog = false
                 },
@@ -1215,9 +1217,6 @@ private fun AlcoholemiaTopBar() {
 /**
  * Barra inferior de la pantalla de alcoholemia con botones de acción.
  * Incluye botones para guardar y limpiar los datos.
- *
- * @param viewModel ViewModel para manejar las acciones.
- * @param navigateToScreen Función para navegar a otras pantallas.
  */
 @Composable
 private fun AlcoholemiaBottomBar(
@@ -1268,12 +1267,6 @@ private fun AlcoholemiaBottomBar(
 
 /**
  * Campo de texto personalizado con estilo específico para la pantalla de alcoholemia.
- *
- * @param value Valor actual del campo.
- * @param onValueChange Callback cuando cambia el valor.
- * @param label Texto de la etiqueta.
- * @param modifier Modificador para ajustar el diseño.
- * @param enabled Estado de habilitación del campo.
  */
 @Composable
 private fun CustomTextField(
@@ -1304,14 +1297,6 @@ private fun CustomTextField(
 
 /**
  * Campo de texto personalizado con icono principal para la pantalla de alcoholemia.
- *
- * @param value Valor actual del campo.
- * @param onValueChange Callback cuando cambia el valor.
- * @param label Texto de la etiqueta.
- * @param placeholder Texto del marcador de posición.
- * @param keyboardType Tipo de teclado a mostrar.
- * @param modifier Modificador para ajustar el diseño.
- * @param leadingIcon Icono principal del campo.
  */
 @Composable
 private fun CustomOutlinedTextFieldAlcohol(
@@ -1319,8 +1304,8 @@ private fun CustomOutlinedTextFieldAlcohol(
     onValueChange: (String) -> Unit,
     label: String,
     placeholder: String,
-    keyboardType: KeyboardType = KeyboardType.Text,
-    modifier: Modifier = Modifier.fillMaxWidth(),
+    keyboardType: KeyboardType,
+    modifier: Modifier = Modifier,
     leadingIcon: @Composable (() -> Unit)? = null
 ) {
     OutlinedTextField(
@@ -1334,7 +1319,7 @@ private fun CustomOutlinedTextFieldAlcohol(
                 textDecoration = TextDecoration.Underline
             )
         },
-        shape = MaterialTheme.shapes.extraSmall,
+        shape = RoundedCornerShape(8.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         modifier = modifier.padding(vertical = 4.dp),
         singleLine = true,
@@ -1343,11 +1328,7 @@ private fun CustomOutlinedTextFieldAlcohol(
 }
 
 /**
- * Opción de checkbox con estilo personalizado.
- *
- * @param text Texto descriptivo de la opción.
- * @param checked Estado actual del checkbox.
- * @param onCheckedChange Callback cuando cambia el estado.
+ * Opción de selección con checkbox para la pantalla de alcoholemia.
  */
 @Composable
 private fun CheckboxOption(
@@ -1380,9 +1361,6 @@ private fun CheckboxOption(
 /**
  * Diálogo para seleccionar fecha con formato específico.
  * Muestra un selector de fecha y formatea la selección como "d 'de' MMMM 'de' yyyy".
- *
- * @param onDateSelected Callback cuando se selecciona una fecha.
- * @param onDismiss Callback cuando se cancela el diálogo.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1390,12 +1368,12 @@ fun getDateDialogDiligencias(
     onDateSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val state = rememberDatePickerState()
+    val datePickerState = rememberDatePickerState()
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             Button(onClick = {
-                val selectedDate = state.selectedDateMillis?.let {
+                val selectedDate = datePickerState.selectedDateMillis?.let {
                     val localDate = Instant.ofEpochMilli(it)
                         .atZone(ZoneId.systemDefault())
                         .toLocalDate()
@@ -1415,10 +1393,9 @@ fun getDateDialogDiligencias(
             }
         }
     ) {
-        DatePicker(state = state)
+        DatePicker(state = datePickerState)
     }
 }
-
 
 private fun isValidPdf(file: File): Boolean {
     return try {

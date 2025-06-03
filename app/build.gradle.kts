@@ -157,6 +157,8 @@ dependencies {
 
     implementation(libs.androidx.documentfile)
 
+    implementation (libs.androidx.foundation)
+
 
 }
 

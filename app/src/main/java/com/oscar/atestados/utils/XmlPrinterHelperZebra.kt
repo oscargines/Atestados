@@ -52,6 +52,10 @@ class XmlPrinterHelperZebra(private val context: Context) {
             }
             Log.i(TAG, "Conexión establecida con $macAddress")
 
+            // Configurar orientación normal
+            connection.write("! U1 setvar \"device.languages\" \"cpcl\"\r\n".toByteArray())
+            connection.write("! U1 SETFF 0 0\n".toByteArray()) // Asegura orientación normal
+
             // Parsear el XML manualmente
             val parser = Xml.newPullParser()
             parser.setInput(ByteArrayInputStream(xmlContent.toByteArray(Charsets.UTF_8)), "UTF-8")
@@ -97,6 +101,7 @@ class XmlPrinterHelperZebra(private val context: Context) {
             connection = BluetoothConnection(macAddress)
             connection.open()
             val templateContent = """
+            ! U1 SETFF 0 0
             ! 0 200 200 1050 1
             TEXT 4 0 10 10 {Title}
             TEXT 4 0 10 50 {Intro}

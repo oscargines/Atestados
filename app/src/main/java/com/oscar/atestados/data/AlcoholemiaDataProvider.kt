@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.util.Base64
 import android.util.Log
 import com.itextpdf.io.source.ByteArrayOutputStream
-import com.oscar.atestados.R
 import com.oscar.atestados.viewModel.*
 import java.io.File
 
@@ -20,66 +19,43 @@ class AlcoholemiaDataProvider(
     private val lecturaDerechosViewModel: LecturaDerechosViewModel,
     private val guardiasViewModel: GuardiasViewModel,
     private val db: AccesoBaseDatos,
-    private val context: Context // Añadido para acceder a recursos
+    private val context: Context
 ) : DocumentDataProvider {
 
     companion object {
         private const val TAG = "AlcoholemiaDataProvider"
     }
 
-    private fun encodeBitmapToBase64(filePath: String): String {
-        if (filePath == "NO DESEA FIRMAR") {
-            Log.d(TAG, "No desea firmar, cargando imagen no_desea_firmar.png")
-            try {
-                // Cargar la imagen desde res/drawable
-                val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.no_desea_firmar)
-                if (bitmap == null) {
-                    Log.e(TAG, "No se pudo cargar no_desea_firmar.png desde recursos")
-                    return ""
-                }
-                val byteArrayOutputStream = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-                val byteArray = byteArrayOutputStream.toByteArray()
-                bitmap.recycle()
-                val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
-                val dataUri = "data:image/png;base64,$base64String"
-                Log.d(TAG, "Imagen no_desea_firmar.png convertida a Base64")
-                return dataUri
-            } catch (e: Exception) {
-                Log.e(TAG, "Error al procesar no_desea_firmar.png: ${e.message}", e)
-                return ""
-            }
-        }
-
-        if (filePath.isEmpty()) {
-            Log.w(TAG, "Ruta de archivo vacía")
+    private fun encodeBitmapToBase64(filePath: String?): String {
+        if (filePath.isNullOrEmpty()) {
+            Log.w(TAG, "Ruta de archivo nula o vacía")
             return ""
         }
 
         val cleanPath = filePath.removePrefix("file://")
         val file = File(cleanPath)
+
         if (!file.exists() || !file.canRead()) {
-            Log.e(TAG, "Archivo de firma no encontrado o no legible: $cleanPath")
+            Log.e(TAG, "Archivo no encontrado o no legible: $cleanPath")
             return ""
         }
 
-        try {
+        return try {
             val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-            if (bitmap == null) {
+            if (bitmap != null) {
+                val outputStream = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                val byteArray = outputStream.toByteArray()
+                bitmap.recycle()
+                val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                "data:image/png;base64,$base64String"
+            } else {
                 Log.e(TAG, "No se pudo decodificar el bitmap desde: $cleanPath")
-                return ""
+                ""
             }
-            val byteArrayOutputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
-            val byteArray = byteArrayOutputStream.toByteArray()
-            bitmap.recycle()
-            val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
-            val dataUri = "data:image/png;base64,$base64String"
-            Log.d(TAG, "Firma convertida a Base64: $dataUri")
-            return dataUri
         } catch (e: Exception) {
-            Log.e(TAG, "Error al codificar firma a Base64: ${e.message}", e)
-            return ""
+            Log.e(TAG, "Error al codificar imagen a Base64: ${e.message}", e)
+            ""
         }
     }
 
@@ -116,9 +92,31 @@ class AlcoholemiaDataProvider(
         val matriculaVehiculo = vehiculoViewModel.matricula.value ?: ""
 
         // Usar rutas de archivo para las firmas
-        val firmaInvestigado = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInvestigado.value ?: "")
-        val firmaInstructor = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInstructor.value ?: "")
-        val firmaSecretario = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaSecretario.value ?: "")
+        val firmaInvestigado = if (!alcoholemiaDosViewModel.deseaFirmar.value!! && alcoholemiaDosViewModel.firmaInvestigado.value.isNullOrEmpty()) {
+            // Si no desea firmar y no hay firma, usar no_desea_firmar.png
+            try {
+                val bitmap = BitmapFactory.decodeResource(context.resources, com.oscar.atestados.R.drawable.no_desea_firmar)
+                if (bitmap != null) {
+                    val byteArrayOutputStream = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+                    val byteArray = byteArrayOutputStream.toByteArray()
+                    bitmap.recycle()
+                    val base64String = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                    "data:image/png;base64,$base64String"
+                } else {
+                    Log.e(TAG, "No se pudo cargar no_desea_firmar.png desde recursos")
+                    ""
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al codificar no_desea_firmar.png: ${e.message}", e)
+                ""
+            }
+        } else {
+            encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInvestigado.value)
+        }
+
+        val firmaInstructor = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaInstructor.value)
+        val firmaSecretario = encodeBitmapToBase64(alcoholemiaDosViewModel.firmaSecretario.value)
 
         return mapOf(
             "lugar" to lugarDiligencias,
@@ -148,9 +146,9 @@ class AlcoholemiaDataProvider(
             "num_serie_eti" to (alcoholemiaUnoViewModel.serie.value ?: ""),
             "letra_investigacion" to letraInvestigacion,
             "desea_realizar_pruebas" to (alcoholemiaUnoViewModel.opcionDeseaPruebas.value?.uppercase() ?: "NO"),
-            "firma_den" to firmaInvestigado,
-            "firma_tip_instructor" to firmaInstructor,
-            "firma_tip_secretario" to firmaSecretario
+            "firma_inestigado" to firmaInvestigado,
+            "firma_instructor" to firmaInstructor,
+            "firma_secretario" to firmaSecretario
         ).also { data ->
             Log.d(TAG, "Mapa de datos: ${data.entries.joinToString("\n") { "${it.key}=${it.value}" }}")
         }
@@ -170,7 +168,8 @@ class AlcoholemiaDataProvider(
             "modelo_etilometro" to "Modelo del etilómetro",
             "num_serie_eti" to "Número de serie del etilómetro",
             "letra_investigacion" to "Motivo de la investigación",
-            "desea_realizar_pruebas" to "Deseo de realizar pruebas"
+            "desea_realizar_pruebas" to "Deseo de realizar pruebas",
+            "firma_inestigado" to "Firma del investigado"
         )
 
         val missingFields = requiredFields.keys.filter { field ->
