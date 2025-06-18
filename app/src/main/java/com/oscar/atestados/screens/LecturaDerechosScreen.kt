@@ -44,6 +44,12 @@ import java.util.*
 
 private const val TAG = "LecturaDerechosScreen"
 
+/**
+ * Pantalla principal para la lectura de derechos durante una investigación.
+ *
+ * @param navigateToScreen Función para navegar a otras pantallas.
+ * @param lecturaDerechosViewModel ViewModel que maneja la lógica y estado de la pantalla.
+ */
 @Composable
 fun LecturaDerechosScreen(
     navigateToScreen: (String) -> Unit,
@@ -106,6 +112,9 @@ fun LecturaDerechosScreen(
     }
 }
 
+/**
+ * Barra superior de la pantalla de lectura de derechos.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LecturaDerechosTopBar() {
@@ -133,6 +142,13 @@ private fun LecturaDerechosTopBar() {
     )
 }
 
+/**
+ * Contenido principal de la pantalla de lectura de derechos.
+ *
+ * @param modifier Modificador para ajustar el diseño.
+ * @param lecturaDerechosViewModel ViewModel que maneja el estado de la pantalla.
+ * @param fusedLocationClient Cliente para obtener la ubicación del dispositivo.
+ */
 @Composable
 private fun LecturaDerechosContent(
     modifier: Modifier = Modifier,
@@ -202,7 +218,8 @@ private fun LecturaDerechosContent(
             },
             label = "Lugar, hora y fecha de la investigación",
             singleLine = false,
-            maxLines = 1,
+            maxLines = 2,
+            minLines = 1,
             leadingIcon = {
                 IconButton(
                     onClick = {
@@ -299,8 +316,10 @@ private fun LecturaDerechosContent(
                 Log.d(TAG, "LugarDelito updated to: $it")
             },
             label = "Lugar, hora y fecha de la comisión del delito",
+            modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
             singleLine = false,
-            maxLines = 1
+            maxLines = 2,
+            minLines = 1
         )
 
         CustomTextField(
@@ -341,6 +360,13 @@ private fun LecturaDerechosContent(
     }
 }
 
+/**
+ * Barra inferior de la pantalla con botones de acción.
+ *
+ * @param viewModel ViewModel para manejar las acciones de los botones.
+ * @param navigateToScreen Función para navegar a otras pantallas.
+ * @param context Contexto de la aplicación.
+ */
 @Composable
 private fun LecturaDerechosBottomBar(
     viewModel: LecturaDerechosViewModel,
@@ -390,6 +416,13 @@ private fun LecturaDerechosBottomBar(
     }
 }
 
+/**
+ * Componente de opción de radio personalizado.
+ *
+ * @param text Texto a mostrar junto al radio button.
+ * @param selected Indica si la opción está seleccionada.
+ * @param onSelect Callback cuando se selecciona la opción.
+ */
 @Composable
 private fun RadioOption(
     text: String,
@@ -416,6 +449,17 @@ private fun RadioOption(
     }
 }
 
+/**
+ * Campo de texto personalizado con estilo consistente.
+ *
+ * @param value Valor actual del campo de texto.
+ * @param onValueChange Callback cuando cambia el valor.
+ * @param label Etiqueta descriptiva del campo.
+ * @param modifier Modificador para ajustar el diseño.
+ * @param singleLine Indica si el campo debe ser de una sola línea.
+ * @param maxLines Número máximo de líneas visibles.
+ * @param leadingIcon Icono opcional a mostrar al inicio del campo.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CustomTextField(
@@ -423,8 +467,9 @@ private fun CustomTextField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
-    singleLine: Boolean = true,
-    maxLines: Int = 1,
+    singleLine: Boolean = false,  // Cambiado por defecto a false
+    maxLines: Int = 3,           // Aumentado por defecto
+    minLines: Int = 1,           // Añadido nuevo parámetro
     leadingIcon: @Composable (() -> Unit)? = null
 ) {
     OutlinedTextField(
@@ -436,6 +481,7 @@ private fun CustomTextField(
             .padding(vertical = 8.dp),
         singleLine = singleLine,
         maxLines = maxLines,
+        minLines = minLines,      // Añadido control de líneas mínimas
         leadingIcon = leadingIcon,
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedBorderColor = TextoSecundarios,

@@ -47,10 +47,11 @@ import com.oscar.atestados.utils.PDFToBitmapPrinter
 import com.oscar.atestados.utils.PdfToBitmapConverter
 import com.oscar.atestados.utils.HtmlParser
 import com.oscar.atestados.utils.PDFA4Printer
+import com.oscar.atestados.utils.PdfUtils
+import com.oscar.atestados.utils.PDFMerger
 import com.oscar.atestados.data.AlcoholemiaDataProvider
 import com.oscar.atestados.ui.composables.MissingFieldsDialog
 import com.oscar.atestados.ui.composables.FullScreenProgressIndicator
-import com.oscar.atestados.ui.composables.BitmapPreviewDialog
 import com.oscar.atestados.viewModel.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -67,7 +68,6 @@ import java.util.*
 import kotlin.text.Regex
 import com.itextpdf.kernel.pdf.PdfReader
 import com.oscar.atestados.utils.PDFLabelPrinterZebra
-import com.oscar.atestados.utils.PdfUtils
 import kotlinx.coroutines.delay
 
 private const val TAG = "Alcoholemia02Screen"
@@ -176,110 +176,165 @@ fun Alcoholemia02Screen(
                     return@LaunchedEffect
                 }
 
-                currentPrintStatus = "Preparando documento..."
-                val tempHtmlFilePath = withContext(Dispatchers.IO) {
-                    htmlParser.generateHtmlFile(
-                        templateAssetPath = "documents/ah01.html",
-                        dataProvider = dataProvider
-                    )
-                }
-                val htmlContent = withContext(Dispatchers.IO) {
-                    File(tempHtmlFilePath).readText(Charsets.UTF_8)
-                }
-
-                // Generar el PDF para Zebra para previsualización
-                currentPrintStatus = "Generando PDF para impresora Zebra..."
-                val zebraPrinter = PDFLabelPrinterZebra(context)
-                val previewFile = File.createTempFile("atestado_zebra_preview", ".pdf", context.cacheDir)
-                zebraPrinter.generarEtiquetaPdf(htmlContent, previewFile)
-
-                if (!previewFile.exists() || previewFile.length() == 0L) {
-                    currentPrintStatus = "Error al generar PDF para Zebra"
-                    Toast.makeText(context, "Error al generar PDF para Zebra", Toast.LENGTH_LONG).show()
-                    isPrintingAtestado = false
-                    withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
-                    return@LaunchedEffect
-                }
-
-                // Generar PDF A4 solo para guardar en almacenamiento usando PdfUtils
-                currentPrintStatus = "Generando PDF A4..."
-                val outputFile =
-                    PdfUtils.writePdfToStorage(htmlContent, "atestado_a4.pdf", pdfA4Printer, context)
-                if (outputFile == null) {
-                    currentPrintStatus = "Error al generar PDF A4"
-                    Toast.makeText(context, "Error al generar PDF A4", Toast.LENGTH_LONG).show()
-                    isPrintingAtestado = false
-                    withContext(Dispatchers.IO) {
-                        File(tempHtmlFilePath).delete()
-                        previewFile.delete()
+                currentPrintStatus = "Preparando documentos..."
+                // Lista de plantillas HTML a procesar
+                val templates = listOf(
+                    "documents/ah01.html",
+                    "documents/ah02.html",
+                    "documents/ah03.html",
+                    "documents/ah04.html",
+                    "documents/ah05.html",
+                    "documents/ah06.html"
+                )
+                // Generar PDFs para cada plantilla y almacenarlos temporalmente
+                val tempPdfFiles = mutableListOf<File>()
+                templates.forEachIndexed { index, templatePath ->
+                    currentPrintStatus = "Generando PDF para ${templatePath.split("/").last()}..."
+                    val tempHtmlFilePath = withContext(Dispatchers.IO) {
+                        htmlParser.generateHtmlFile(
+                            templatePath = templatePath,
+                            dataProvider = dataProvider
+                        )
                     }
+                    val htmlContent = withContext(Dispatchers.IO) {
+                        File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                    }
+
+                    // Generar PDF para Zebra (previsualización e impresión)
+                    val zebraPrinter = PDFLabelPrinterZebra(context)
+                    val tempZebraPdf = File.createTempFile("atestado_zebra_${index}", ".pdf", context.cacheDir)
+                    zebraPrinter.generarEtiquetaPdf(htmlContent, tempZebraPdf)
+
+                    if (!tempZebraPdf.exists() || tempZebraPdf.length() == 0L) {
+                        currentPrintStatus = "Error al generar PDF para ${templatePath.split("/").last()}"
+                        Toast.makeText(context, "Error al generar PDF para ${templatePath.split("/").last()}", Toast.LENGTH_LONG).show()
+                        withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
+                        isPrintingAtestado = false
+                        tempPdfFiles.forEach { it.delete() }
+                        return@LaunchedEffect
+                    }
+
+                    // Generar PDF A4
+                    val tempA4Pdf = File.createTempFile("atestado_a4_${index}", ".pdf", context.cacheDir)
+                    val success = try {
+                        pdfA4Printer.generarDocumentoA4(htmlContent, tempA4Pdf)
+                        true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error al generar PDF A4: ${e.message}", e)
+                        false
+                    }
+                    if (!success || !tempA4Pdf.exists() || tempA4Pdf.length() == 0L) {
+                        currentPrintStatus = "Error al generar PDF A4 para ${templatePath.split("/").last()}"
+                        Toast.makeText(context, "Error al generar PDF A4 para ${templatePath.split("/").last()}", Toast.LENGTH_LONG).show()
+                        withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
+                        isPrintingAtestado = false
+                        tempPdfFiles.forEach { it.delete() }
+                        return@LaunchedEffect
+                    }
+
+                    tempPdfFiles.add(tempA4Pdf)
+                    withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
+                }
+                // Unir todos los PDFs A4 en un solo archivo
+                currentPrintStatus = "Uniendo PDFs..."
+                val outputA4File = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+                    "Atestados/atestado_completo_${System.currentTimeMillis()}.pdf"
+                )
+                outputA4File.parentFile?.mkdirs()
+                if (tempPdfFiles.isNotEmpty()) {
+                    val pdfMerger = PDFMerger() // Instanciar PDFMerger
+                    val firstPdf = tempPdfFiles.first()
+                    firstPdf.copyTo(outputA4File, overwrite = true)
+                    if (tempPdfFiles.size > 1) {
+                        tempPdfFiles.drop(1).forEach { secondaryPdf ->
+                            pdfMerger.unirPDFs(outputA4File, secondaryPdf)
+                        }
+                    }
+                    tempPdfFiles.forEach { it.delete() }
+                } else {
+                    currentPrintStatus = "No se generaron PDFs para unir"
+                    Toast.makeText(context, "No se generaron PDFs", Toast.LENGTH_LONG).show()
+                    isPrintingAtestado = false
                     return@LaunchedEffect
                 }
 
-                // Abrir el PDF A4 usando FileProvider
+                // Abrir el PDF A4 combinado usando FileProvider
                 withContext(Dispatchers.Main) {
                     try {
                         val contentUri = FileProvider.getUriForFile(
                             context,
                             "com.oscar.atestados.fileprovider",
-                            outputFile
+                            outputA4File
                         )
                         val intent = Intent(Intent.ACTION_VIEW).apply {
                             setDataAndType(contentUri, "application/pdf")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
-                        try {
-                            context.startActivity(
-                                Intent.createChooser(
-                                    intent,
-                                    "Seleccionar aplicación para abrir PDF"
-                                )
+                        context.startActivity(
+                            Intent.createChooser(
+                                intent,
+                                "Seleccionar aplicación para abrir PDF"
                             )
-                            currentPrintStatus = "PDF A4 abierto"
-                            Log.d(TAG, "PDF intent lanzado para abrir: $contentUri")
-                        } catch (e: ActivityNotFoundException) {
-                            currentPrintStatus = "No hay aplicación para abrir PDFs"
-                            Log.w(TAG, "No se encontró aplicación para abrir PDFs", e)
-                        }
-                    } catch (e: Exception) {
-                        currentPrintStatus = "Error al abrir PDF A4: ${e.message}"
-                        Log.e(TAG, "Error al abrir PDF A4: ${e.message}", e)
+                        )
+                        currentPrintStatus = "PDF A4 abierto"
+                        Log.d(TAG, "PDF intent lanzado para abrir: $contentUri")
+                    } catch (e: ActivityNotFoundException) {
+                        currentPrintStatus = "No hay aplicación para abrir PDFs"
+                        Log.w(TAG, "No se encontró aplicación para abrir PDFs", e)
+                        Toast.makeText(context, "No hay aplicación para abrir PDFs", Toast.LENGTH_LONG).show()
                     }
                 }
 
-                // Previsualizar el PDF de Zebra
+                // Generar PDF combinado para Zebra (previsualización)
+                currentPrintStatus = "Generando PDF combinado para impresora Zebra..."
+                val zebraPrinter = PDFLabelPrinterZebra(context)
+                val previewFile = File.createTempFile("atestado_zebra_preview", ".pdf", context.cacheDir)
+                val combinedHtmlContent = templates.map { templatePath ->
+                    val tempHtmlFilePath = withContext(Dispatchers.IO) {
+                        htmlParser.generateHtmlFile(
+                            templatePath = templatePath,
+                            dataProvider = dataProvider
+                        )
+                    }
+                    val htmlContent = withContext(Dispatchers.IO) {
+                        File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                    }
+                    withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
+                    htmlContent
+                }.joinToString(separator = "<div style=\"page-break-before: always;\"></div>")
+                zebraPrinter.generarEtiquetaPdf(combinedHtmlContent, previewFile)
+
                 if (!isValidPdf(previewFile)) {
-                    currentPrintStatus = "Error: El archivo PDF no es válido"
-                    Toast.makeText(context, "Error: El archivo PDF no es válido", Toast.LENGTH_LONG).show()
-                    withContext(Dispatchers.IO) {
-                        File(tempHtmlFilePath).delete()
-                        previewFile.delete()
-                    }
+                    currentPrintStatus = "Error: El archivo PDF combinado no es válido"
+                    Toast.makeText(context, "Error: El archivo PDF combinado no es válido", Toast.LENGTH_LONG).show()
                     isPrintingAtestado = false
+                    previewFile.delete()
+                    return@LaunchedEffect
+                }
+
+                // Previsualizar el PDF combinado
+                val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(previewFile)
+                if (bitmaps.isNotEmpty() && bitmaps.any { it != null }) {
+                    previewBitmaps.clear()
+                    previewBitmaps.addAll(bitmaps)
+                    showPreviewDialog = true
+                    currentPrintStatus = "Mostrando previsualización de ${bitmaps.size} página(s)"
+                    Log.d(TAG, "Bitmaps generados: ${bitmaps.size} páginas")
                 } else {
-                    val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(previewFile)
-                    if (bitmaps.isNotEmpty() && bitmaps.any { it != null }) {
-                        previewBitmaps.clear()
-                        previewBitmaps.addAll(bitmaps) // Guardar todos los bitmaps
-                        showPreviewDialog = true
-                        currentPrintStatus = "Mostrando previsualización de ${bitmaps.size} página(s)"
-                        Log.d(TAG, "Bitmaps generados: ${bitmaps.size} páginas")
-                    } else {
-                        currentPrintStatus = "Error al generar previsualización"
-                        Toast.makeText(context, "Error al generar las imágenes", Toast.LENGTH_SHORT).show()
-                        withContext(Dispatchers.IO) {
-                            File(tempHtmlFilePath).delete()
-                            previewFile.delete()
-                        }
-                        isPrintingAtestado = false
-                    }
+                    currentPrintStatus = "Error al generar previsualización"
+                    Toast.makeText(context, "Error al generar las imágenes", Toast.LENGTH_SHORT).show()
+                    isPrintingAtestado = false
+                    previewFile.delete()
                 }
             } catch (e: Exception) {
                 currentPrintStatus = "Error al generar documentos: ${e.message}"
                 Toast.makeText(context, "Error al generar documentos: ${e.message}", Toast.LENGTH_LONG).show()
                 Log.e(TAG, "Error en generación de documentos: ${e.message}", e)
                 isPrintingAtestado = false
+                previewBitmaps.forEach { it?.recycle() }
+                previewBitmaps.clear()
             }
         }
     }
@@ -288,27 +343,39 @@ fun Alcoholemia02Screen(
     LaunchedEffect(showPreviewDialog) {
         if (!showPreviewDialog && isPrintingAtestado && previewBitmaps.isNotEmpty()) {
             try {
-                // Cerrar el diálogo y mostrar el progreso
                 currentPrintStatus = "Preparando impresión..."
-
                 val macAddress = impresoraViewModel.getSelectedPrinterMac()
                     ?: throw Exception("No hay impresora seleccionada")
-                val tempHtmlFilePath = withContext(Dispatchers.IO) {
-                    htmlParser.generateHtmlFile(
-                        templateAssetPath = "documents/ah01.html",
-                        dataProvider = dataProvider
-                    )
-                }
-                val htmlContent = withContext(Dispatchers.IO) {
-                    File(tempHtmlFilePath).readText(Charsets.UTF_8)
-                }
+
+                // Generar HTML combinado para impresión
+                val templates = listOf(
+                    "documents/ah01.html",
+                    "documents/ah02.html",
+                    "documents/ah03.html",
+                    "documents/ah04.html",
+                    "documents/ah05.html",
+                    "documents/ah06.html"
+                )
+                val combinedHtmlContent = templates.map { templatePath ->
+                    val tempHtmlFilePath = withContext(Dispatchers.IO) {
+                        htmlParser.generateHtmlFile(
+                            templatePath = templatePath,
+                            dataProvider = dataProvider
+                        )
+                    }
+                    val htmlContent = withContext(Dispatchers.IO) {
+                        File(tempHtmlFilePath).readText(Charsets.UTF_8)
+                    }
+                    withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
+                    htmlContent
+                }.joinToString(separator = "<div style=\"page-break-before: always;\"></div>")
 
                 currentPrintStatus = "Enviando a imprimir..."
                 val printResult = pdfToBitmapPrinter.printHtmlAsBitmap(
                     htmlAssetPath = "",
                     macAddress = macAddress,
-                    outputFileName = "atestado_temp.pdf",
-                    htmlContent = htmlContent,
+                    outputFileName = "atestado_completo.pdf",
+                    htmlContent = combinedHtmlContent,
                     onStatusUpdate = { status ->
                         scope.launch(Dispatchers.Main) { currentPrintStatus = status }
                     }
@@ -324,14 +391,11 @@ fun Alcoholemia02Screen(
                         Toast.makeText(context, "Error al imprimir: ${printResult.message}", Toast.LENGTH_LONG).show()
                     }
                 }
-
-                withContext(Dispatchers.IO) { File(tempHtmlFilePath).delete() }
             } catch (e: Exception) {
                 currentPrintStatus = "Error al imprimir: ${e.message}"
                 Toast.makeText(context, "Error al imprimir: ${e.message}", Toast.LENGTH_LONG).show()
                 Log.e(TAG, "Error en impresión: ${e.message}", e)
             } finally {
-                // Reciclar todos los bitmaps
                 previewBitmaps.forEach { it?.recycle() }
                 previewBitmaps.clear()
                 isPrintingAtestado = false
@@ -376,17 +440,14 @@ fun Alcoholemia02Screen(
                         atestadosDir.mkdirs()
                         Log.d(TAG, "Directorio Atestados creado en ${atestadosDir.absolutePath}")
                     }
-                    // Log files in directory for debugging
                     atestadosDir.listFiles()?.forEach { file ->
                         Log.d(
                             TAG,
                             "Archivo en Atestados: ${file.name}, readable: ${file.canRead()}, size: ${file.length()}"
                         )
                     } ?: Log.d(TAG, "No hay archivos en Atestados o directorio inaccesible")
-                    // Crear una DocumentsContract URI
                     val documentsUri =
                         Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments%2FAtestados")
-                    // Intent para DocumentsUI
                     val documentsUiIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
                         type = "*/*"
                         putExtra(Intent.EXTRA_LOCAL_ONLY, true)
@@ -395,7 +456,6 @@ fun Alcoholemia02Screen(
                         putExtra("android.provider.extra.INITIAL_URI", documentsUri)
                         setPackage("com.google.android.documentsui")
                     }
-                    // Intent genérico como fallback
                     val genericIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
                         type = "*/*"
                         putExtra(Intent.EXTRA_LOCAL_ONLY, true)
@@ -403,13 +463,11 @@ fun Alcoholemia02Screen(
                         putExtra("android.content.extra.SHOW_ADVANCED", true)
                         putExtra("android.provider.extra.INITIAL_URI", documentsUri)
                     }
-                    // Verificar si DocumentsUI está disponible
                     val documentsUiAvailable =
                         context.packageManager.queryIntentActivities(documentsUiIntent, 0)
                             .isNotEmpty()
                     val chosenIntent =
                         if (documentsUiAvailable) documentsUiIntent else genericIntent
-                    // Log apps que pueden manejar el intent
                     val resolveInfoList =
                         context.packageManager.queryIntentActivities(chosenIntent, 0)
                     if (resolveInfoList.isNotEmpty()) {
@@ -420,7 +478,6 @@ fun Alcoholemia02Screen(
                     } else {
                         Log.w(TAG, "Ninguna app puede manejar ACTION_GET_CONTENT")
                     }
-                    // Mostrar toast de guía
                     Toast.makeText(
                         context,
                         "Busque los PDFs en Documents > Atestados",
@@ -490,7 +547,6 @@ fun Alcoholemia02Screen(
         BitmapPreviewDialogCompact(
             bitmaps = previewBitmaps,
             onConfirm = {
-                // No establecer isPrintingAtestado aquí, se maneja en onPrintingStarted
                 showPreviewDialog = false
             },
             onDismiss = {
@@ -504,7 +560,7 @@ fun Alcoholemia02Screen(
                 }
             },
             onPrintingStarted = {
-                isPrintingAtestado = true // Activar el indicador de progreso
+                isPrintingAtestado = true
                 currentPrintStatus = "Iniciando impresión..."
             }
         )

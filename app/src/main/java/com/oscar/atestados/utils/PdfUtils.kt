@@ -12,6 +12,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.itextpdf.kernel.pdf.PdfDocument
+import com.itextpdf.kernel.pdf.PdfReader
+import com.itextpdf.kernel.pdf.PdfWriter
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -243,6 +246,26 @@ object PdfUtils {
                 Log.e(TAG, "listAtestadosFiles: Error al consultar MediaStore: ${e.message}", e)
             }
             files
+        }
+    }
+    fun unirPDFs(outputFile: File, secondaryPdf: File) {
+        try {
+            PdfWriter(outputFile).use { writer ->
+                PdfDocument(writer).use { outputDoc ->
+                    PdfReader(outputFile).use { primaryReader ->
+                        PdfDocument(primaryReader).use { primaryDoc ->
+                            primaryDoc.copyPagesTo(1, primaryDoc.numberOfPages, outputDoc)
+                        }
+                    }
+                    PdfReader(secondaryPdf).use { secondaryReader ->
+                        PdfDocument(secondaryReader).use { secondaryDoc ->
+                            secondaryDoc.copyPagesTo(1, secondaryDoc.numberOfPages, outputDoc)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            throw RuntimeException("Error al unir PDFs: ${e.message}", e)
         }
     }
 }

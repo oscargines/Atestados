@@ -26,6 +26,7 @@ class PDFToBitmapPrinter(private val context: Context) {
     companion object {
         private const val TAG = "PDFToBitmapPrinter"
         // 99 mm a 200 DPI (99 / 25.4 * 200 ≈ 780 píxeles)
+        const val MAX_HEIGHT_280MM = 2205
         const val PRINT_WIDTH = 780
         private const val PRINT_TIMEOUT_MS = 8000L
     }
@@ -126,6 +127,8 @@ class PDFToBitmapPrinter(private val context: Context) {
      *
      * @note Optimizado para ZQ521 con CPCL, con rotación de 180º y sin segmentación innecesaria.
      */
+    // Tu código original con solo la función printBitmaps modificada
+
     private suspend fun printBitmaps(
         macAddress: String,
         bitmaps: List<Bitmap>,
@@ -150,25 +153,38 @@ class PDFToBitmapPrinter(private val context: Context) {
             onStatusUpdate("Impresora inicializada: $printerLanguage")
             Log.d(TAG, "Lenguaje de la impresora detectado: $printerLanguage")
 
-            // Dimensiones objetivo: 99 mm x 280 mm a 200 DPI
-            val targetWidth = PRINT_WIDTH // 99 mm
-            val targetHeight = ((280f / 99f) * targetWidth).toInt() // Proporcional a 280 mm
-            val maxHeightZQ521 = 4096 // Límite conservador para ZQ521
+            // Configurar tipo de medio y modo de sensor
+            connection.write("! U1 setvar \"media.type\" \"label\"\r\n".toByteArray())
+            connection.write("! U1 setvar \"media.sense_mode\" \"gap\"\r\n".toByteArray())
+            connection.write("! U1 setvar \"media.feed_length\" \"0\"\r\n".toByteArray())
+            delay(1000) // Aumentar tiempo para asegurar que los comandos se procesen
+
+            // Calibrar la impresora
+            connection.write("! U1 CALIBRATE\r\n".toByteArray())
+            delay(2000) // Esperar a que la calibración termine
+
+            val targetWidth = PRINT_WIDTH // 780 px ≈ 99 mm
+            val maxHeightZQ521 = MAX_HEIGHT_280MM
 
             bitmaps.forEachIndexed { index, bitmap ->
-                // Ajustar el bitmap al ancho objetivo
+                Log.d(TAG, "Bitmap original: ${bitmap.width}x${bitmap.height}")
                 val scaledBitmap = if (bitmap.width != targetWidth) {
-                    Bitmap.createScaledBitmap(bitmap, targetWidth, (bitmap.height * targetWidth.toFloat() / bitmap.width).toInt(), true)
+                    Bitmap.createScaledBitmap(
+                        bitmap,
+                        targetWidth,
+                        (bitmap.height * targetWidth.toFloat() / bitmap.width).toInt(),
+                        true
+                    )
                 } else {
                     bitmap
                 }
 
-                // Segmentar solo si excede la memoria de la ZQ521
                 val segments = if (scaledBitmap.height > maxHeightZQ521) {
                     segmentBitmap(scaledBitmap, targetWidth, maxHeightZQ521)
                 } else {
                     listOf(scaledBitmap)
                 }
+                Log.d(TAG, "Segmentos generados: ${segments.size}, alturas: ${segments.map { it.height }}")
 
                 segments.forEachIndexed { segmentIndex, segmentBitmap ->
                     val zebraImage = ZebraImageFactory.getImage(segmentBitmap) as ZebraImageAndroid
@@ -176,39 +192,38 @@ class PDFToBitmapPrinter(private val context: Context) {
 
                     if (printerLanguage == PrinterLanguage.CPCL) {
                         Log.d(TAG, "Ejecutando bloque CPCL con ROTATE 180")
-                        // Asegurar que la impresora esté en modo CPCL
                         connection.write("! U1 setvar \"device.languages\" \"cpcl\"\r\n".toByteArray())
                         delay(500)
 
-                        // Secuencia CPCL robusta con rotación
+                        val yOffset = maxHeightZQ521 - segmentBitmap.height
+
                         val cpclCommand = """
-                            ! 0 200 200 ${segmentBitmap.height} 1
-                            JOURNAL
-                            CLR
-                            DEL R:TEMP.PCX
-                            PW $targetWidth
-                            ROTATE 180
-                            PCX 0 0 R:TEMP.PCX
-                            FORM
-                            PRINT
-                        """.trimIndent()
+                        ! 0 200 200 $maxHeightZQ521 1
+                        LABEL
+                        CLR
+                        DEL R:TEMP.PCX
+                        PW $targetWidth
+                        ROTATE 180
+                        PCX 0 $yOffset R:TEMP.PCX
+                        FORM
+                        PRINT
+                    """.trimIndent()
 
                         Log.d(TAG, "Enviando comando CPCL: $cpclCommand")
                         printer.storeImage("R:TEMP.PCX", zebraImage, segmentBitmap.width, segmentBitmap.height)
                         connection.write(cpclCommand.toByteArray())
                     } else {
                         Log.d(TAG, "Ejecutando bloque ZPL (no esperado para ZQ521 en CPCL)")
-                        // Fallback para ZPL, aunque no debería ejecutarse
                         connection.write("^XA^POI^XZ".toByteArray())
                         delay(500)
                         printer.printImage(zebraImage, 0, 0, segmentBitmap.width, segmentBitmap.height, false)
                         connection.write("^XA^PON^XZ".toByteArray())
                         delay(500)
                     }
-                    delay(2000) // Espera entre segmentos
+
+                    delay(2000)
                 }
 
-                // Reciclar el bitmap escalado si no es el original
                 if (scaledBitmap != bitmap && !scaledBitmap.isRecycled) {
                     scaledBitmap.recycle()
                 }

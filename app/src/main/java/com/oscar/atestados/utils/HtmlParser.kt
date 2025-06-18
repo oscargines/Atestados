@@ -2,177 +2,77 @@ package com.oscar.atestados.utils
 
 import android.content.Context
 import android.util.Log
-import com.itextpdf.styledxmlparser.jsoup.Jsoup
 import com.oscar.atestados.data.DocumentDataProvider
 import java.io.File
-import java.nio.charset.StandardCharsets
 
-private const val TAG = "HtmlParser"
-
-/**
- * Clase utilitaria para analizar plantillas HTML y reemplazar marcadores con valores reales.
- *
- * Esta clase proporciona funcionalidad para:
- * - Leer plantillas HTML desde los assets
- * - Reemplazar elementos marcadores con datos dinámicos
- * - Generar archivos HTML temporales con el contenido procesado
- *
- * @property context El contexto de Android utilizado para acceder a assets y directorio cache
- */
 class HtmlParser(private val context: Context) {
+    private val TAG = "HtmlParser"
 
-    /**
-     * Genera un archivo HTML procesando una plantilla con datos dinámicos.
-     *
-     * @param templateAssetPath Ruta al archivo plantilla HTML en assets
-     * @param dataProvider Proveedor de datos dinámicos para reemplazar marcadores
-     * @return Ruta absoluta al archivo HTML generado
-     * @throws Exception si falla la lectura de la plantilla o escritura del archivo
-     */
-    fun generateHtmlFile(templateAssetPath: String, dataProvider: DocumentDataProvider): String {
-        Log.d(TAG, "Iniciando generación de archivo HTML con plantilla: $templateAssetPath")
-        try {
-            val template = readTemplateFromAssets(templateAssetPath)
-            Log.d(TAG, "Plantilla leída correctamente, tamaño: ${template.length} caracteres")
-
-            val data = dataProvider.getData()
-            Log.d(TAG, "Datos obtenidos del proveedor, cantidad de elementos: ${data.size}")
-
-            val modifiedHtml = replacePlaceholders(template, data)
-            Log.d(TAG, "Plantilla modificada correctamente")
-
-            val filePath = writeHtmlToFile(modifiedHtml)
-            Log.d(TAG, "Archivo HTML generado exitosamente en: $filePath")
-
-            return filePath
-        } catch (e: Exception) {
-            Log.e(TAG, "Error durante la generación del archivo HTML", e)
-            throw Exception("Error al generar el archivo HTML: ${e.message}", e)
+    fun generateHtmlFile(templatePath: String, dataProvider: DocumentDataProvider): String {
+        Log.d(TAG, "Generando archivo HTML para plantilla: $templatePath")
+        val htmlContent = context.assets.open(templatePath).bufferedReader().use { it.readText() }
+        val modifiedHtml = if (templatePath.endsWith("ah04.html")) {
+            htmlContent
+        } else {
+            replacePlaceholders(htmlContent, dataProvider.getData())
         }
-    }
-    fun replaceImageSrc(html: String, signatures: Map<String, String>): String {
-        var result = html
-        signatures.forEach { (id, base64) ->
-            if (base64.isNotBlank()) {
-                result = result.replace(
-                    "<img id=\"$id\" src=\"\"",
-                    "<img id=\"$id\" src=\"data:image/png;base64,$base64\""
-                )
-                Log.d("HtmlParser", "Imagen reemplazada - ID: $id, src: data:image/png;base64,${base64.take(50)}...")
-            } else {
-                Log.w("HtmlParser", "Firma vacía para ID: $id")
-                // Añadir un placeholder para depurar
-                result = result.replace(
-                    "<img id=\"$id\" src=\"\"",
-                    "<img id=\"$id\" src=\"data:image/png;base64,ERROR_EMPTY_SIGNATURE\" />"
-                )
-            }
-        }
-        return result
+        val outputFile = File(context.cacheDir, "temp_${templatePath.replace("/", "_")}_${System.currentTimeMillis()}.html")
+        outputFile.writeText(modifiedHtml)
+        Log.d(TAG, "Archivo HTML generado: ${outputFile.absolutePath}")
+        return outputFile.absolutePath
     }
 
-    /**
-     * Lee una plantilla HTML desde la carpeta de assets.
-     *
-     * @param templateAssetPath Ruta al archivo plantilla en assets
-     * @return Contenido del archivo plantilla como String
-     * @throws Exception si no se puede leer el archivo
-     */
-    private fun readTemplateFromAssets(templateAssetPath: String): String {
-        Log.d(TAG, "Intentando leer plantilla desde: $templateAssetPath")
-        return try {
-            context.assets.open(templateAssetPath).use { inputStream ->
-                val content = inputStream.bufferedReader(StandardCharsets.UTF_8).readText()
-                Log.d(TAG, "Plantilla leída exitosamente desde assets")
-                content
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al leer plantilla desde assets: $templateAssetPath", e)
-            throw Exception("No se pudo leer la plantilla HTML: ${e.message}", e)
+    private fun replacePlaceholders(htmlContent: String, data: Map<String, String>): String {
+        var result = htmlContent
+
+        // Mapear motivo desde opcionMotivo
+        val opcionMotivo = data["opcionMotivo"]?.lowercase() ?: ""
+        val motivo = when (opcionMotivo) {
+            "accidente" -> "Implicado en accidente de circulación"
+            "sintomas" -> "Conducción con síntomas de influencia de bebidas alcohólicas"
+            "infraccion" -> "Comisión de infracción a las normas de circulación"
+            "control", "control preventivo" -> "Control preventivo de alcoholemia"
+            else -> "No especificado"
         }
-    }
 
-    /**
-     * Reemplaza marcadores en la plantilla HTML con valores reales del mapa de datos.
-     *
-     * Maneja dos tipos de marcadores:
-     * 1. Inputs de tipo checkbox (elementos con type="checkbox")
-     * 2. Elementos span (elementos con atributos id)
-     *
-     * @param template Contenido de la plantilla HTML
-     * @param data Mapa de claves de marcadores a sus valores de reemplazo
-     * @return HTML modificado con los marcadores reemplazados
-     */
-    private fun replacePlaceholders(template: String, data: Map<String, String>): String {
-        Log.d(TAG, "Iniciando reemplazo de marcadores en plantilla")
-        val doc = Jsoup.parse(template)
+        // Derivar campos compuestos
+        val lugarInvestigacion = "${data["lugar_investigacion"] ?: ""}, ${data["momento_lectura"] ?: ""}"
+        val lugarDelito = "${data["lugar_delito"] ?: ""}, ${data["fecha_diligencia"] ?: ""} ${data["hora_diligencia"] ?: ""}"
 
-        data.forEach { (key, value) ->
-            try {
-                if (key.endsWith("_checkbox")) {
-                    Log.d(TAG, "Procesando checkbox con key: $key")
-                    val isChecked = value == "checked"
-                    val checkbox = doc.select("input[type=checkbox][id=$key]").first()
-                    if (checkbox != null) {
-                        if (isChecked) checkbox.attr("checked", "checked")
-                        else checkbox.removeAttr("checked")
-                        Log.d(TAG, "Checkbox reemplazado - ID: $key, Estado: ${if (isChecked) "marcado" else "no marcado"}")
-                    } else {
-                        Log.w(TAG, "No se encontró el checkbox con ID: $key en la plantilla")
-                    }
-                } else if (key.startsWith("firma_")) {
-                    Log.d(TAG, "Procesando imagen con key: $key, valor: ${value.take(50)}...")
-                    val img = doc.select("img[id=$key]").first()
-                    if (img != null) {
-                        img.attr("src", value)
-                        Log.d(TAG, "Imagen reemplazada - ID: $key, src: ${img.attr("src").take(50)}...")
-                    } else {
-                        Log.w(TAG, "No se encontró la imagen con ID: $key en la plantilla")
-                    }
-                } else {
-                    Log.d(TAG, "Procesando span con key: $key")
-                    val escapedValue = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                    val spans = doc.select("span[id=$key]")
-                    if (spans.isNotEmpty()) {
-                        spans.forEach { span ->
-                            span.text(escapedValue)
-                            span.addClass("underline")
-                            Log.d(TAG, "Span reemplazado - ID: $key, Valor: $escapedValue")
-                        }
-                    } else {
-                        Log.w(TAG, "No se encontró el span con ID: $key en la plantilla")
-                    }
+        // Datos con valores predeterminados y aliases
+        val completeData = data.toMutableMap().apply {
+            putIfAbsent("motivo", motivo)
+            putIfAbsent("fecha_diligencia_2", data["fecha_diligencia"] ?: "")
+            putIfAbsent("hora_diligencia_3", data["hora_diligencia"] ?: "")
+            putIfAbsent("serie_etilometro", data["num_serie_eti"] ?: "")
+            putIfAbsent("termino_minicipal", data["termino_municipal"] ?: "") // Corregir error tipográfico
+            putIfAbsent("hora_final", data["momento_lectura"] ?: data["hora_diligencia"] ?: "")
+        }
+
+        completeData.forEach { (key, value) ->
+            when {
+                key.startsWith("firma_") -> {
+                    // Reemplazar firmas
+                    result = result.replace(
+                        """<img id="$key" src="">""",
+                        """<img id="$key" src="$value">"""
+                    )
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error al procesar marcador con key: $key", e)
+                key.startsWith("boolean_") -> {
+                    // Reemplazar checkboxes
+                    val checked = value.toBoolean() || value.uppercase() in listOf("SÍ", "SI")
+                    result = result.replace(
+                        """<span id="$key"></span>""",
+                        """<span id="${key}_checkbox" data-checked="$checked"></span>"""
+                    )
+                }
+                else -> {
+                    // Reemplazar texto
+                    result = result.replace("""<span id="$key"></span>""", value)
+                }
             }
         }
 
-        Log.d(TAG, "Reemplazo de marcadores completado")
-        val result = doc.outerHtml()
-        Log.d(TAG, "HTML generado (primeros 500 chars): ${result.take(500)}...")
         return result
-    }
-
-    /**
-     * Escribe el contenido HTML en un archivo temporal.
-     *
-     * @param htmlContent Contenido HTML a escribir
-     * @return Ruta absoluta al archivo temporal generado
-     * @throws Exception si no se puede escribir el archivo
-     */
-    private fun writeHtmlToFile(htmlContent: String): String {
-        Log.d(TAG, "Intentando escribir archivo HTML temporal")
-        val tempFile = File(context.cacheDir, "document_temp_${System.currentTimeMillis()}.html")
-
-        try {
-            tempFile.writeText(htmlContent, StandardCharsets.UTF_8)
-            Log.d(TAG, "Archivo HTML escrito exitosamente. Tamaño: ${htmlContent.length} caracteres")
-            Log.d(TAG, "Ubicación del archivo: ${tempFile.absolutePath}")
-            return tempFile.absolutePath
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al escribir archivo HTML en: ${tempFile.absolutePath}", e)
-            throw Exception("No se pudo escribir el archivo HTML: ${e.message}", e)
-        }
     }
 }

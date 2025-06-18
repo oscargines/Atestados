@@ -331,7 +331,7 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
                 _printStatus.value = "Generando HTML..."
                 val htmlContent = withContext(Dispatchers.IO) {
                     val tempHtmlFilePath = htmlParser.generateHtmlFile(
-                        templateAssetPath = "documents/acta_citacion.html",
+                        templatePath = "documents/acta_citacion.html",
                         dataProvider = dataProvider
                     )
                     val content = File(tempHtmlFilePath).readText(Charsets.UTF_8)
@@ -434,7 +434,7 @@ class CitacionViewModel(application: Application) : AndroidViewModel(application
                 val macAddress = impresoraViewModel.getSelectedPrinterMac() ?: throw Exception("No hay impresora seleccionada")
                 val htmlContent = withContext(Dispatchers.IO) {
                     val tempHtmlFilePath = htmlParser.generateHtmlFile(
-                        templateAssetPath = "documents/acta_citacion.html",
+                        templatePath = "documents/acta_citacion.html",
                         dataProvider = dataProvider
                     )
                     val content = File(tempHtmlFilePath).readText(Charsets.UTF_8)

@@ -27,10 +27,9 @@ object PdfToBitmapConverter {
      * @throws IllegalStateException Si el PDF está corrupto o no se puede leer.
      *
      * @sample Ejemplo de uso:
-     * ```
+     *
      * val bitmaps = PdfToBitmapConverter.convertAllPagesToBitmaps(File("ruta/al/archivo.pdf"))
-     * bitmaps.forEach { imageView.setImageBitmap(it) }
-     * ```
+     * bitmaps.forEach { imageView.setImageBitmap(it)
      *
      * @note Los recursos (PdfRenderer y FileDescriptor) se manejan automáticamente
      * y se liberan correctamente incluso en caso de error.
