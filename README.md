@@ -57,5 +57,7 @@ La interfaz que el usuario debe de utilizar debe de destacar por su simplicidad.
 ![Image](https://github.com/user-attachments/assets/4eb6f3cc-8e73-4619-9287-4d2288d9f802)
 ![Image](https://github.com/user-attachments/assets/57b8fdc0-5ad0-41ec-9e05-30c2d251334b)
 
+### Este proyecto ha obtenido una nota media de 9 sobre 10.
+
 
 
